@@ -265,37 +265,47 @@ def create_day_of_week_distribution_chart(distribution_data: Dict[str, Any]) -> 
     avg_pls = [item["avg_pl"] for item in dow_data_sorted]
 
     # Color bars based on profitability
-    colors = ["#10b981" if pl > 0 else "#ef4444" for pl in avg_pls]
+    colors = ["#16a34a" if pl > 0 else "#dc2626" for pl in avg_pls]
+
+    # Show only average P/L as text labels (trade count is the bar height)
+    labels = [f"${avg_pl:+,.0f}" for avg_pl in avg_pls]
 
     # Create bar chart
     fig.add_trace(
         go.Bar(
             x=days,
             y=counts,
-            name="Trade Count",
-            marker=dict(color=colors, pattern=dict(shape="/")),
-            text=[f"{count}<br>${avg_pl:+.0f}" for count, avg_pl in zip(counts, avg_pls)],
-            textposition="auto",  # Let Plotly automatically position text to avoid cutoff
-            textfont=dict(size=11, color="white"),  # Make text more visible
+            marker=dict(color=colors),
+            text=labels,
+            textposition="inside",
+            textfont=dict(size=12, color="white", family="Arial Black"),
             hovertemplate=(
                 "<b>%{x}</b><br>"
                 "<b>Trade Count:</b> %{y}<br>"
-                "<b>Avg P/L:</b> $%{customdata:+,.2f}<br>"
+                "<b>Avg P/L:</b> $%{customdata}<br>"
                 "<extra></extra>"
             ),
-            customdata=avg_pls,
+            customdata=[f"{avg_pl:+.0f}" for avg_pl in avg_pls],
         )
     )
 
     # Update layout
     fig.update_layout(
-        title=dict(
-            text="📅 Trade Distribution by Day of Week", font=dict(size=18, weight="bold"), x=0.02
+        title="📅 Trade Distribution by Day",
+        xaxis=dict(
+            title="Day of Week",
+            showgrid=False,
         ),
-        xaxis=dict(title="Day of Week", showgrid=False),
-        yaxis=dict(title="Number of Trades", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
+        yaxis=dict(
+            title="Number of Trades",
+            showgrid=True,
+            gridcolor="rgba(0,0,0,0.1)",
+            zeroline=True,
+            zerolinecolor="black",
+            zerolinewidth=1,
+        ),
         showlegend=False,
-        margin=dict(t=80, b=60, l=60, r=60),  # Auto text positioning handles overflow
+        margin=dict(t=60, b=60, l=80, r=40),
     )
 
     return fig
@@ -335,7 +345,7 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
         )
     )
 
-    # Add statistical lines
+    # Add statistical lines and legend items
     if distribution_data.get("rom_statistics"):
         stats = distribution_data["rom_statistics"]
 
@@ -344,8 +354,18 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
             fig.add_vline(
                 x=stats["mean"],
                 line=dict(color="blue", width=2, dash="dash"),
-                annotation_text=f"Mean: {stats['mean']:.1f}%",
-                annotation_position="top",
+            )
+            # Add invisible trace for legend
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="lines",
+                    line=dict(color="blue", width=2, dash="dash"),
+                    name=f"Mean: {stats['mean']:.1f}%",
+                    showlegend=True,
+                    hoverinfo="skip",
+                )
             )
 
         # Median line
@@ -353,19 +373,42 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
             fig.add_vline(
                 x=stats["median"],
                 line=dict(color="green", width=2, dash="dot"),
-                annotation_text=f"Median: {stats['median']:.1f}%",
-                annotation_position="bottom",
             )
+            # Add invisible trace for legend
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="lines",
+                    line=dict(color="green", width=2, dash="dot"),
+                    name=f"Median: {stats['median']:.1f}%",
+                    showlegend=True,
+                    hoverinfo="skip",
+                )
+            )
+
+    # Calculate smart x-axis range based on data
+    min_rom = min(rom_values)
+    max_rom = max(rom_values)
+    range_padding = (max_rom - min_rom) * 0.1  # Add 10% padding
+    x_min = max(-100, min_rom - range_padding)  # Don't go below -100%
+    x_max = min(200, max_rom + range_padding)  # Cap at reasonable upper limit
 
     # Update layout
     fig.update_layout(
         title=dict(
             text="📊 Return on Margin Distribution", font=dict(size=18, weight="bold"), x=0.02
         ),
-        xaxis=dict(title="Return on Margin (%)", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
+        xaxis=dict(
+            title="Return on Margin (%)",
+            showgrid=True,
+            gridcolor="rgba(0,0,0,0.1)",
+            range=[x_min, x_max],  # Focus on where the data actually is
+        ),
         yaxis=dict(title="Number of Trades", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
-        showlegend=False,
-        margin=dict(t=100, b=60, l=60, r=60),  # Increased top margin for annotation text
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(t=100, b=60, l=60, r=60),  # Top margin for legend
     )
 
     return fig
@@ -542,15 +585,14 @@ def generate_performance_charts(trades: List[Any]) -> Dict[str, Any]:
 
 
 def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
-    """Create monthly returns heatmap from calculated monthly data."""
+    """Create monthly returns bar chart from calculated monthly data."""
     if not monthly_data or not monthly_data.get("monthly_returns"):
         return create_empty_chart("No monthly data available")
 
     monthly_returns = monthly_data["monthly_returns"]  # {year: {month: value}}
 
-    # Prepare axes
-    years = sorted(list(monthly_returns.keys()))
-    months = [
+    # Flatten the data for a chronological bar chart
+    month_names = [
         "Jan",
         "Feb",
         "Mar",
@@ -565,43 +607,56 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
         "Dec",
     ]
 
-    # Build z matrix and formatted text
-    returns_matrix = []
-    text_matrix = []
+    # Collect all month/year combinations chronologically
+    all_months = []
+    all_values = []
+    all_labels = []
 
+    years = sorted(list(monthly_returns.keys()))
     for year in years:
-        year_returns = []
-        year_text = []
+        year_data = monthly_returns[year]
         for month_idx in range(1, 13):
-            value = monthly_returns.get(year, {}).get(month_idx, 0.0)
-            year_returns.append(value)
-            year_text.append(f"{value:+.1f}")
-        returns_matrix.append(year_returns)
-        text_matrix.append(year_text)
+            if month_idx in year_data and year_data[month_idx] != 0:
+                value = year_data[month_idx]
+                all_months.append(f"{month_names[month_idx-1]} {year}")
+                all_values.append(value)
+                all_labels.append(f"${value:,.0f}")
 
-    returns_array = np.array(returns_matrix, dtype=float)
+    if not all_values:
+        return create_empty_chart("No monthly data available")
+
+    # Create color array based on positive/negative values
+    colors = ["#16a34a" if v >= 0 else "#dc2626" for v in all_values]
 
     fig = go.Figure(
-        data=go.Heatmap(
-            z=returns_array,
-            x=months,
-            y=years,
-            text=text_matrix,
-            texttemplate="%{text}",
-            textfont={"size": 12},
-            colorscale=[[0, "#dc2626"], [0.5, "#f3f4f6"], [1, "#16a34a"]],
-            zmid=0,
-            hovertemplate="<b>%{y} %{x}</b><br>Return: %{text}%<extra></extra>",
-            showscale=True,
-            colorbar=dict(title="Monthly Return ($)"),
+        data=go.Bar(
+            x=all_months,
+            y=all_values,
+            marker=dict(color=colors),
+            text=all_labels,
+            textposition="inside",
+            textfont=dict(size=10, color="white"),
+            hovertemplate="<b>%{x}</b><br>Return: %{text}<extra></extra>",
         )
     )
 
     fig.update_layout(
-        title="Monthly Returns Heatmap",
-        xaxis_title="Month",
-        yaxis_title="Year",
-        margin=dict(l=0, r=0, t=40, b=0),
+        title="📅 Monthly Performance",
+        xaxis=dict(
+            title="Month",
+            tickangle=45,  # Angle month labels for better readability
+            showgrid=False,
+        ),
+        yaxis=dict(
+            title="Monthly Return ($)",
+            showgrid=True,
+            gridcolor="rgba(0,0,0,0.1)",
+            zeroline=True,
+            zerolinecolor="black",
+            zerolinewidth=1,
+        ),
+        margin=dict(t=60, b=80, l=80, r=40),  # More bottom margin for angled labels
+        showlegend=False,
     )
 
     return fig
