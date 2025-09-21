@@ -1,0 +1,22 @@
+# Ignore development files
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.claude/
+node_modules/
+venv/
+.venv/
+
+# Ignore test and sample data
+tests/
+sampleData/
+
+# Ignore development configs
+dev-requirements.txt
+docker-compose.yml
+Dockerfile
+.dockerignore

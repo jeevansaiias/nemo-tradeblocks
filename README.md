@@ -27,7 +27,7 @@ A comprehensive trading analytics platform built with FastAPI and Dash, featurin
 - **Frontend**: Dash 3.2.0+ with Dash Mantine Components 2.2.1+
 - **Data Processing**: Pandas 2.2.3+, NumPy 1.26.4+
 - **Visualizations**: Plotly 5.24.1+
-- **Deployment**: Render.com ready
+- **Deployment**: Vercel ready
 
 ## Quick Start
 
@@ -126,13 +126,25 @@ app/
 
 ## Deployment
 
-### Render.com
+### Vercel (Recommended)
 
-The application is configured for easy deployment on Render.com:
+TradeBlocks is optimized for Vercel deployment:
 
-1. Connect your GitHub repository to Render
-2. The `render.yaml` file will automatically configure the deployment
-3. Set any required environment variables in the Render dashboard
+1. **Connect Repository:**
+   ```bash
+   # Push to GitHub
+   git push origin master
+   ```
+
+2. **Deploy to Vercel:**
+   - Visit [vercel.com](https://vercel.com)
+   - Import your `tradeblocks` repository
+   - Vercel will automatically detect the Python app
+   - Deploy with default settings
+
+3. **Environment Variables (Optional):**
+   - Set any required environment variables in Vercel dashboard
+   - Most features work without additional configuration
 
 ### Manual Deployment
 

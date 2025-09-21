@@ -30,6 +30,17 @@ def create_main_layout():
                                 gap="sm",
                                 align="center",
                             ),
+
+                            # Center - NinjaTaco tribute
+                            dmc.Group([
+                                dmc.Text("Inspired by NinjaTaco", size="xs", c="orange.6", fw=500),
+                                html.Img(
+                                    src="/assets/ninjataco-tribute.png",
+                                    style={"height": "24px", "width": "auto", "opacity": "0.7"}
+                                ),
+                                
+                            ], gap="xs", align="center"),
+
                             # Right side items
                             dmc.Group(
                                 children=[
@@ -225,6 +236,7 @@ def create_main_layout():
                     )
                 ]
             ),
+
         ],
         header={"height": 60},
         navbar={"width": 250, "breakpoint": "sm", "collapsed": {"mobile": True}},
