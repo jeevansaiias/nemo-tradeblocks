@@ -171,121 +171,9 @@ def create_correlation_network(correlation_data, threshold):
     if len(strategies) < 2:
         return create_empty_network()
 
-    # Create network graph
-    import networkx as nx
-
-    G = nx.Graph()
-
-    # Add nodes
-    for i, strategy in enumerate(strategies):
-        G.add_node(i, label=strategy)
-
-    # Add edges based on correlation threshold
-    for i in range(len(strategies)):
-        for j in range(i + 1, len(strategies)):
-            correlation = abs(matrix[i][j])
-            if correlation >= threshold:
-                G.add_edge(i, j, weight=correlation, correlation=matrix[i][j])
-
-    if len(G.edges()) == 0:
-        return create_empty_network_with_threshold(threshold)
-
-    # Calculate layout
-    pos = nx.spring_layout(G, k=1, iterations=50, seed=42)
-
-    # Create edge traces
-    edge_x, edge_y, edge_info = [], [], []
-    edge_colors = []
-
-    for edge in G.edges(data=True):
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.extend([x0, x1, None])
-        edge_y.extend([y0, y1, None])
-
-        correlation = edge[2]["correlation"]
-        edge_info.append(
-            f"{strategies[edge[0]]} ↔ {strategies[edge[1]]}<br>Correlation: {correlation:.3f}"
-        )
-
-        # Color edges based on correlation
-        if correlation > 0.7:
-            edge_colors.extend(["red", "red", "red"])
-        elif correlation > 0.3:
-            edge_colors.extend(["orange", "orange", "orange"])
-        else:
-            edge_colors.extend(["lightblue", "lightblue", "lightblue"])
-
-    # Create node traces
-    node_x, node_y, node_text, node_sizes = [], [], [], []
-
-    for i, node in enumerate(G.nodes()):
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-        node_text.append(strategies[node])
-
-        # Size nodes based on degree (number of connections)
-        degree = G.degree(node)
-        node_sizes.append(max(20, 10 + degree * 5))
-
-    # Create figure
-    fig = go.Figure()
-
-    # Add edges
-    fig.add_trace(
-        go.Scatter(
-            x=edge_x,
-            y=edge_y,
-            line=dict(width=1.5, color="lightgray"),
-            hoverinfo="none",
-            mode="lines",
-            showlegend=False,
-        )
-    )
-
-    # Add nodes
-    fig.add_trace(
-        go.Scatter(
-            x=node_x,
-            y=node_y,
-            mode="markers+text",
-            hoverinfo="text",
-            hovertext=[f"{text}<br>Connections: {G.degree(i)}" for i, text in enumerate(node_text)],
-            text=node_text,
-            textposition="middle center",
-            textfont=dict(size=9, color="white"),
-            marker=dict(size=node_sizes, color="steelblue", line=dict(width=2, color="darkblue")),
-            showlegend=False,
-        )
-    )
-
-    # Update layout
-    fig.update_layout(
-        title=dict(text=f"Strategy Network (threshold: {threshold})", x=0.5, font=dict(size=14)),
-        showlegend=False,
-        hovermode="closest",
-        margin=dict(b=20, l=5, r=5, t=40),
-        annotations=[
-            dict(
-                text=f"Showing correlations ≥ {threshold}<br>Node size = connection count",
-                showarrow=False,
-                xref="paper",
-                yref="paper",
-                x=0.02,
-                y=0.02,
-                xanchor="left",
-                yanchor="bottom",
-                font=dict(color="gray", size=9),
-            )
-        ],
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        height=300,
-        plot_bgcolor="white",
-    )
-
-    return fig
+    # Network graph functionality disabled for lighter deployment
+    # TODO: Re-implement network graph with lightweight alternative
+    return create_empty_network_with_threshold(threshold)
 
 
 def calculate_correlation_analytics(correlation_data):
@@ -344,29 +232,27 @@ def calculate_correlation_analytics(correlation_data):
 
 
 def identify_correlation_clusters(matrix, strategies, threshold=0.7):
-    """Identify clusters of highly correlated strategies"""
-    import networkx as nx
-
-    # Create graph with high correlations
-    G = nx.Graph()
-
-    for i in range(len(strategies)):
-        G.add_node(i, label=strategies[i])
-
-    for i in range(len(strategies)):
-        for j in range(i + 1, len(strategies)):
-            if abs(matrix[i][j]) >= threshold:
-                G.add_edge(i, j)
-
-    # Find connected components (clusters)
-    clusters = list(nx.connected_components(G))
-
+    """Identify clusters of highly correlated strategies (simplified without networkx)"""
+    # Simplified clustering without networkx - just find highly correlated pairs
     cluster_groups = []
-    for i, cluster in enumerate(clusters):
-        if len(cluster) > 1:  # Only consider actual clusters
-            cluster_strategies = [strategies[node] for node in cluster]
+    clustered_strategies = set()
+
+    for i in range(len(strategies)):
+        if strategies[i] in clustered_strategies:
+            continue
+
+        cluster = [strategies[i]]
+        clustered_strategies.add(strategies[i])
+
+        # Find strategies highly correlated with this one
+        for j in range(i + 1, len(strategies)):
+            if abs(matrix[i][j]) >= threshold and strategies[j] not in clustered_strategies:
+                cluster.append(strategies[j])
+                clustered_strategies.add(strategies[j])
+
+        if len(cluster) > 1:  # Only include clusters with multiple strategies
             cluster_groups.append(
-                {"id": i, "strategies": cluster_strategies, "size": len(cluster_strategies)}
+                {"id": len(cluster_groups), "strategies": cluster, "size": len(cluster)}
             )
 
     return {"count": len(cluster_groups), "groups": cluster_groups}
