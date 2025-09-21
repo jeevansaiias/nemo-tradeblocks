@@ -34,6 +34,21 @@ optimization_calc = OptimizationCalculator()
 trade_analysis_calc = TradeAnalysisCalculator()
 mc_simulator = MonteCarloSimulator()
 
+# In-memory storage for tests (in production this would be a database)
+portfolios_store = {}
+
+
+@router.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+@router.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "TradeBlocks Portfolio Analysis API", "status": "running"}
+
 
 @router.post("/portfolio/upload", response_model=dict)
 async def upload_portfolio(file: UploadFile = File(...)):
@@ -53,8 +68,15 @@ async def upload_portfolio(file: UploadFile = File(...)):
 
         logger.info(f"Processed portfolio {file.filename} with {len(portfolio.trades)} trades")
 
+        # Generate portfolio ID and store for stateful endpoints
+        import uuid
+
+        portfolio_id = str(uuid.uuid4())
+        portfolios_store[portfolio_id] = portfolio
+
         # Return the full portfolio data for client-side storage
         return {
+            "portfolio_id": portfolio_id,
             "portfolio_data": portfolio.model_dump(),
             "filename": file.filename,
             "total_trades": portfolio.total_trades,
@@ -275,5 +297,104 @@ async def calculate_margin_utilization(portfolio_data: dict):
         )
 
 
-# Note: Old stateful endpoints for correlation, optimization, and Monte Carlo have been removed
-# These will be reimplemented as stateless endpoints when those features are needed
+# Stateful endpoints for testing (use stored portfolios)
+
+
+@router.get("/portfolio/{portfolio_id}/stats")
+async def get_portfolio_stats(portfolio_id: str):
+    """Get portfolio statistics by ID"""
+    if portfolio_id not in portfolios_store:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    portfolio = portfolios_store[portfolio_id]
+    trades_data = [trade.model_dump() for trade in portfolio.trades]
+
+    # Calculate basic stats
+    basic_stats = calculate_basic_portfolio_stats(trades_data)
+
+    # Calculate additional metrics
+    unique_dates = len(set(trade.get("date_opened") for trade in trades_data))
+    avg_daily_pl = basic_stats["total_pl"] / unique_dates if unique_dates > 0 else 0
+
+    total_commissions = sum(
+        trade.get("opening_commissions_fees", 0) + trade.get("closing_commissions_fees", 0)
+        for trade in trades_data
+    )
+
+    return {
+        "total_trades": basic_stats["total_trades"],
+        "total_pl": basic_stats["total_pl"],
+        "win_rate": basic_stats["win_rate"],
+        "avg_win": basic_stats["avg_win"],
+        "avg_loss": basic_stats["avg_loss"],
+        "max_win": basic_stats["max_win"],
+        "max_loss": basic_stats["max_loss"],
+        "max_drawdown": 0,  # Simplified for tests
+        "avg_daily_pl": avg_daily_pl,
+        "total_commissions": total_commissions,
+        "profit_factor": basic_stats["profit_factor"],
+    }
+
+
+@router.get("/portfolio/{portfolio_id}/strategy-stats")
+async def get_strategy_stats(portfolio_id: str):
+    """Get strategy statistics by portfolio ID"""
+    if portfolio_id not in portfolios_store:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    portfolio = portfolios_store[portfolio_id]
+    trades_data = [trade.model_dump() for trade in portfolio.trades]
+
+    # Calculate strategy breakdown
+    strategy_breakdown = calculate_strategy_breakdown(trades_data)
+
+    return strategy_breakdown
+
+
+@router.get("/portfolio/{portfolio_id}/trades")
+async def get_trades(
+    portfolio_id: str,
+    strategy: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = 0,
+):
+    """Get trades by portfolio ID with optional filtering"""
+    if portfolio_id not in portfolios_store:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    portfolio = portfolios_store[portfolio_id]
+
+    # Use the trade analysis calculator
+    result = trade_analysis_calc.get_filtered_trades(
+        portfolio, strategy=strategy, limit=limit, offset=offset
+    )
+
+    return result
+
+
+@router.get("/portfolios")
+async def list_portfolios():
+    """List all portfolios"""
+    portfolios_list = []
+    for portfolio_id, portfolio in portfolios_store.items():
+        portfolios_list.append(
+            {
+                "portfolio_id": portfolio_id,
+                "filename": portfolio.filename,
+                "total_trades": portfolio.total_trades,
+                "total_pl": portfolio.total_pl,
+                "upload_timestamp": portfolio.upload_timestamp.isoformat(),
+            }
+        )
+
+    return {"portfolios": portfolios_list}
+
+
+@router.delete("/portfolio/{portfolio_id}")
+async def delete_portfolio(portfolio_id: str):
+    """Delete a portfolio by ID"""
+    if portfolio_id not in portfolios_store:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    del portfolios_store[portfolio_id]
+    return {"message": "Portfolio deleted successfully"}

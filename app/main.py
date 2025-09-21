@@ -16,6 +16,20 @@ fastapi_app = FastAPI(
 # Mount API routes
 fastapi_app.include_router(portfolio_router, prefix="/api/v1")
 
+
+# Add basic endpoints at root level for tests
+@fastapi_app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+
+@fastapi_app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "TradeBlocks Portfolio Analysis API", "status": "running"}
+
+
 # Create Dash app
 dash_app = create_dash_app()
 
