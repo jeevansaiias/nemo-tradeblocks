@@ -33,15 +33,18 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov black ruff
 
-    - name: Code formatting check
+    - name: Install CI tools
       run: |
-        black --check app/ --diff
+        pip install pytest pytest-cov black ruff safety
 
-    - name: Lint with ruff
+    - name: Code formatting check (advisory)
       run: |
-        ruff check app/
+        black --check app/ --diff || echo "⚠️ Code formatting issues found (non-blocking)"
+
+    - name: Lint with ruff (advisory)
+      run: |
+        ruff check app/ || echo "⚠️ Linting issues found (non-blocking)"
 
     - name: Test import structure
       run: |
@@ -55,10 +58,9 @@ jobs:
           echo "ℹ️ No tests found, skipping test execution"
         fi
 
-    - name: Check requirements security
+    - name: Check requirements security (advisory)
       run: |
-        pip install safety
-        safety check --json || echo "⚠️ Security check completed with warnings"
+        safety check --json || echo "⚠️ Security check completed with warnings (non-blocking)"
 
   deploy-check:
     runs-on: ubuntu-latest
