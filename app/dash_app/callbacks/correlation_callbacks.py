@@ -575,7 +575,8 @@ def calculate_strategy_correlations(trades_data, method="pearson"):
     """Calculate correlation matrix between strategies based on daily P/L"""
     import pandas as pd
     import numpy as np
-    from scipy.stats import pearsonr, spearmanr, kendalltau
+
+    # Using pandas/numpy equivalents instead of scipy for smaller bundle size
     from collections import defaultdict
 
     # Group trades by strategy and date
@@ -618,18 +619,22 @@ def calculate_strategy_correlations(trades_data, method="pearson"):
             values_i = strategy_matrix[i]
             values_j = strategy_matrix[j]
 
-            # Calculate correlation based on method
+            # Calculate correlation based on method using pandas/numpy
             if method == "pearson":
                 if np.std(values_i) > 0 and np.std(values_j) > 0:
-                    corr, _ = pearsonr(values_i, values_j)
+                    corr = np.corrcoef(values_i, values_j)[0, 1]
                 else:
                     corr = 0
             elif method == "spearman":
-                corr, _ = spearmanr(values_i, values_j)
+                # Spearman correlation using pandas
+                df_temp = pd.DataFrame({"x": values_i, "y": values_j})
+                corr = df_temp.corr(method="spearman").iloc[0, 1]
             elif method == "kendall":
-                corr, _ = kendalltau(values_i, values_j)
+                # Kendall tau using pandas
+                df_temp = pd.DataFrame({"x": values_i, "y": values_j})
+                corr = df_temp.corr(method="kendall").iloc[0, 1]
             else:
-                corr, _ = pearsonr(values_i, values_j)
+                corr = np.corrcoef(values_i, values_j)[0, 1]
 
             correlation_matrix[i, j] = corr
             correlation_matrix[j, i] = corr

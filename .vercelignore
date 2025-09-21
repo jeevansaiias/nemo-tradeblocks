@@ -1,22 +1,48 @@
-# Ignore development files
-__pycache__/
-*.pyc
-.env
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.vscode/
-.claude/
-node_modules/
+# Development files
 venv/
 .venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.local
+.env.*.local
 
-# Ignore test and sample data
+# Test files
 tests/
-sampleData/
+.pytest_cache/
+.coverage
+htmlcov/
 
-# Ignore development configs
+# Documentation
+*.md
+docs/
+
+# Development tools
+.git/
+.gitignore
+.github/
+scripts/
+.pre-commit-config.yaml
+pytest.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache directories
+.mypy_cache/
+.ruff_cache/
+.claude/
+
+# Development requirements
 dev-requirements.txt
-docker-compose.yml
-Dockerfile
-.dockerignore
+requirements-dev.txt
