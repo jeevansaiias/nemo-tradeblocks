@@ -20,7 +20,45 @@ def create_dash_app():
         suppress_callback_exceptions=True,
         title="TradeBlocks - Trading Analytics Platform",
         assets_folder="../assets",
+        meta_tags=[
+            {
+                "name": "description",
+                "content": "TradeBlocks - Professional Trading Analytics Platform",
+            },
+            {"name": "viewport", "content": "width=device-width, initial-scale=1"},
+            {"property": "og:title", "content": "TradeBlocks - Trading Analytics Platform"},
+            {
+                "property": "og:description",
+                "content": "Professional trading analytics and portfolio management",
+            },
+            {"property": "og:type", "content": "website"},
+        ],
     )
+
+    # Update favicon in index string
+    app.index_string = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            {%metas%}
+            <title>{%title%}</title>
+            <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+            <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+            <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+            <link rel="manifest" href="/assets/site.webmanifest">
+            {%favicon%}
+            {%css%}
+        </head>
+        <body>
+            {%app_entry%}
+            <footer>
+                {%config%}
+                {%scripts%}
+                {%renderer%}
+            </footer>
+        </body>
+    </html>
+    """
 
     # Configure DMC theme - TradeBlocks themed
     app.layout = dmc.MantineProvider(
