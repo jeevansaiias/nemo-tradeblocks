@@ -20,52 +20,33 @@ def create_trade_data_tab():
                                 data=[],
                                 placeholder="All strategies",
                                 clearable=True,
-                                style={"width": "200px"}
+                                style={"width": "200px"},
                             ),
-                            dmc.Switch(
-                                id="split-legs-toggle",
-                                label="Split Legs",
-                                checked=False
-                            ),
+                            dmc.Switch(id="split-legs-toggle", label="Split Legs", checked=False),
                             dmc.Button(
                                 "Export CSV",
                                 id="export-trades-button",
                                 leftSection=DashIconify(icon="tabler:download"),
-                                variant="light"
-                            )
+                                variant="light",
+                            ),
                         ],
-                        gap="md"
-                    )
+                        gap="md",
+                    ),
                 ],
-                justify="space-between"
+                justify="space-between",
             ),
-
             # Summary stats
             dmc.Paper(
-                children=[
-                    dmc.Group(
-                        id="trade-summary-stats",
-                        justify="space-around",
-                        children=[]
-                    )
-                ],
+                children=[dmc.Group(id="trade-summary-stats", justify="space-around", children=[])],
                 p="md",
-                withBorder=True
+                withBorder=True,
             ),
-
             # Data table
-            dmc.Paper(
-                children=[
-                    html.Div(id="trades-table-container")
-                ],
-                p="md",
-                withBorder=True
-            ),
-
+            dmc.Paper(children=[html.Div(id="trades-table-container")], p="md", withBorder=True),
             # Download component (hidden)
-            dcc.Download(id="download-trades-csv")
+            dcc.Download(id="download-trades-csv"),
         ],
-        gap="lg"
+        gap="lg",
     )
 
 
@@ -73,8 +54,7 @@ def create_trades_table(trades_data, split_legs=False):
     """Create the trades data table"""
     if not trades_data:
         return dmc.Center(
-            dmc.Text("No trade data available", c="dimmed"),
-            style={"height": "200px"}
+            dmc.Text("No trade data available", c="dimmed"), style={"height": "200px"}
         )
 
     # Convert to DataFrame for easier manipulation
@@ -82,8 +62,14 @@ def create_trades_table(trades_data, split_legs=False):
 
     # Select and format columns for display
     display_columns = [
-        'date_opened', 'strategy', 'legs', 'premium', 'pl',
-        'num_contracts', 'margin_req', 'reason_for_close'
+        "date_opened",
+        "strategy",
+        "legs",
+        "premium",
+        "pl",
+        "num_contracts",
+        "margin_req",
+        "reason_for_close",
     ]
 
     # Filter columns that exist in the data
@@ -91,25 +77,27 @@ def create_trades_table(trades_data, split_legs=False):
     df_display = df[available_columns].copy()
 
     # Format numeric columns
-    numeric_columns = ['premium', 'pl', 'margin_req']
+    numeric_columns = ["premium", "pl", "margin_req"]
     for col in numeric_columns:
         if col in df_display.columns:
             df_display[col] = df_display[col].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "")
 
     # Format date columns
-    if 'date_opened' in df_display.columns:
-        df_display['date_opened'] = pd.to_datetime(df_display['date_opened']).dt.strftime('%Y-%m-%d')
+    if "date_opened" in df_display.columns:
+        df_display["date_opened"] = pd.to_datetime(df_display["date_opened"]).dt.strftime(
+            "%Y-%m-%d"
+        )
 
     # Rename columns for better display
     column_rename = {
-        'date_opened': 'Date Opened',
-        'strategy': 'Strategy',
-        'legs': 'Legs',
-        'premium': 'Premium',
-        'pl': 'P/L',
-        'num_contracts': 'Contracts',
-        'margin_req': 'Margin Req',
-        'reason_for_close': 'Close Reason'
+        "date_opened": "Date Opened",
+        "strategy": "Strategy",
+        "legs": "Legs",
+        "premium": "Premium",
+        "pl": "P/L",
+        "num_contracts": "Contracts",
+        "margin_req": "Margin Req",
+        "reason_for_close": "Close Reason",
     }
 
     df_display = df_display.rename(columns=column_rename)
@@ -117,62 +105,38 @@ def create_trades_table(trades_data, split_legs=False):
     # Create Dash DataTable
     return dash_table.DataTable(
         id="trades-table",
-        data=df_display.to_dict('records'),
-        columns=[
-            {"name": col, "id": col, "type": "text"}
-            for col in df_display.columns
-        ],
+        data=df_display.to_dict("records"),
+        columns=[{"name": col, "id": col, "type": "text"} for col in df_display.columns],
         page_size=20,
-        page_action='native',
-        sort_action='native',
-        filter_action='native',
-        style_table={
-            'overflowX': 'auto',
-            'minWidth': '100%'
-        },
+        page_action="native",
+        sort_action="native",
+        filter_action="native",
+        style_table={"overflowX": "auto", "minWidth": "100%"},
         style_cell={
-            'textAlign': 'left',
-            'padding': '10px',
-            'fontFamily': 'Inter, sans-serif',
-            'fontSize': '14px'
+            "textAlign": "left",
+            "padding": "10px",
+            "fontFamily": "Inter, sans-serif",
+            "fontSize": "14px",
         },
         style_header={
-            'backgroundColor': '#f8f9fa',
-            'fontWeight': 'bold',
-            'border': '1px solid #dee2e6'
+            "backgroundColor": "#f8f9fa",
+            "fontWeight": "bold",
+            "border": "1px solid #dee2e6",
         },
-        style_data={
-            'border': '1px solid #dee2e6',
-            'whiteSpace': 'normal',
-            'height': 'auto'
-        },
+        style_data={"border": "1px solid #dee2e6", "whiteSpace": "normal", "height": "auto"},
         style_data_conditional=[
+            {"if": {"row_index": "odd"}, "backgroundColor": "#f8f9fa"},
+            {"if": {"filter_query": "{P/L} contains -", "column_id": "P/L"}, "color": "#d63384"},
             {
-                'if': {'row_index': 'odd'},
-                'backgroundColor': '#f8f9fa'
+                "if": {"filter_query": '{P/L} > 0 && {P/L} != ""', "column_id": "P/L"},
+                "color": "#198754",
             },
-            {
-                'if': {
-                    'filter_query': '{P/L} contains -',
-                    'column_id': 'P/L'
-                },
-                'color': '#d63384'
-            },
-            {
-                'if': {
-                    'filter_query': '{P/L} > 0 && {P/L} != ""',
-                    'column_id': 'P/L'
-                },
-                'color': '#198754'
-            }
         ],
         tooltip_data=[
-            {
-                column: {'value': str(value), 'type': 'markdown'}
-                for column, value in row.items()
-            } for row in df_display.to_dict('records')
+            {column: {"value": str(value), "type": "markdown"} for column, value in row.items()}
+            for row in df_display.to_dict("records")
         ],
-        tooltip_duration=None
+        tooltip_duration=None,
     )
 
 
@@ -182,17 +146,21 @@ def create_trade_summary_stats(trades_data):
         return []
 
     total_trades = len(trades_data)
-    total_pl = sum(trade.get('pl', 0) for trade in trades_data)
-    winning_trades = sum(1 for trade in trades_data if trade.get('pl', 0) > 0)
+    total_pl = sum(trade.get("pl", 0) for trade in trades_data)
+    winning_trades = sum(1 for trade in trades_data if trade.get("pl", 0) > 0)
     win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-    total_premium = sum(abs(trade.get('premium', 0)) for trade in trades_data)
+    total_premium = sum(abs(trade.get("premium", 0)) for trade in trades_data)
 
     return [
         create_summary_stat("Total Trades", f"{total_trades:,}", "tabler:list"),
-        create_summary_stat("Total P/L", f"${total_pl:,.2f}", "tabler:currency-dollar",
-                           color="green" if total_pl >= 0 else "red"),
+        create_summary_stat(
+            "Total P/L",
+            f"${total_pl:,.2f}",
+            "tabler:currency-dollar",
+            color="green" if total_pl >= 0 else "red",
+        ),
         create_summary_stat("Win Rate", f"{win_rate:.1f}%", "tabler:percentage"),
-        create_summary_stat("Total Premium", f"${total_premium:,.2f}", "tabler:coins")
+        create_summary_stat("Total Premium", f"${total_premium:,.2f}", "tabler:coins"),
     ]
 
 
@@ -204,12 +172,12 @@ def create_summary_stat(label, value, icon, color="blue"):
             dmc.Stack(
                 children=[
                     dmc.Text(label, size="sm", c="dimmed"),
-                    dmc.Text(value, size="lg", fw=600, c=color)
+                    dmc.Text(value, size="lg", fw=600, c=color),
                 ],
-                gap="xs"
-            )
+                gap="xs",
+            ),
         ],
-        gap="sm"
+        gap="sm",
     )
 
 
@@ -219,17 +187,17 @@ def split_trade_legs(trades_data):
     split_trades = []
 
     for trade in trades_data:
-        legs_str = trade.get('legs', '')
+        legs_str = trade.get("legs", "")
 
         # Simple split by '|' - each leg becomes a separate row
-        if '|' in legs_str:
-            legs = legs_str.split('|')
+        if "|" in legs_str:
+            legs = legs_str.split("|")
             for i, leg in enumerate(legs):
                 split_trade = trade.copy()
-                split_trade['legs'] = leg.strip()
-                split_trade['leg_number'] = i + 1
+                split_trade["legs"] = leg.strip()
+                split_trade["leg_number"] = i + 1
                 # Distribute P/L evenly across legs (simplified)
-                split_trade['pl'] = trade.get('pl', 0) / len(legs)
+                split_trade["pl"] = trade.get("pl", 0) / len(legs)
                 split_trades.append(split_trade)
         else:
             split_trades.append(trade)

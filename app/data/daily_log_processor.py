@@ -4,6 +4,7 @@ Daily Log Processor
 Handles parsing and processing of OptionOmega daily log CSV files.
 These files contain end-of-day portfolio values and performance metrics.
 """
+
 import pandas as pd
 from typing import List
 from io import StringIO
@@ -26,7 +27,7 @@ class DailyLogProcessor:
             "Trading Funds": "trading_funds",
             "P/L": "daily_pl",
             "P/L %": "daily_pl_pct",
-            "Drawdown %": "drawdown_pct"
+            "Drawdown %": "drawdown_pct",
         }
 
     def parse_csv(self, file_content: str, filename: str) -> DailyLog:
@@ -54,23 +55,28 @@ class DailyLogProcessor:
     def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and standardize the dataframe"""
         # Remove BOM character if present
-        df.columns = df.columns.str.replace('\ufeff', '')
+        df.columns = df.columns.str.replace("\ufeff", "")
 
         # Rename columns using mapping
         df = df.rename(columns=self.column_mapping)
 
         # Convert date column
-        df['date'] = pd.to_datetime(df['date']).dt.date
+        df["date"] = pd.to_datetime(df["date"]).dt.date
 
         # Convert numeric columns
         numeric_columns = [
-            'net_liquidity', 'current_funds', 'withdrawn', 'trading_funds',
-            'daily_pl', 'daily_pl_pct', 'drawdown_pct'
+            "net_liquidity",
+            "current_funds",
+            "withdrawn",
+            "trading_funds",
+            "daily_pl",
+            "daily_pl_pct",
+            "drawdown_pct",
         ]
 
         for col in numeric_columns:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Fill any NaN values with 0 for numeric columns
         for col in numeric_columns:
@@ -90,7 +96,7 @@ class DailyLogProcessor:
                 # Handle any remaining NaN values
                 for field in entry_data:
                     if pd.isna(entry_data[field]):
-                        entry_data[field] = 0 if field != 'date' else entry_data[field]
+                        entry_data[field] = 0 if field != "date" else entry_data[field]
 
                 entry = DailyLogEntry(**entry_data)
                 entries.append(entry)

@@ -280,14 +280,6 @@ python app/main.py
 docker-compose up
 ```
 
-### Production Deployment
-
-The application is configured for Render.com deployment:
-
-1. Connect GitHub repository to Render
-2. Set environment variables in Render dashboard
-3. Deploy using `render.yaml` configuration
-
 ## 📚 Resources
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class Trade(BaseModel):
     """Individual trade record from portfolio CSV"""
+
     date_opened: date
     time_opened: time
     opening_price: float
@@ -40,6 +41,7 @@ class Trade(BaseModel):
 
 class Portfolio(BaseModel):
     """Collection of trades with metadata"""
+
     trades: List[Trade]
     upload_timestamp: datetime
     filename: str
@@ -55,12 +57,13 @@ class Portfolio(BaseModel):
             filename=filename,
             total_trades=len(trades),
             total_pl=sum(trade.pl for trade in trades),
-            strategies=list(set(trade.strategy for trade in trades))
+            strategies=list(set(trade.strategy for trade in trades)),
         )
 
 
 class PortfolioStats(BaseModel):
     """Portfolio statistics and metrics"""
+
     total_trades: int
     total_pl: float
     win_rate: float
@@ -78,6 +81,7 @@ class PortfolioStats(BaseModel):
 
 class StrategyStats(BaseModel):
     """Statistics for individual strategy"""
+
     strategy_name: str
     trade_count: int
     total_pl: float
@@ -93,6 +97,7 @@ class StrategyStats(BaseModel):
 
 class MonteCarloRequest(BaseModel):
     """Request for Monte Carlo simulation"""
+
     strategy: Optional[str] = None  # None = all strategies
     num_simulations: int = Field(default=1000, ge=100, le=10000)
     days_forward: int = Field(default=252, ge=1, le=1000)
@@ -101,6 +106,7 @@ class MonteCarloRequest(BaseModel):
 
 class MonteCarloResult(BaseModel):
     """Monte Carlo simulation results"""
+
     simulations: List[List[float]]  # Each simulation's daily returns
     percentiles: dict  # Confidence levels and their values
     final_values: List[float]  # Final portfolio values
@@ -111,6 +117,7 @@ class MonteCarloResult(BaseModel):
 
 class CorrelationMatrix(BaseModel):
     """Correlation matrix for strategies"""
+
     strategies: List[str]
     correlation_data: List[List[float]]
     p_values: Optional[List[List[float]]] = None
@@ -118,6 +125,7 @@ class CorrelationMatrix(BaseModel):
 
 class OptimizationRequest(BaseModel):
     """Portfolio optimization request"""
+
     strategies: List[str]
     target_return: Optional[float] = None
     risk_tolerance: float = Field(default=1.0, ge=0.1, le=5.0)
@@ -127,6 +135,7 @@ class OptimizationRequest(BaseModel):
 
 class OptimizationResult(BaseModel):
     """Portfolio optimization results"""
+
     optimal_weights: dict  # Strategy -> weight mapping
     expected_return: float
     volatility: float
@@ -136,16 +145,33 @@ class OptimizationResult(BaseModel):
 
 class AnalysisConfig(BaseModel):
     """Analysis configuration settings for portfolio analysis"""
+
     # Analysis parameters that affect calculations
-    risk_free_rate: float = Field(default=2.0, ge=0.0, le=20, description="Annual risk-free rate for Sharpe/Sortino calculations")
+    risk_free_rate: float = Field(
+        default=2.0,
+        ge=0.0,
+        le=20,
+        description="Annual risk-free rate for Sharpe/Sortino calculations",
+    )
 
     # Time-based calculation preferences
-    use_business_days_only: bool = Field(default=True, description="Use only business days for time calculations")
-    annualization_factor: int = Field(default=252, ge=200, le=365, description="Days per year for annualization (252 for business days, 365 for calendar days)")
+    use_business_days_only: bool = Field(
+        default=True, description="Use only business days for time calculations"
+    )
+    annualization_factor: int = Field(
+        default=252,
+        ge=200,
+        le=365,
+        description="Days per year for annualization (252 for business days, 365 for calendar days)",
+    )
 
     # Advanced analysis settings
-    confidence_level: float = Field(default=0.95, ge=0.8, le=0.99, description="Confidence level for VaR and other risk metrics")
-    drawdown_threshold: float = Field(default=0.05, ge=0.01, le=0.5, description="Minimum drawdown % to consider significant")
+    confidence_level: float = Field(
+        default=0.95, ge=0.8, le=0.99, description="Confidence level for VaR and other risk metrics"
+    )
+    drawdown_threshold: float = Field(
+        default=0.05, ge=0.01, le=0.5, description="Minimum drawdown % to consider significant"
+    )
 
     @classmethod
     def get_default(cls):
@@ -155,6 +181,7 @@ class AnalysisConfig(BaseModel):
 
 class DailyLogEntry(BaseModel):
     """Individual daily log entry from OptionOmega daily CSV"""
+
     date: date
     net_liquidity: float
     current_funds: float
@@ -172,6 +199,7 @@ class DailyLogEntry(BaseModel):
 
 class DailyLog(BaseModel):
     """Collection of daily log entries with metadata"""
+
     entries: List[DailyLogEntry]
     upload_timestamp: datetime
     filename: str
@@ -197,7 +225,5 @@ class DailyLog(BaseModel):
             date_range_start=sorted_entries[0].date,
             date_range_end=sorted_entries[-1].date,
             final_portfolio_value=sorted_entries[-1].net_liquidity,
-            max_drawdown=min(entry.drawdown_pct for entry in sorted_entries)
+            max_drawdown=min(entry.drawdown_pct for entry in sorted_entries),
         )
-
-

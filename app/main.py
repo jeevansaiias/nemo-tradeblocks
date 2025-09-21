@@ -10,7 +10,7 @@ from app.api.portfolio import router as portfolio_router
 fastapi_app = FastAPI(
     title="TradeBlocks - Trading Analytics API",
     description="🧱 Build smarter trades with powerful analytics, one block at a time! 📊",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Mount API routes
@@ -32,9 +32,9 @@ if __name__ == "__main__":
 
     # Check if running in debug mode (VS Code/debugpy)
     is_debug_mode = (
-        os.getenv("DEBUG") or
-        any("debugpy" in arg for arg in sys.argv) or
-        any("--debug" in arg for arg in sys.argv)
+        os.getenv("DEBUG")
+        or any("debugpy" in arg for arg in sys.argv)
+        or any("--debug" in arg for arg in sys.argv)
     )
 
     if is_debug_mode:
@@ -50,13 +50,8 @@ if __name__ == "__main__":
             port=port,
             reload=True,
             reload_dirs=["app"],
-            log_level="info"
+            log_level="info",
         )
     else:
         # Production mode
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=port,
-            log_level="info"
-        )
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

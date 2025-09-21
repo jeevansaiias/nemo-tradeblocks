@@ -46,6 +46,7 @@ def register_callbacks(app):
 
     # Import and register correlation callbacks
     from app.dash_app.callbacks.correlation_callbacks import register_correlation_callbacks
+
     register_correlation_callbacks(app)
 
     # Use clientside callback to update MantineProvider theme
@@ -92,13 +93,17 @@ def register_callbacks(app):
 
     @app.callback(
         Output("portfolio-section", "children"),
-        [Input("current-portfolio-data", "data"),
-         Input("portfolio-filename", "data"),
-         Input("current-daily-log-data", "data"),
-         Input("daily-log-filename", "data")],
-        prevent_initial_call=False
+        [
+            Input("current-portfolio-data", "data"),
+            Input("portfolio-filename", "data"),
+            Input("current-daily-log-data", "data"),
+            Input("daily-log-filename", "data"),
+        ],
+        prevent_initial_call=False,
     )
-    def update_portfolio_section(portfolio_data, filename_data, daily_log_data, daily_log_filename_data):
+    def update_portfolio_section(
+        portfolio_data, filename_data, daily_log_data, daily_log_filename_data
+    ):
         """Update portfolio section based on whether portfolio is loaded"""
         if portfolio_data and filename_data:
             # Portfolio is loaded - show info
@@ -110,59 +115,58 @@ def register_callbacks(app):
             if daily_log_data and daily_log_filename_data:
                 daily_filename = daily_log_filename_data.get("filename", "Unknown")
                 daily_entries = daily_log_filename_data.get("total_entries", 0)
-                daily_log_info.extend([
-                    dmc.Text(
-                        f"📊 {daily_filename}",
-                        size="xs",
-                        c="dimmed",
-                        style={"fontWeight": 600}
-                    ),
-                    dmc.Text(
-                        f"📅 {daily_entries} daily entries",
-                        size="xs",
-                        c="dimmed",
-                    )
-                ])
+                daily_log_info.extend(
+                    [
+                        dmc.Text(
+                            f"📊 {daily_filename}", size="xs", c="dimmed", style={"fontWeight": 600}
+                        ),
+                        dmc.Text(
+                            f"📅 {daily_entries} daily entries",
+                            size="xs",
+                            c="dimmed",
+                        ),
+                    ]
+                )
 
             return dmc.Paper(
                 children=[
-                    dmc.Stack([
-                        dmc.Text("🧱 Active Blocks", size="sm", fw=500, c="blue.6"),
-                        dmc.Text(
-                            f"🧱 {filename}",
-                            size="xs",
-                            c="dimmed",
-                            style={"fontWeight": 600}
-                        ),
-                        dmc.Text(
-                            f"📈 {total_trades} trades",
-                            size="xs",
-                            c="dimmed",
-                        ),
-                        *daily_log_info,
-                        dmc.Group(
-                            children=[
-                                dmc.Button(
-                                    "Change Files",
-                                    id="change-files-button",
-                                    variant="subtle",
-                                    color="blue",
-                                    size="xs",
-                                    leftSection=DashIconify(icon="tabler:edit"),
-                                ),
-                                dmc.Button(
-                                    "Clear All",
-                                    id="clear-portfolio-button",
-                                    variant="subtle",
-                                    color="red",
-                                    size="xs",
-                                    leftSection=DashIconify(icon="tabler:trash"),
-                                )
-                            ],
-                            gap="xs",
-                            style={"marginTop": "8px"}
-                        )
-                    ], gap="xs")
+                    dmc.Stack(
+                        [
+                            dmc.Text("🧱 Active Blocks", size="sm", fw=500, c="blue.6"),
+                            dmc.Text(
+                                f"🧱 {filename}", size="xs", c="dimmed", style={"fontWeight": 600}
+                            ),
+                            dmc.Text(
+                                f"📈 {total_trades} trades",
+                                size="xs",
+                                c="dimmed",
+                            ),
+                            *daily_log_info,
+                            dmc.Group(
+                                children=[
+                                    dmc.Button(
+                                        "Change Files",
+                                        id="change-files-button",
+                                        variant="subtle",
+                                        color="blue",
+                                        size="xs",
+                                        leftSection=DashIconify(icon="tabler:edit"),
+                                    ),
+                                    dmc.Button(
+                                        "Clear All",
+                                        id="clear-portfolio-button",
+                                        variant="subtle",
+                                        color="red",
+                                        size="xs",
+                                        leftSection=DashIconify(icon="tabler:trash"),
+                                    ),
+                                ],
+                                gap="xs",
+                                style={"marginTop": "8px"},
+                            ),
+                        ],
+                        gap="xs",
+                    )
                 ],
                 p="sm",
                 m="sm",
@@ -269,15 +273,18 @@ def register_callbacks(app):
         ],
         prevent_initial_call=True,
     )
-    def update_upload_modal_content(modal_opened, portfolio_data, daily_log_data, portfolio_filename, daily_log_filename):
+    def update_upload_modal_content(
+        modal_opened, portfolio_data, daily_log_data, portfolio_filename, daily_log_filename
+    ):
         """Update upload modal content to show success states when data is loaded"""
         if modal_opened:
             from app.dash_app.components.file_upload import create_upload_component
+
             return create_upload_component(
                 portfolio_data=portfolio_data,
                 daily_log_data=daily_log_data,
                 portfolio_filename=portfolio_filename,
-                daily_log_filename=daily_log_filename
+                daily_log_filename=daily_log_filename,
             )
         return no_update
 
@@ -315,10 +322,7 @@ def register_callbacks(app):
                 )
 
                 # Store both portfolio data and filename info
-                filename_data = {
-                    "filename": filename,
-                    "total_trades": result["total_trades"]
-                }
+                filename_data = {"filename": filename, "total_trades": result["total_trades"]}
 
                 return portfolio_data, filename_data, success_msg
 
@@ -354,6 +358,7 @@ def register_callbacks(app):
 
             # Process daily log using DailyLogProcessor
             from app.data.daily_log_processor import DailyLogProcessor
+
             processor = DailyLogProcessor()
             daily_log = processor.parse_csv(file_content, filename)
 
@@ -365,26 +370,25 @@ def register_callbacks(app):
                             dmc.Stack(
                                 children=[
                                     dmc.Text(f"Successfully uploaded: {filename}", fw=500),
-                                    dmc.Text(f"Loaded {daily_log.total_entries} daily entries", size="sm")
+                                    dmc.Text(
+                                        f"Loaded {daily_log.total_entries} daily entries", size="sm"
+                                    ),
                                 ],
-                                gap="xs"
-                            )
+                                gap="xs",
+                            ),
                         ],
-                        gap="sm"
+                        gap="sm",
                     )
                 ],
                 color="green",
-                variant="light"
+                variant="light",
             )
 
             # Convert daily log to dict for storage
             daily_log_data = daily_log.model_dump()
 
             # Store both daily log data and filename info
-            filename_data = {
-                "filename": filename,
-                "total_entries": daily_log.total_entries
-            }
+            filename_data = {"filename": filename, "total_entries": daily_log.total_entries}
 
             return daily_log_data, filename_data, success_msg, no_update
 
@@ -415,8 +419,16 @@ def register_callbacks(app):
         [State("current-portfolio-data", "data")],
         prevent_initial_call=True,
     )
-    def update_main_content_and_nav(geek_clicks, perf_clicks, trade_clicks, monte_clicks,
-                                   corr_clicks, margin_clicks, opt_clicks, portfolio_data):
+    def update_main_content_and_nav(
+        geek_clicks,
+        perf_clicks,
+        trade_clicks,
+        monte_clicks,
+        corr_clicks,
+        margin_clicks,
+        opt_clicks,
+        portfolio_data,
+    ):
         """Update main content and navigation highlighting"""
         if not portfolio_data:
             return create_welcome_content(), True, False, False, False, False, False, False
@@ -470,26 +482,34 @@ def register_callbacks(app):
 
         if not portfolio_data:
             logger.info("No portfolio data available")
-            return dmc.Center(
-                dmc.Text("No portfolio data available", c="dimmed", size="lg"),
-                style={"height": "400px"}
-            ), []
+            return (
+                dmc.Center(
+                    dmc.Text("No portfolio data available", c="dimmed", size="lg"),
+                    style={"height": "400px"},
+                ),
+                [],
+            )
 
         try:
             # Get all trades first to build strategy filter options
             trades_response = requests.post(f"{API_BASE_URL}/calculate/trades", json=portfolio_data)
 
             if trades_response.status_code != 200:
-                return dmc.Center(
-                    dmc.Text("Error loading trades data", c="red", size="lg"),
-                    style={"height": "400px"}
-                ), []
+                return (
+                    dmc.Center(
+                        dmc.Text("Error loading trades data", c="red", size="lg"),
+                        style={"height": "400px"},
+                    ),
+                    [],
+                )
 
             all_trades_data = trades_response.json().get("trades", [])
 
             # Build strategy filter options
             all_strategies = list(set(trade.get("strategy", "") for trade in all_trades_data))
-            strategy_options = [{"value": strategy, "label": strategy} for strategy in sorted(all_strategies)]
+            strategy_options = [
+                {"value": strategy, "label": strategy} for strategy in sorted(all_strategies)
+            ]
 
             # Determine if we're filtering by strategy
             is_filtered = bool(selected_strategies)
@@ -499,7 +519,8 @@ def register_callbacks(app):
             if selected_strategies:
                 logger.info(f"Filtering by strategies: {selected_strategies}")
                 filtered_trades = [
-                    trade for trade in all_trades_data
+                    trade
+                    for trade in all_trades_data
                     if trade.get("strategy") in selected_strategies
                 ]
 
@@ -511,27 +532,36 @@ def register_callbacks(app):
             portfolio_stats_request = {
                 "portfolio_data": filtered_portfolio_data,
                 "daily_log_data": daily_log_data,
-                "is_filtered": is_filtered
+                "is_filtered": is_filtered,
             }
 
             # Calculate stats on filtered data
-            stats_response = requests.post(f"{API_BASE_URL}/calculate/portfolio-stats", json=portfolio_stats_request)
-            strategy_stats_response = requests.post(f"{API_BASE_URL}/calculate/strategy-stats", json=filtered_portfolio_data)
+            stats_response = requests.post(
+                f"{API_BASE_URL}/calculate/portfolio-stats", json=portfolio_stats_request
+            )
+            strategy_stats_response = requests.post(
+                f"{API_BASE_URL}/calculate/strategy-stats", json=filtered_portfolio_data
+            )
 
             # Prepare request with config and daily log data for advanced stats
             advanced_stats_request = {
                 "portfolio_data": filtered_portfolio_data,
                 "daily_log_data": daily_log_data,
                 "config": config_data or {},
-                "is_filtered": is_filtered
+                "is_filtered": is_filtered,
             }
-            advanced_stats_response = requests.post(f"{API_BASE_URL}/calculate/advanced-stats", json=advanced_stats_request)
+            advanced_stats_response = requests.post(
+                f"{API_BASE_URL}/calculate/advanced-stats", json=advanced_stats_request
+            )
 
             if stats_response.status_code != 200:
-                return dmc.Center(
-                    dmc.Text("Error calculating portfolio stats", c="red", size="lg"),
-                    style={"height": "400px"}
-                ), strategy_options
+                return (
+                    dmc.Center(
+                        dmc.Text("Error calculating portfolio stats", c="red", size="lg"),
+                        style={"height": "400px"},
+                    ),
+                    strategy_options,
+                )
 
             portfolio_stats = stats_response.json()
             strategy_stats = (
@@ -544,15 +574,23 @@ def register_callbacks(app):
             # Import the function here to avoid circular imports
             from app.dash_app.components.tabs.geekistics import create_comprehensive_stats
 
-            content = create_comprehensive_stats(portfolio_stats, strategy_stats, filtered_trades, selected_strategies, advanced_stats)
+            content = create_comprehensive_stats(
+                portfolio_stats,
+                strategy_stats,
+                filtered_trades,
+                selected_strategies,
+                advanced_stats,
+            )
             return content, strategy_options
 
         except Exception as e:
             logger.error(f"Error updating geekistics tab: {str(e)}")
-            return dmc.Center(
-                dmc.Text(f"Error: {str(e)}", c="red", size="lg"),
-                style={"height": "400px"}
-            ), []
+            return (
+                dmc.Center(
+                    dmc.Text(f"Error: {str(e)}", c="red", size="lg"), style={"height": "400px"}
+                ),
+                [],
+            )
 
     @app.callback(
         [
@@ -571,7 +609,9 @@ def register_callbacks(app):
 
         try:
             # Send portfolio data to stateless API endpoint
-            response = requests.post(f"{API_BASE_URL}/calculate/performance-data", json=portfolio_data)
+            response = requests.post(
+                f"{API_BASE_URL}/calculate/performance-data", json=portfolio_data
+            )
 
             if response.status_code != 200:
                 return {}, {}, {}, {}
@@ -623,11 +663,17 @@ def register_callbacks(app):
 
             # Filter by strategy if specified (client-side filtering for now)
             if strategy_filter:
-                trades_data = [trade for trade in trades_data if trade.get("strategy") == strategy_filter]
+                trades_data = [
+                    trade for trade in trades_data if trade.get("strategy") == strategy_filter
+                ]
 
             # Get strategy options for filter
-            all_strategies = list(set(trade.get("strategy", "") for trade in response.json().get("trades", [])))
-            strategy_options = [{"value": strategy, "label": strategy} for strategy in all_strategies]
+            all_strategies = list(
+                set(trade.get("strategy", "") for trade in response.json().get("trades", []))
+            )
+            strategy_options = [
+                {"value": strategy, "label": strategy} for strategy in all_strategies
+            ]
 
             # Create table and summary
             trades_table = create_trades_table(trades_data, split_legs)
@@ -701,8 +747,7 @@ def register_callbacks(app):
     @app.callback(
         [Output("settings-modal", "opened"), Output("settings-modal-content", "children")],
         [Input("settings-button", "n_clicks")],
-        [State("settings-modal", "opened"),
-         State("analysis-config-store", "data")],
+        [State("settings-modal", "opened"), State("analysis-config-store", "data")],
         prevent_initial_call=True,
     )
     def open_settings_modal(settings_clicks, modal_opened, config_data):
@@ -716,8 +761,7 @@ def register_callbacks(app):
     # Close modal callback (handles save and cancel)
     @app.callback(
         Output("settings-modal", "opened", allow_duplicate=True),
-        [Input("settings-save-button", "n_clicks"),
-         Input("settings-cancel-button", "n_clicks")],
+        [Input("settings-save-button", "n_clicks"), Input("settings-cancel-button", "n_clicks")],
         prevent_initial_call=True,
     )
     def close_settings_modal(save_clicks, cancel_clicks):
@@ -730,24 +774,33 @@ def register_callbacks(app):
     @app.callback(
         Output("analysis-config-store", "data", allow_duplicate=True),
         [Input("settings-save-button", "n_clicks")],
-        [State("settings-risk-free-rate", "value"),
-         State("settings-use-business-days-only", "checked"),
-         State("settings-annualization-factor", "value"),
-         State("settings-confidence-level", "value"),
-         State("settings-drawdown-threshold", "value")],
+        [
+            State("settings-risk-free-rate", "value"),
+            State("settings-use-business-days-only", "checked"),
+            State("settings-annualization-factor", "value"),
+            State("settings-confidence-level", "value"),
+            State("settings-drawdown-threshold", "value"),
+        ],
         prevent_initial_call=True,
     )
-    def save_analysis_config(save_clicks, risk_free_rate,
-                            use_business_days, annualization_factor,
-                            confidence_level, drawdown_threshold):
+    def save_analysis_config(
+        save_clicks,
+        risk_free_rate,
+        use_business_days,
+        annualization_factor,
+        confidence_level,
+        drawdown_threshold,
+    ):
         """Save analysis configuration to localStorage"""
         if save_clicks:
             return {
                 "risk_free_rate": risk_free_rate or 2.0,
-                "use_business_days_only": use_business_days if use_business_days is not None else True,
+                "use_business_days_only": (
+                    use_business_days if use_business_days is not None else True
+                ),
                 "annualization_factor": annualization_factor or 252,
                 "confidence_level": confidence_level or 0.95,
-                "drawdown_threshold": drawdown_threshold or 0.05
+                "drawdown_threshold": drawdown_threshold or 0.05,
             }
         return no_update
 
@@ -765,7 +818,7 @@ def register_callbacks(app):
                 "use_business_days_only": True,
                 "annualization_factor": 252,
                 "confidence_level": 0.95,
-                "drawdown_threshold": 0.05
+                "drawdown_threshold": 0.05,
             }
         return no_update
 
@@ -784,8 +837,7 @@ def register_callbacks(app):
 
     @app.callback(
         Output("config-indicators", "children"),
-        [Input("analysis-config-store", "data"),
-         Input("current-portfolio-data", "data")],
+        [Input("analysis-config-store", "data"), Input("current-portfolio-data", "data")],
         prevent_initial_call=False,
     )
     def update_config_indicators(config_data, portfolio_data):
@@ -808,10 +860,11 @@ def register_callbacks(app):
                 if all_trades:
                     # Import here to avoid circular imports
                     from app.data.models import calculate_initial_capital_from_trades
+
                     # Convert trade objects to dicts if needed
                     trades_data = []
                     for trade in all_trades:
-                        if hasattr(trade, 'dict'):
+                        if hasattr(trade, "dict"):
                             trades_data.append(trade.dict())
                         else:
                             trades_data.append(trade)

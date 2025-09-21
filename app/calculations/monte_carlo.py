@@ -33,8 +33,10 @@ class MonteCarloSimulator:
             mean_return = np.mean(daily_returns)
             std_return = np.std(daily_returns)
 
-            logger.info(f"Running Monte Carlo with {request.num_simulations} simulations, "
-                       f"mean return: {mean_return:.4f}, std: {std_return:.4f}")
+            logger.info(
+                f"Running Monte Carlo with {request.num_simulations} simulations, "
+                f"mean return: {mean_return:.4f}, std: {std_return:.4f}"
+            )
 
             # Run simulations
             simulations = []
@@ -64,8 +66,10 @@ class MonteCarloSimulator:
             expected_return = np.mean(final_values)
             std_deviation = np.std(final_values)
 
-            logger.info(f"Monte Carlo completed. Expected return: {expected_return:.2f}, "
-                       f"VaR 95%: {var_95:.2f}")
+            logger.info(
+                f"Monte Carlo completed. Expected return: {expected_return:.2f}, "
+                f"VaR 95%: {var_95:.2f}"
+            )
 
             return MonteCarloResult(
                 simulations=simulations,
@@ -73,7 +77,7 @@ class MonteCarloSimulator:
                 final_values=final_values,
                 var_95=var_95,
                 expected_return=expected_return,
-                std_deviation=std_deviation
+                std_deviation=std_deviation,
             )
 
         except Exception as e:
@@ -109,17 +113,20 @@ class MonteCarloSimulator:
             logger.error(f"Error calculating daily returns: {str(e)}")
             raise
 
-    def run_strategy_comparison(self, portfolio: Portfolio, strategies: List[str],
-                               num_simulations: int = 1000, days_forward: int = 252) -> Dict[str, MonteCarloResult]:
+    def run_strategy_comparison(
+        self,
+        portfolio: Portfolio,
+        strategies: List[str],
+        num_simulations: int = 1000,
+        days_forward: int = 252,
+    ) -> Dict[str, MonteCarloResult]:
         """Run Monte Carlo simulation for multiple strategies for comparison"""
         try:
             results = {}
 
             for strategy in strategies:
                 request = MonteCarloRequest(
-                    strategy=strategy,
-                    num_simulations=num_simulations,
-                    days_forward=days_forward
+                    strategy=strategy, num_simulations=num_simulations, days_forward=days_forward
                 )
                 results[strategy] = self.run_simulation(portfolio, request)
 

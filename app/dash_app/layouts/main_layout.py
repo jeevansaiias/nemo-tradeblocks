@@ -20,14 +20,33 @@ def create_main_layout():
                                     html.Img(
                                         src="/assets/tradeblocks-logo.png",
                                         className="tb-logo",
-                                        style={"height": "32px", "width": "auto"}
+                                        style={"height": "32px", "width": "auto"},
                                     ),
-                                    dmc.Stack([
-                                        dmc.Text("TradeBlocks", size="lg", fw=700, c="blue.6"),
-                                        dmc.Text("Trading Analytics Platform", size="xs", c="dimmed"),
-                                    ], gap="0px"),
+                                    dmc.Stack(
+                                        [
+                                            dmc.Text("TradeBlocks", size="lg", fw=700, c="blue.6"),
+                                            dmc.Text(
+                                                "Trading Analytics Platform", size="xs", c="dimmed"
+                                            ),
+                                        ],
+                                        gap="0px",
+                                    ),
                                 ],
                                 gap="sm",
+                                align="center",
+                            ),
+                            # Center - NinjaTaco tribute
+                            dmc.Group(
+                                [
+                                    dmc.Text(
+                                        "Inspired by NinjaTaco", size="xs", c="orange.6", fw=500
+                                    ),
+                                    html.Img(
+                                        src="/assets/ninjataco-tribute.png",
+                                        style={"height": "24px", "width": "auto", "opacity": "0.7"},
+                                    ),
+                                ],
+                                gap="xs",
                                 align="center",
                             ),
                             # Right side items
@@ -36,16 +55,21 @@ def create_main_layout():
                                     # Configuration indicators
                                     html.Div(id="config-indicators"),
                                     # Settings button with label
-                                    dmc.Group([
-                                        dmc.Button(
-                                            "Portfolio Settings",
-                                            id="settings-button",
-                                            leftSection=DashIconify(icon="tabler:settings", width=16),
-                                            variant="light",
-                                            color="blue",
-                                            size="sm",
-                                        ),
-                                    ], gap="xs"),
+                                    dmc.Group(
+                                        [
+                                            dmc.Button(
+                                                "Portfolio Settings",
+                                                id="settings-button",
+                                                leftSection=DashIconify(
+                                                    icon="tabler:settings", width=16
+                                                ),
+                                                variant="light",
+                                                color="blue",
+                                                size="sm",
+                                            ),
+                                        ],
+                                        gap="xs",
+                                    ),
                                     # Theme toggle
                                     dmc.SegmentedControl(
                                         id="theme-toggle",
@@ -162,55 +186,55 @@ def create_main_layout():
                                 id="upload-modal",
                                 title="🧱 Upload Your Trading Blocks",
                                 size="lg",
-                                children=[
-                                    create_upload_component()
-                                ],
+                                children=[create_upload_component()],
                             ),
-
                             # Clear portfolio confirmation modal
                             dmc.Modal(
                                 id="clear-confirm-modal",
                                 title="🗑️ Clear Portfolio",
                                 opened=False,
                                 children=[
-                                    dmc.Stack([
-                                        dmc.Text(
-                                            "Are you sure you want to clear your portfolio data?",
-                                            size="sm"
-                                        ),
-                                        dmc.Text(
-                                            "This will permanently delete all your portfolio data from this browser.",
-                                            size="xs",
-                                            c="dimmed"
-                                        ),
-                                        dmc.Group([
-                                            dmc.Button(
-                                                "Cancel",
-                                                id="clear-cancel-button",
-                                                variant="light",
-                                                color="gray"
+                                    dmc.Stack(
+                                        [
+                                            dmc.Text(
+                                                "Are you sure you want to clear your portfolio data?",
+                                                size="sm",
                                             ),
-                                            dmc.Button(
-                                                "Clear Portfolio",
-                                                id="clear-confirm-button",
-                                                color="red"
-                                            )
-                                        ], justify="flex-end", gap="sm")
-                                    ], gap="md")
-                                ]
+                                            dmc.Text(
+                                                "This will permanently delete all your portfolio data from this browser.",
+                                                size="xs",
+                                                c="dimmed",
+                                            ),
+                                            dmc.Group(
+                                                [
+                                                    dmc.Button(
+                                                        "Cancel",
+                                                        id="clear-cancel-button",
+                                                        variant="light",
+                                                        color="gray",
+                                                    ),
+                                                    dmc.Button(
+                                                        "Clear Portfolio",
+                                                        id="clear-confirm-button",
+                                                        color="red",
+                                                    ),
+                                                ],
+                                                justify="flex-end",
+                                                gap="sm",
+                                            ),
+                                        ],
+                                        gap="md",
+                                    )
+                                ],
                             ),
-
                             # Portfolio settings modal
                             dmc.Modal(
                                 id="settings-modal",
                                 title="⚙️ Portfolio Configuration",
                                 opened=False,
                                 size="lg",
-                                children=[
-                                    html.Div(id="settings-modal-content")
-                                ]
+                                children=[html.Div(id="settings-modal-content")],
                             ),
-
                             # Main content
                             html.Div(
                                 style={"position": "relative"},
@@ -241,7 +265,7 @@ def create_welcome_content():
                     html.Img(
                         src="/assets/tradeblocks-logo.png",
                         className="tb-logo",
-                        style={"height": "150px", "width": "auto", "opacity": "0.8"}
+                        style={"height": "150px", "width": "auto", "opacity": "0.8"},
                     ),
                     dmc.Title("Welcome to TradeBlocks", order=2, ta="center", c="blue.6"),
                     dmc.Title("Trading Analytics Platform", order=3, ta="center", c="dimmed"),

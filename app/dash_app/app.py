@@ -29,7 +29,18 @@ def create_dash_app():
             "primaryColor": "blue",
             "fontFamily": "'Inter', sans-serif",
             "colors": {
-                "blocks": ["#EBF4FF", "#C3DAFE", "#A3BFFA", "#7C9CF9", "#667EEA", "#5A67D8", "#4C51BF", "#434190", "#3C366B", "#322659"]
+                "blocks": [
+                    "#EBF4FF",
+                    "#C3DAFE",
+                    "#A3BFFA",
+                    "#7C9CF9",
+                    "#667EEA",
+                    "#5A67D8",
+                    "#4C51BF",
+                    "#434190",
+                    "#3C366B",
+                    "#322659",
+                ]
             },
             "components": {
                 "Paper": {"defaultProps": {"shadow": "sm", "radius": "md"}},
@@ -47,13 +58,17 @@ def create_dash_app():
             dcc.Store(id="daily-log-filename", storage_type="local"),
             dcc.Store(id="theme-store", storage_type="local", data={"theme": "light"}),
             dcc.Store(id="system-theme-store", storage_type="memory"),
-            dcc.Store(id="analysis-config-store", storage_type="local", data={
-                "risk_free_rate": 2.0,
-                "use_business_days_only": True,
-                "annualization_factor": 252,
-                "confidence_level": 0.95,
-                "drawdown_threshold": 0.05
-            }),
+            dcc.Store(
+                id="analysis-config-store",
+                storage_type="local",
+                data={
+                    "risk_free_rate": 2.0,
+                    "use_business_days_only": True,
+                    "annualization_factor": 252,
+                    "confidence_level": 0.95,
+                    "drawdown_threshold": 0.05,
+                },
+            ),
             # Hidden div for theme callback output
             html.Div(id="theme-output", style={"display": "none"}),
             # Main layout

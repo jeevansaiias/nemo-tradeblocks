@@ -3,6 +3,7 @@ Trade Analysis Calculator
 
 Handles trade data analysis and filtering for the trade data tab.
 """
+
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -19,7 +20,7 @@ class TradeAnalysisCalculator:
         portfolio: Portfolio,
         strategy: Optional[str] = None,
         limit: Optional[int] = None,
-        offset: Optional[int] = 0
+        offset: Optional[int] = 0,
     ) -> Dict[str, Any]:
         """Get trades with optional filtering"""
         try:
@@ -31,7 +32,7 @@ class TradeAnalysisCalculator:
 
             # Apply pagination
             if limit:
-                trades = trades[offset:offset+limit]
+                trades = trades[offset : offset + limit]
 
             # Convert to dict for JSON serialization
             trades_data = [trade.model_dump() for trade in trades]
@@ -40,7 +41,7 @@ class TradeAnalysisCalculator:
                 "trades": trades_data,
                 "total_count": len(portfolio.trades),
                 "filtered_count": len(trades_data),
-                "strategy_filter": strategy
+                "strategy_filter": strategy,
             }
         except Exception as e:
             logger.error(f"Error processing trades: {str(e)}")
@@ -69,7 +70,7 @@ class TradeAnalysisCalculator:
                 "avg_duration": sum(durations) / len(durations) if durations else 0,
                 "min_duration": min(durations) if durations else 0,
                 "max_duration": max(durations) if durations else 0,
-                "strategies": list(set(trade.strategy for trade in portfolio.trades))
+                "strategies": list(set(trade.strategy for trade in portfolio.trades)),
             }
         except Exception as e:
             logger.error(f"Error calculating trade statistics: {str(e)}")
