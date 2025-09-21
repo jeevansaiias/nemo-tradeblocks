@@ -180,7 +180,7 @@ def register_callbacks(app):
                                 id="upload-button",
                                 leftSection=DashIconify(icon="tabler:upload"),
                                 variant="light",
-                                color="ninja",
+                                color="blue",
                                 size="sm",
                                 fullWidth=True,
                             ),

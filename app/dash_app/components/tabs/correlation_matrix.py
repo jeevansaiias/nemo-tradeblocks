@@ -172,7 +172,7 @@ def create_correlation_header():
                 "Refresh",
                 id="correlation-refresh-btn",
                 variant="light",
-                color="ninja",
+                color="blue",
                 leftSection=DashIconify(icon="tabler:refresh", width=16)
             )
         ], gap="md", align="end")
@@ -502,7 +502,7 @@ def create_export_panel():
                 "Generate Report",
                 id="export-correlation-report",
                 variant="filled",
-                color="ninja",
+                color="blue",
                 leftSection=DashIconify(icon="tabler:report", width=16)
             )
         ], cols=4, spacing="md")

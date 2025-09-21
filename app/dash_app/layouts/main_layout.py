@@ -20,10 +20,12 @@ def create_main_layout():
                                     html.Img(
                                         src="/assets/tradeblocks-logo.png",
                                         className="tb-logo",
-                                        style={"height": "40px", "width": "auto"}
+                                        style={"height": "32px", "width": "auto"}
                                     ),
-                                    dmc.Text("TradeBlocks", size="xl", fw=700, c="blue.6"),
-                                    dmc.Text("Trading Analytics Platform", size="sm", c="dimmed", style={"marginLeft": "8px"}),
+                                    dmc.Stack([
+                                        dmc.Text("TradeBlocks", size="lg", fw=700, c="blue.6"),
+                                        dmc.Text("Trading Analytics Platform", size="xs", c="dimmed"),
+                                    ], gap="0px"),
                                 ],
                                 gap="sm",
                                 align="center",
@@ -40,7 +42,7 @@ def create_main_layout():
                                             id="settings-button",
                                             leftSection=DashIconify(icon="tabler:settings", width=16),
                                             variant="light",
-                                            color="orange",
+                                            color="blue",
                                             size="sm",
                                         ),
                                     ], gap="xs"),
@@ -97,49 +99,49 @@ def create_main_layout():
                                 children=[
                                     # Portfolio info section
                                     html.Div(id="portfolio-section"),
-                                    # Navigation items - Ninja themed
+                                    # Navigation items - TradeBlocks themed
                                     dmc.NavLink(
                                         label="🧱 Block Stats",
                                         leftSection=DashIconify(icon="tabler:chart-bar"),
                                         id="nav-geekistics",
                                         active=True,
-                                        description="Geekistics & Basic Metrics",
+                                        description="Block Stats & Analytics",
                                     ),
                                     dmc.NavLink(
-                                        label="⚔️ Battle Charts",
+                                        label="📈 Performance Blocks",
                                         leftSection=DashIconify(icon="tabler:chart-line"),
                                         id="nav-performance",
                                         description="Performance Analytics",
                                     ),
                                     dmc.NavLink(
-                                        label="🎲 Fortune Teller",
+                                        label="🎲 Risk Simulator",
                                         leftSection=DashIconify(icon="tabler:dice"),
                                         id="nav-monte-carlo",
-                                        description="Monte Carlo Simulator",
+                                        description="Risk Simulation",
                                     ),
                                     dmc.NavLink(
-                                        label="🕸️ Stealth Matrix",
+                                        label="🔗 Connection Matrix",
                                         leftSection=DashIconify(icon="tabler:grid-dots"),
                                         id="nav-correlation",
-                                        description="Correlation Analysis",
+                                        description="Strategy Connections",
                                     ),
                                     dmc.NavLink(
-                                        label="📜 Battle Logs",
+                                        label="📊 Trade Blocks",
                                         leftSection=DashIconify(icon="tabler:table"),
                                         id="nav-trade-data",
-                                        description="Trade Data & History",
+                                        description="Trading Block History",
                                     ),
                                     dmc.NavLink(
-                                        label="🍃 Shadow Resources",
+                                        label="💰 Capital Blocks",
                                         leftSection=DashIconify(icon="tabler:percentage"),
                                         id="nav-margin",
-                                        description="Margin Utilization",
+                                        description="Capital Management",
                                     ),
                                     dmc.NavLink(
-                                        label="🎯 Master's Way",
+                                        label="🎯 Builder's Edge",
                                         leftSection=DashIconify(icon="tabler:target"),
                                         id="nav-optimizer",
-                                        description="Portfolio Optimizer",
+                                        description="Portfolio Builder",
                                     ),
                                 ],
                                 gap="xs",
