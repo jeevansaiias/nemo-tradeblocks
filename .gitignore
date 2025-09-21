@@ -79,7 +79,12 @@ coverage.xml
 temp/
 tmp/
 
-/sampleData
-
 /.mypy_cache
 /.claude
+
+# User test data - exclude personal trading data from commits
+# Only the README.md should be committed in tests/data/
+tests/data/tradelog.csv
+tests/data/dailylog.csv
+tests/data/*.csv
+!tests/data/README.md
