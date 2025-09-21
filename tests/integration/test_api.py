@@ -6,8 +6,8 @@ def test_health_endpoint(client):
 
 
 def test_root_endpoint(client):
-    """Test root endpoint"""
-    response = client.get("/")
+    """Test API root endpoint"""
+    response = client.get("/api")
     assert response.status_code == 200
     assert "Portfolio Analysis API" in response.json()["message"]
 
