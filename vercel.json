@@ -17,7 +17,13 @@
     }
   ],
   "env": {
-    "PYTHONPATH": ".",
-    "API_BASE_URL": "/api/v1"
+    "PYTHONPATH": "."
+  },
+  "functions": {
+    "app/main.py": {
+      "env": {
+        "API_BASE_URL": "https://$VERCEL_URL/api/v1"
+      }
+    }
   }
 }
