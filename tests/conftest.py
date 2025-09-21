@@ -58,6 +58,15 @@ def sample_csv_content():
 2025-09-17,10:01:00,6631.83,"11 Sep 18 6635 C BTO 10.45 | 11 Sep 18 6675 C STO 0.70",-985,6631.96,2025-09-18,16:00:00,0,Expired,-10874.16,11,1586111.24,22660,Test Strategy 2,39.16,0,0.07,0.5,15.24,15.77,26.5,4.98,126.4,-100"""
     return csv_content
 
+@pytest.fixture
+def sample_single_backtest_csv_content():
+    """Sample CSV content for testing file upload"""
+    csv_content = """"Date Opened","Time Opened","Opening Price","Legs","Premium","Closing Price","Date Closed","Time Closed","Avg. Closing Cost","Reason For Close","P/L","No. of Contracts","Funds at Close","Margin Req.","Strategy","Opening Commissions + Fees","Closing Commissions + Fees","Opening Short/Long Ratio","Closing Short/Long Ratio","Gap","Movement","Max Profit","Max Loss"
+"2025-08-22","15:02:00",6469.83,"208 Aug 27 6410 P STO 8.70 | 208 Aug 27 6520 C STO 5.80 | 208 Aug 29 6410 P BTO 18.45 | 208 Aug 29 6520 C BTO 17.70",-2175,6462.47,"2025-08-22","15:59:00",-2095,"Backtest Completed",-19136,208,3004512,452400,"",1248,1248,0.4,0.381,14.42,85.24,1.84,-3.68
+"2025-08-15","15:02:00",6456.59,"252 Aug 20 6395 P STO 8.85 | 252 Aug 20 6505 C STO 6.80 | 252 Aug 22 6395 P BTO 17.25 | 252 Aug 22 6505 C BTO 16.30",-1800,6443.11,"2025-08-19","09:38:00",-1795,"Below Short/Long Ratio",-4284,252,3023648,453600,"",1512,1512,0.47,0.172,8.84,-20.79,14.44,-1.11
+"""
+    return csv_content
+
 
 @pytest.fixture
 def sample_portfolio(sample_csv_content):

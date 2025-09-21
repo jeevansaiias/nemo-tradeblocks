@@ -25,7 +25,7 @@ class Trade(BaseModel):
     closing_commissions_fees: float
     opening_short_long_ratio: float
     closing_short_long_ratio: Optional[float] = None
-    opening_vix: float
+    opening_vix: Optional[float] = None
     closing_vix: Optional[float] = None
     gap: Optional[float] = None
     movement: Optional[float] = None

@@ -85,6 +85,10 @@ class PortfolioProcessor:
         if missing_columns:
             raise ValueError(f"Required columns missing: {missing_columns}")
 
+        # Ensure all expected columns are present
+        all_columns = list(self.column_mapping.values())
+        df = df.reindex(columns=all_columns)
+
         # Convert date columns
         if "date_opened" in df.columns:
             df["date_opened"] = pd.to_datetime(df["date_opened"]).dt.date
@@ -126,7 +130,7 @@ class PortfolioProcessor:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Fill NaN values appropriately - use empty string for text fields, keep NaN for numeric
-        text_columns = ["reason_for_close"]
+        text_columns = ["reason_for_close", "strategy"]
         for col in text_columns:
             if col in df.columns:
                 df[col] = df[col].fillna("")
@@ -139,33 +143,22 @@ class PortfolioProcessor:
         """Convert DataFrame rows to Trade objects"""
         trades = []
 
-        for _, row in df.iterrows():
-            try:
-                trade_data = row.to_dict()
-
-                # Handle None values for optional fields
-                for field in [
-                    "closing_price",
-                    "date_closed",
-                    "time_closed",
-                    "avg_closing_cost",
-                    "reason_for_close",
-                    "closing_short_long_ratio",
-                    "closing_vix",
-                    "gap",
-                    "movement",
-                    "max_profit",
-                    "max_loss",
-                ]:
-                    if pd.isna(trade_data.get(field)):
-                        trade_data[field] = None
-
-                trade = Trade(**trade_data)
-                trades.append(trade)
-
-            except Exception as e:
-                logger.warning(f"Skipping invalid trade row: {str(e)}")
-                continue
+        optional_fields = [
+            "closing_price",
+            "date_closed",
+            "time_closed",
+            "avg_closing_cost",
+            "reason_for_close",
+            "closing_short_long_ratio",
+            "opening_vix",
+            "closing_vix",
+            "gap",
+            "movement",
+            "max_profit",
+            "max_loss",
+        ]
+        df[optional_fields] = df[optional_fields].where(pd.notna(df[optional_fields]), None)
+        trades = [Trade(**row_dict) for row_dict in df.to_dict(orient="records")]
 
         return trades
 
@@ -200,3 +193,4 @@ class PortfolioProcessor:
             result[strategy_name] = MockStrategyStats(stats)
 
         return result
+        return trades
