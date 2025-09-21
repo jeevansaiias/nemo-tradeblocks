@@ -275,7 +275,8 @@ def create_day_of_week_distribution_chart(distribution_data: Dict[str, Any]) -> 
             name="Trade Count",
             marker=dict(color=colors, pattern=dict(shape="/")),
             text=[f"{count}<br>${avg_pl:+.0f}" for count, avg_pl in zip(counts, avg_pls)],
-            textposition="outside",
+            textposition="auto",  # Let Plotly automatically position text to avoid cutoff
+            textfont=dict(size=11, color="white"),  # Make text more visible
             hovertemplate=(
                 "<b>%{x}</b><br>"
                 "<b>Trade Count:</b> %{y}<br>"
@@ -294,8 +295,7 @@ def create_day_of_week_distribution_chart(distribution_data: Dict[str, Any]) -> 
         xaxis=dict(title="Day of Week", showgrid=False),
         yaxis=dict(title="Number of Trades", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
         showlegend=False,
-        margin=dict(t=80, b=60, l=60, r=60),
-        height=350,
+        margin=dict(t=80, b=60, l=60, r=60),  # Auto text positioning handles overflow
     )
 
     return fig
@@ -326,7 +326,7 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
             marker=dict(
                 color=rom_values,
                 colorscale=[[0, "#ef4444"], [0.5, "#f59e0b"], [1, "#10b981"]],
-                colorbar=dict(title="ROM %"),
+                showscale=False,  # Remove the colorbar
                 line=dict(color="white", width=1),
             ),
             hovertemplate=(
@@ -365,8 +365,7 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
         xaxis=dict(title="Return on Margin (%)", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
         yaxis=dict(title="Number of Trades", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
         showlegend=False,
-        margin=dict(t=80, b=60, l=60, r=60),
-        height=350,
+        margin=dict(t=100, b=60, l=60, r=60),  # Increased top margin for annotation text
     )
 
     return fig
@@ -461,7 +460,6 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
         margin=dict(t=80, b=60, l=80, r=80),
-        height=400,
     )
 
     return fig
@@ -607,7 +605,6 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
         title="Monthly Returns Heatmap",
         xaxis_title="Month",
         yaxis_title="Year",
-        height=400,
         margin=dict(l=0, r=0, t=40, b=0),
     )
 
@@ -659,7 +656,6 @@ def create_trade_sequence_chart(
         title="Trade Sequence vs Return",
         xaxis_title="Trade Number",
         yaxis_title="Return ($)",
-        height=400,
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
@@ -721,7 +717,6 @@ def create_rom_timeline_chart(rom_data: Dict[str, Any], ma_period_value: str = "
         title="Return on Margin Over Time",
         xaxis_title="Date",
         yaxis_title="Return on Margin (%)",
-        height=300,
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
@@ -764,7 +759,6 @@ def create_rolling_metrics_chart(
         title=f"Rolling {metric_key.replace('_',' ').title()}",
         xaxis_title="Date",
         yaxis_title=metric_key.replace("_", " ").title(),
-        height=300,
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=False,
     )
@@ -798,7 +792,6 @@ def create_risk_evolution_chart(rolling_data: Dict[str, Any]) -> go.Figure:
         title="Risk Metrics Evolution (Volatility)",
         xaxis_title="Date",
         yaxis_title="Volatility",
-        height=300,
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=True,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
@@ -1112,12 +1105,20 @@ def create_distribution_analysis_section():
                             dcc.Graph(
                                 id="day-of-week-chart",
                                 config={"responsive": True, "displayModeBar": False},
-                                style={"height": "250px"},
+                                style={
+                                    "height": "min(250px, 30vh)",
+                                    "minHeight": "200px",
+                                    "width": "100%",
+                                },
                             ),
                             dcc.Graph(
                                 id="rom-distribution-chart",
                                 config={"responsive": True, "displayModeBar": False},
-                                style={"height": "250px"},
+                                style={
+                                    "height": "min(250px, 30vh)",
+                                    "minHeight": "200px",
+                                    "width": "100%",
+                                },
                             ),
                         ],
                         gap="md",
@@ -1143,7 +1144,11 @@ def create_distribution_analysis_section():
                             dcc.Graph(
                                 id="streak-distribution-chart",
                                 config={"responsive": True, "displayModeBar": False},
-                                style={"height": "300px"},
+                                style={
+                                    "height": "min(300px, 35vh)",
+                                    "minHeight": "250px",
+                                    "width": "100%",
+                                },
                             ),
                             # Streak Statistics
                             dmc.Group(
@@ -1200,7 +1205,7 @@ def create_time_based_analysis_section():
                     dcc.Graph(
                         id="monthly-heatmap-chart",
                         config={"responsive": True, "displayModeBar": False},
-                        style={"height": "400px"},
+                        style={"height": "min(400px, 45vh)", "minHeight": "300px", "width": "100%"},
                     ),
                 ],
                 p="md",
@@ -1227,7 +1232,7 @@ def create_time_based_analysis_section():
                     dcc.Graph(
                         id="trade-sequence-chart",
                         config={"responsive": True, "displayModeBar": False},
-                        style={"height": "400px"},
+                        style={"height": "min(400px, 45vh)", "minHeight": "300px", "width": "100%"},
                     ),
                 ],
                 p="md",
@@ -1269,7 +1274,7 @@ def create_advanced_metrics_section():
                     dcc.Graph(
                         id="rom-timeline-chart",
                         config={"responsive": True, "displayModeBar": False},
-                        style={"height": "300px"},
+                        style={"height": "min(300px, 35vh)", "minHeight": "250px", "width": "100%"},
                     ),
                 ],
                 p="md",
@@ -1300,7 +1305,7 @@ def create_advanced_metrics_section():
                     dcc.Graph(
                         id="rolling-metrics-chart",
                         config={"responsive": True, "displayModeBar": False},
-                        style={"height": "300px"},
+                        style={"height": "min(300px, 35vh)", "minHeight": "250px", "width": "100%"},
                     ),
                 ],
                 p="md",
@@ -1313,7 +1318,7 @@ def create_advanced_metrics_section():
                     dcc.Graph(
                         id="risk-evolution-chart",
                         config={"responsive": True, "displayModeBar": False},
-                        style={"height": "300px"},
+                        style={"height": "min(300px, 35vh)", "minHeight": "250px", "width": "100%"},
                     ),
                 ],
                 p="md",
