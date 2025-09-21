@@ -679,6 +679,7 @@ def register_callbacks(app):
             Input("sequence-show-trend", "checked"),
             Input("rom-ma-period", "value"),
             Input("rolling-metric-type", "value"),
+            Input("theme-store", "data"),
         ],
         prevent_initial_call=False,
     )
@@ -692,6 +693,7 @@ def register_callbacks(app):
         sequence_show_trend,
         rom_ma_period,
         rolling_metric_type,
+        theme_data,
     ):
         """Update Performance Blocks charts from uploaded real data."""
         try:
@@ -785,8 +787,9 @@ def register_callbacks(app):
                 equity_data,
                 scale=scale_mode or "linear",
                 show_drawdown_areas=bool(show_drawdown_areas),
+                theme_data=theme_data,
             )
-            drawdown_fig = create_drawdown_chart(equity_data)
+            drawdown_fig = create_drawdown_chart(equity_data, theme_data=theme_data)
             dow_fig = create_day_of_week_distribution_chart(distribution_data)
             rom_dist_fig = create_rom_distribution_chart(distribution_data)
             streak_fig = create_streak_distribution_chart(streak_data)

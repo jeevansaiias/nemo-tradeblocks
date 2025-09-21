@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Any, Optional
 
+from app.utils.theme import get_theme_colors, apply_theme_layout
+
 
 # =============================================================================
 # REAL CHART IMPLEMENTATIONS - Phase 2 Core Charts
@@ -15,7 +17,10 @@ from typing import List, Dict, Any, Optional
 
 
 def create_equity_curve_chart(
-    equity_data: Dict[str, Any], scale: str = "linear", show_drawdown_areas: bool = True
+    equity_data: Dict[str, Any],
+    scale: str = "linear",
+    show_drawdown_areas: bool = True,
+    theme_data=None,
 ) -> go.Figure:
     """
     Create equity curve chart with linear/log toggle and drawdown highlighting.
@@ -24,7 +29,11 @@ def create_equity_curve_chart(
         equity_data: Output from calculate_enhanced_cumulative_equity
         scale: 'linear' or 'log' for y-axis scaling
         show_drawdown_areas: Whether to highlight drawdown periods
+        theme_data: Theme data for styling
     """
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     fig = go.Figure()
 
     if not equity_data or "equity_curve" not in equity_data:
@@ -100,41 +109,58 @@ def create_equity_curve_chart(
             fig.add_vrect(
                 x0=dates[start_idx],
                 x1=dates[end_idx],
-                fillcolor="rgba(239, 68, 68, 0.1)",
+                fillcolor="rgba(239, 68, 68, 0.08)",
                 layer="below",
                 line_width=0,
-                annotation_text="Drawdown",
-                annotation_position="top left",
             )
 
-    # Update layout
-    fig.update_layout(
+        # Add a legend entry for drawdown areas if any exist
+        if drawdown_periods:
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="markers",
+                    marker=dict(color="rgba(239, 68, 68, 0.5)", size=10, symbol="square"),
+                    name="Drawdown Periods",
+                    showlegend=True,
+                    hoverinfo="skip",
+                )
+            )
+
+    # Apply theme-aware layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title=dict(text="📈 Portfolio Equity Curve", font=dict(size=20, weight="bold"), x=0.02),
-        xaxis=dict(title="Date", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
+        xaxis=dict(title="Date", gridcolor=theme_colors["grid_color"]),
         yaxis=dict(
             title="Portfolio Value ($)",
             type=scale,
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
+            gridcolor=theme_colors["grid_color"],
             tickformat="$,.0f",
         ),
         hovermode="x unified",
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(t=80, b=60, l=80, r=60),
-        height=400,
+        margin=dict(t=60, b=40, l=80, r=60),
+        autosize=True,
     )
 
     return fig
 
 
-def create_drawdown_chart(equity_data: Dict[str, Any]) -> go.Figure:
+def create_drawdown_chart(equity_data: Dict[str, Any], theme_data=None) -> go.Figure:
     """
     Create drawdown chart with filled area and recovery highlighting.
 
     Args:
         equity_data: Output from calculate_enhanced_cumulative_equity
+        theme_data: Theme data for styling
     """
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     fig = go.Figure()
 
     if not equity_data or "equity_curve" not in equity_data:
@@ -191,14 +217,15 @@ def create_drawdown_chart(equity_data: Dict[str, Any]) -> go.Figure:
             )
         )
 
-    # Update layout
-    fig.update_layout(
+    # Apply theme-aware layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title=dict(text="📉 Portfolio Drawdown", font=dict(size=20, weight="bold"), x=0.02),
-        xaxis=dict(title="Date", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
+        xaxis=dict(title="Date", gridcolor=theme_colors["grid_color"]),
         yaxis=dict(
             title="Drawdown (%)",
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
+            gridcolor=theme_colors["grid_color"],
             tickformat=".1f",
             range=[min(drawdowns + [0]) * 1.1, 5],  # Show a bit above zero
         ),
@@ -206,7 +233,6 @@ def create_drawdown_chart(equity_data: Dict[str, Any]) -> go.Figure:
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(t=80, b=60, l=80, r=60),
-        height=400,
     )
 
     return fig
@@ -1039,7 +1065,7 @@ def create_main_equity_section():
                     dcc.Graph(
                         id="equity-curve-chart",
                         config={"responsive": True, "displayModeBar": True},
-                        style={"height": "500px"},
+                        style={"height": "min(400px, 50vh)", "minHeight": "300px", "width": "100%"},
                     ),
                 ],
                 p="md",
@@ -1052,7 +1078,7 @@ def create_main_equity_section():
                     dcc.Graph(
                         id="drawdown-chart",
                         config={"responsive": True, "displayModeBar": True},
-                        style={"height": "300px"},
+                        style={"height": "min(400px, 50vh)", "minHeight": "300px", "width": "100%"},
                     ),
                 ],
                 p="md",
