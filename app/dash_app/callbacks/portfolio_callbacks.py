@@ -18,10 +18,8 @@ from app.dash_app.components.tabs.geekistics import (
 )
 from app.dash_app.components.tabs.performance_charts import (
     create_performance_charts_tab,
-    create_cumulative_pl_chart,
-    create_drawdown_chart,
-    create_daily_pl_chart,
-    create_monthly_heatmap,
+    get_mock_charts,
+    get_mock_metrics,
 )
 from app.dash_app.components.tabs.trade_data import (
     create_trade_data_tab,
@@ -594,6 +592,7 @@ def register_callbacks(app):
                 [],
             )
 
+    # Note: Old performance charts callback - using mock data for now
     @app.callback(
         [
             Output("cumulative-pl-chart", "figure"),
@@ -605,32 +604,81 @@ def register_callbacks(app):
         prevent_initial_call=True,
     )
     def update_performance_charts(portfolio_data, timeframe):
-        """Update the Performance Charts tab"""
+        """Update the Performance Charts tab - using mock data for now"""
         if not portfolio_data:
             return {}, {}, {}, {}
 
         try:
-            # Send portfolio data to stateless API endpoint
-            response = requests.post(
-                f"{API_BASE_URL}/calculate/performance-data", json=portfolio_data
+            # Use mock data for now since we've rebuilt the performance page
+            mock_charts = get_mock_charts()
+            return (
+                mock_charts["equity_curve"],
+                mock_charts["drawdown"],
+                mock_charts["equity_curve"],  # Placeholder for daily chart
+                mock_charts["monthly_heatmap"],
             )
-
-            if response.status_code != 200:
-                return {}, {}, {}, {}
-
-            performance_data = response.json()
-
-            # Create charts
-            cumulative_chart = create_cumulative_pl_chart(performance_data)
-            drawdown_chart = create_drawdown_chart(performance_data)
-            daily_chart = create_daily_pl_chart(performance_data)
-            monthly_chart = create_monthly_heatmap(performance_data)
-
-            return cumulative_chart, drawdown_chart, daily_chart, monthly_chart
 
         except Exception as e:
             logger.error(f"Error updating performance charts: {str(e)}")
             return {}, {}, {}, {}
+
+    # Performance Blocks page callbacks
+    @app.callback(
+        [
+            Output("performance-key-metrics", "children"),
+            Output("blocks-equity-curve", "figure"),
+            Output("blocks-drawdown-chart", "figure"),
+            Output("blocks-day-of-week", "figure"),
+            Output("blocks-rom-distribution", "figure"),
+            Output("blocks-streak-distribution", "figure"),
+            Output("blocks-monthly-heatmap", "figure"),
+            Output("blocks-trade-sequence", "figure"),
+            Output("blocks-rom-timeline", "figure"),
+            Output("blocks-rolling-metrics", "figure"),
+            Output("blocks-risk-evolution", "figure"),
+        ],
+        [
+            Input("current-portfolio-data", "data"),
+            Input("blocks-strategy-filter", "value"),
+            Input("blocks-date-range", "value"),
+            Input("blocks-scale-toggle", "checked"),
+            Input("blocks-comparison-mode", "checked"),
+        ],
+        prevent_initial_call=False,
+    )
+    def update_performance_blocks(
+        portfolio_data, strategy_filter, date_range, linear_scale, comparison_mode
+    ):
+        """Update all Performance Blocks charts with mock data"""
+
+        # For now, use mock data regardless of portfolio_data
+        # TODO: Replace with real data processing when ready
+        mock_charts = get_mock_charts()
+        mock_metrics = get_mock_metrics()
+
+        # Apply scale toggle to equity curve
+        if linear_scale:
+            # Modify equity curve to be linear (mock data is already configured for this)
+            pass
+        else:
+            # Apply logarithmic scale
+            equity_chart = mock_charts["equity_curve"]
+            equity_chart["layout"]["yaxis"]["type"] = "log"
+            mock_charts["equity_curve"] = equity_chart
+
+        return (
+            mock_metrics,
+            mock_charts["equity_curve"],
+            mock_charts["drawdown"],
+            mock_charts["day_of_week"],
+            mock_charts["rom_distribution"],
+            mock_charts["streak_distribution"],
+            mock_charts["monthly_heatmap"],
+            mock_charts["trade_sequence"],
+            mock_charts["rom_timeline"],
+            mock_charts["rolling_metrics"],
+            mock_charts["risk_evolution"],
+        )
 
     @app.callback(
         [
