@@ -761,8 +761,8 @@ def create_correlation_analytics_from_matrix(correlation_matrix, strategies):
                     dmc.Divider(),
                     dmc.Group(
                         [
-                            dmc.Text("Average:", size="sm", c="blue", fw=600),
-                            dmc.Text(f"{avg_corr:.2f}", size="lg", fw=700, c="blue"),
+                            dmc.Text("Average:", size="sm", c="gray.8", fw=600),
+                            dmc.Text(f"{avg_corr:.2f}", size="lg", fw=700, c="gray.8"),
                         ],
                         justify="space-between",
                     ),

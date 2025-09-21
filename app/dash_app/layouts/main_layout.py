@@ -18,13 +18,13 @@ def create_main_layout():
                             dmc.Group(
                                 children=[
                                     html.Img(
-                                        src="/assets/tradeblocks-logo.png",
+                                        src="/assets/recreate-this-tradeblocks-logo-on-a-clean-white-background-k.png",
                                         className="tb-logo",
                                         style={"height": "32px", "width": "auto"},
                                     ),
                                     dmc.Stack(
                                         [
-                                            dmc.Text("TradeBlocks", size="lg", fw=700, c="blue.6"),
+                                            dmc.Text("TradeBlocks", size="lg", fw=700),
                                             dmc.Text(
                                                 "Trading Analytics Platform", size="xs", c="dimmed"
                                             ),
@@ -64,7 +64,7 @@ def create_main_layout():
                                                     icon="tabler:settings", width=16
                                                 ),
                                                 variant="light",
-                                                color="blue",
+                                                color="gray",
                                                 size="sm",
                                             ),
                                         ],
@@ -263,11 +263,11 @@ def create_welcome_content():
             dmc.Stack(
                 children=[
                     html.Img(
-                        src="/assets/tradeblocks-logo.png",
+                        src="/assets/recreate-this-tradeblocks-logo-on-a-clean-white-background-k.png",
                         className="tb-logo",
                         style={"height": "150px", "width": "auto", "opacity": "0.8"},
                     ),
-                    dmc.Title("Welcome to TradeBlocks", order=2, ta="center", c="blue.6"),
+                    dmc.Title("Welcome to TradeBlocks", order=2, ta="center"),
                     dmc.Title("Trading Analytics Platform", order=3, ta="center", c="dimmed"),
                     dmc.Text(
                         "🧱 Build smarter trades with powerful analytics, one block at a time! 📊",
@@ -287,7 +287,7 @@ def create_welcome_content():
                         size="lg",
                         leftSection=DashIconify(icon="tabler:upload"),
                         id="welcome-upload-button",
-                        color="blue",
+                        color="gray",
                         variant="gradient",
                         gradient={"from": "orange", "to": "red"},
                     ),

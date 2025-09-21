@@ -132,7 +132,7 @@ def register_callbacks(app):
                 children=[
                     dmc.Stack(
                         [
-                            dmc.Text("🧱 Active Blocks", size="sm", fw=500, c="blue.6"),
+                            dmc.Text("🧱 Active Blocks", size="sm", fw=500),
                             dmc.Text(
                                 f"🧱 {filename}", size="xs", c="dimmed", style={"fontWeight": 600}
                             ),
@@ -148,7 +148,7 @@ def register_callbacks(app):
                                         "Change Files",
                                         id="change-files-button",
                                         variant="subtle",
-                                        color="blue",
+                                        color="gray",
                                         size="xs",
                                         leftSection=DashIconify(icon="tabler:edit"),
                                     ),
@@ -184,7 +184,7 @@ def register_callbacks(app):
                                 id="upload-button",
                                 leftSection=DashIconify(icon="tabler:upload"),
                                 variant="light",
-                                color="blue",
+                                color="gray",
                                 size="sm",
                                 fullWidth=True,
                             ),

@@ -164,7 +164,7 @@ def create_trade_summary_stats(trades_data):
     ]
 
 
-def create_summary_stat(label, value, icon, color="blue"):
+def create_summary_stat(label, value, icon, color="gray"):
     """Create a summary statistic component"""
     return dmc.Group(
         children=[
