@@ -33,6 +33,7 @@ from app.dash_app.components.tabs.performance_charts import (
     create_rom_timeline_chart,
     create_rolling_metrics_chart,
     create_risk_evolution_chart,
+    generate_streak_statistics_group,
 )
 from app.dash_app.components.tabs.trade_data import (
     create_trade_data_tab,
@@ -663,6 +664,7 @@ def register_callbacks(app):
             Output("day-of-week-chart", "figure"),
             Output("rom-distribution-chart", "figure"),
             Output("streak-distribution-chart", "figure"),
+            Output("streak-statistics-group", "children"),
             Output("monthly-heatmap-chart", "figure"),
             Output("trade-sequence-chart", "figure"),
             Output("rom-timeline-chart", "figure"),
@@ -801,6 +803,9 @@ def register_callbacks(app):
             )
             risk_fig = create_risk_evolution_chart(rolling_data)
 
+            # Generate streak statistics
+            streak_stats = generate_streak_statistics_group(streak_data)
+
             # Metrics bar
             metrics = dmc.Group(
                 children=[
@@ -819,6 +824,7 @@ def register_callbacks(app):
                 dow_fig,
                 rom_dist_fig,
                 streak_fig,
+                streak_stats,
                 heatmap_fig,
                 sequence_fig,
                 rom_timeline_fig,
@@ -836,6 +842,7 @@ def register_callbacks(app):
                 mocks.get("day_of_week", {}),
                 mocks.get("rom_distribution", {}),
                 mocks.get("streak_distribution", {}),
+                generate_streak_statistics_group({}),  # Default streak stats
                 mocks.get("monthly_heatmap", {}),
                 mocks.get("trade_sequence", {}),
                 mocks.get("rom_timeline", {}),

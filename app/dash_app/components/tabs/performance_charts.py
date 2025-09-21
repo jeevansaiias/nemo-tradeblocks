@@ -410,8 +410,6 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
                 orientation="h",
                 name="Win Streaks",
                 marker=dict(color="#10b981"),
-                text=[f"{count} times" for count in win_counts],
-                textposition="outside",
                 hovertemplate=(
                     "<b>Win Streak:</b> %{y} trades<br>"
                     "<b>Occurrences:</b> %{x}<br>"
@@ -429,8 +427,6 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
                 orientation="h",
                 name="Loss Streaks",
                 marker=dict(color="#ef4444"),
-                text=[f"{count} times" for count in loss_counts],
-                textposition="outside",
                 hovertemplate=(
                     "<b>Loss Streak:</b> %{y} trades<br>"
                     "<b>Occurrences:</b> %{customdata}<br>"
@@ -446,7 +442,7 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
     # Update layout
     fig.update_layout(
         title=dict(
-            text="🎯 Win/Loss Streak Distribution", font=dict(size=18, weight="bold"), x=0.02
+            text="🎯 Win/Loss Streak Distribution", font=dict(size=16, weight="bold"), x=0.02
         ),
         xaxis=dict(
             title="← Loss Streaks | Win Streaks →",
@@ -459,7 +455,7 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
         yaxis=dict(title="Streak Length (Trades)", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        margin=dict(t=80, b=60, l=80, r=80),
+        margin=dict(t=60, b=40, l=60, r=40),  # Reduced margins for better space usage
     )
 
     return fig
@@ -1145,13 +1141,14 @@ def create_distribution_analysis_section():
                                 id="streak-distribution-chart",
                                 config={"responsive": True, "displayModeBar": False},
                                 style={
-                                    "height": "min(300px, 35vh)",
-                                    "minHeight": "250px",
+                                    "height": "min(380px, 45vh)",
+                                    "minHeight": "320px",
                                     "width": "100%",
                                 },
                             ),
-                            # Streak Statistics
+                            # Streak Statistics (populated by callback)
                             dmc.Group(
+                                id="streak-statistics-group",
                                 children=[
                                     create_streak_stat("Max Win", "0", "green"),
                                     create_streak_stat("Max Loss", "0", "red"),
@@ -1182,6 +1179,66 @@ def create_streak_stat(label, value, color):
         gap="xs",
         align="center",
     )
+
+
+def generate_streak_statistics_group(streak_data: Dict[str, Any]) -> dmc.Group:
+    """
+    Generate streak statistics group with real data.
+
+    Args:
+        streak_data: Output from calculate_streak_distributions
+
+    Returns:
+        DMC Group component with real streak statistics
+    """
+    try:
+        # Default values
+        max_win = "0"
+        max_loss = "0"
+        avg_win = "0.0"
+        avg_loss = "0.0"
+
+        if streak_data and "statistics" in streak_data:
+            stats = streak_data["statistics"]
+
+            # Get max streaks
+            max_win_streak = stats.get("max_win_streak", 0)
+            max_loss_streak = stats.get("max_loss_streak", 0)
+
+            # Get average streaks
+            avg_win_streak = stats.get("avg_win_streak", 0.0)
+            avg_loss_streak = stats.get("avg_loss_streak", 0.0)
+
+            # Format values
+            max_win = str(max_win_streak)
+            max_loss = str(max_loss_streak)
+            avg_win = f"{avg_win_streak:.1f}"
+            avg_loss = f"{avg_loss_streak:.1f}"
+
+        return dmc.Group(
+            children=[
+                create_streak_stat("Max Win", max_win, "green"),
+                create_streak_stat("Max Loss", max_loss, "red"),
+                create_streak_stat("Avg Win", avg_win, "teal"),
+                create_streak_stat("Avg Loss", avg_loss, "orange"),
+            ],
+            justify="space-around",
+            w="100%",
+        )
+
+    except Exception as e:
+        print(f"Error generating streak statistics: {e}")
+        # Fallback to default values
+        return dmc.Group(
+            children=[
+                create_streak_stat("Max Win", "0", "green"),
+                create_streak_stat("Max Loss", "0", "red"),
+                create_streak_stat("Avg Win", "0.0", "teal"),
+                create_streak_stat("Avg Loss", "0.0", "orange"),
+            ],
+            justify="space-around",
+            w="100%",
+        )
 
 
 def create_time_based_analysis_section():
