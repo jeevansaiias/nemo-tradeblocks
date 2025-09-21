@@ -51,6 +51,26 @@ def create_upload_component(
                 variant="light",
                 style={"marginBottom": "10px"},
             ),
+            dmc.Alert(
+                children=[
+                    dmc.Group(
+                        [
+                            DashIconify(icon="tabler:alert-triangle", width=16),
+                            dmc.Text(
+                                "⚠️ Educational use only • Not financial advice • See footer for full disclaimer",
+                                size="sm",
+                                fw=500,
+                            ),
+                        ],
+                        gap="xs",
+                        align="flex-start",
+                        wrap="nowrap",
+                    )
+                ],
+                color="orange",
+                variant="light",
+                style={"marginBottom": "15px"},
+            ),
             dmc.SimpleGrid(
                 children=[
                     create_single_upload(

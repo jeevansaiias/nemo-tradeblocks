@@ -35,34 +35,6 @@ def create_main_layout():
                                 gap="sm",
                                 align="center",
                             ),
-                            # Center - NinjaTaco tribute
-                            dmc.Anchor(
-                                children=[
-                                    dmc.Group(
-                                        [
-                                            dmc.Text(
-                                                "Inspired by NinjaTaco",
-                                                size="xs",
-                                                c="orange.6",
-                                                fw=500,
-                                            ),
-                                            html.Img(
-                                                src="/assets/ninjataco-tribute.png",
-                                                style={
-                                                    "height": "24px",
-                                                    "width": "auto",
-                                                    "opacity": "0.7",
-                                                },
-                                            ),
-                                        ],
-                                        gap="xs",
-                                        align="center",
-                                    )
-                                ],
-                                href="https://ninjata.co/",
-                                target="_blank",
-                                style={"textDecoration": "none"},
-                            ),
                             # Right side items
                             dmc.Group(
                                 children=[
@@ -115,20 +87,6 @@ def create_main_layout():
                                         ],
                                         size="sm",
                                         radius="md",
-                                    ),
-                                    # GitHub link
-                                    dmc.Anchor(
-                                        children=[
-                                            dmc.ActionIcon(
-                                                DashIconify(icon="tabler:brand-github", width=20),
-                                                variant="subtle",
-                                                color="gray",
-                                                size="md",
-                                            )
-                                        ],
-                                        href="https://github.com/davidromeo/tradeblocks",
-                                        target="_blank",
-                                        style={"textDecoration": "none"},
                                     ),
                                 ],
                                 gap="sm",
@@ -204,6 +162,113 @@ def create_main_layout():
                 ],
                 w=250,
             ),
+            # Footer
+            dmc.AppShellFooter(
+                children=[
+                    dmc.Container(
+                        children=[
+                            dmc.Group(
+                                children=[
+                                    # Left side - Warning and disclaimer
+                                    dmc.Group(
+                                        children=[
+                                            dmc.Text(
+                                                "⚠️ Educational use only • Not financial advice • Trading involves risk",
+                                                size="xs",
+                                                c="dimmed",
+                                            ),
+                                            dmc.Text("•", size="xs", c="dimmed"),
+                                            dmc.Button(
+                                                "Full Disclaimer",
+                                                id="disclaimer-link",
+                                                variant="subtle",
+                                                size="xs",
+                                                color="orange",
+                                                style={
+                                                    "padding": "0",
+                                                    "height": "auto",
+                                                    "minHeight": "auto",
+                                                },
+                                            ),
+                                        ],
+                                        gap="xs",
+                                        align="center",
+                                    ),
+                                    # Center - Tagline
+                                    dmc.Text(
+                                        "TradeBlocks builds insights, not investment advice",
+                                        size="xs",
+                                        c="dimmed",
+                                        style={"fontStyle": "italic"},
+                                    ),
+                                    # Right side - Credits and links
+                                    dmc.Group(
+                                        children=[
+                                            # NinjaTaco tribute
+                                            dmc.Anchor(
+                                                children=[
+                                                    dmc.Group(
+                                                        [
+                                                            dmc.Text(
+                                                                "Inspired by NinjaTaco",
+                                                                size="xs",
+                                                                c="orange.6",
+                                                                fw=500,
+                                                            ),
+                                                            html.Img(
+                                                                src="/assets/ninjataco-tribute.png",
+                                                                style={
+                                                                    "height": "16px",
+                                                                    "width": "auto",
+                                                                    "opacity": "0.7",
+                                                                },
+                                                            ),
+                                                        ],
+                                                        gap="4px",
+                                                        align="center",
+                                                    )
+                                                ],
+                                                href="https://ninjata.co/",
+                                                target="_blank",
+                                                style={"textDecoration": "none"},
+                                            ),
+                                            dmc.Text("•", size="xs", c="dimmed"),
+                                            # GitHub link
+                                            dmc.Anchor(
+                                                children=[
+                                                    dmc.Group(
+                                                        [
+                                                            DashIconify(
+                                                                icon="tabler:brand-github", width=14
+                                                            ),
+                                                            dmc.Text(
+                                                                "GitHub", size="xs", c="gray.6"
+                                                            ),
+                                                        ],
+                                                        gap="4px",
+                                                        align="center",
+                                                    )
+                                                ],
+                                                href="https://github.com/davidromeo/tradeblocks",
+                                                target="_blank",
+                                                style={"textDecoration": "none"},
+                                            ),
+                                        ],
+                                        gap="xs",
+                                        align="center",
+                                    ),
+                                ],
+                                justify="space-between",
+                                align="center",
+                                w="100%",
+                            )
+                        ],
+                        size="xl",
+                        p="sm",
+                    )
+                ],
+                h=50,
+            ),
             # Main content area
             dmc.AppShellMain(
                 children=[
@@ -263,6 +328,14 @@ def create_main_layout():
                                 size="lg",
                                 children=[html.Div(id="settings-modal-content")],
                             ),
+                            # Disclaimer modal
+                            dmc.Modal(
+                                id="disclaimer-modal",
+                                title="⚠️ Important Disclaimer",
+                                opened=False,
+                                size="lg",
+                                children=[create_disclaimer_content()],
+                            ),
                             # Main content
                             html.Div(
                                 style={"position": "relative"},
@@ -280,6 +353,7 @@ def create_main_layout():
         ],
         header={"height": 60},
         navbar={"width": 250, "breakpoint": "sm", "collapsed": {"mobile": True}},
+        footer={"height": 50},
         padding="md",
     )
 
@@ -325,4 +399,99 @@ def create_welcome_content():
             )
         ],
         style={"minHeight": "60vh"},
+    )
+
+
+def create_disclaimer_content():
+    """Create the full disclaimer content for the modal"""
+    return dmc.Stack(
+        children=[
+            dmc.Alert(
+                children=[
+                    dmc.Text(
+                        "🧱 Important Legal Notice - Please Read Before Building Your Analytics",
+                        fw=600,
+                        size="sm",
+                    )
+                ],
+                color="orange",
+                variant="light",
+                mb="md",
+            ),
+            dmc.Stack(
+                children=[
+                    dmc.Text(
+                        "Educational & Research Purposes Only",
+                        fw=600,
+                        size="md",
+                        c="red.6",
+                    ),
+                    dmc.Text(
+                        "TradeBlocks is designed for educational exploration and research analysis of trading strategies. Nothing within this platform constitutes investment advice, trading recommendations, or financial guidance of any kind.",
+                        size="sm",
+                    ),
+                ],
+                gap="xs",
+                mb="md",
+            ),
+            dmc.Stack(
+                children=[
+                    dmc.Text("Your Data, Your Responsibility", fw=600, size="md", c="orange.6"),
+                    dmc.Text(
+                        "All calculations, metrics, and insights are generated from the historical data you provide. We make no guarantees about data accuracy, completeness, or the validity of your trading logs. Quality analysis requires quality data — imperfect inputs will produce unreliable results.",
+                        size="sm",
+                    ),
+                ],
+                gap="xs",
+                mb="md",
+            ),
+            dmc.Stack(
+                children=[
+                    dmc.Text("Software & Technical Limitations", fw=600, size="md", c="blue.6"),
+                    dmc.Text(
+                        "Like all software, TradeBlocks may contain errors, bugs, or unexpected behaviors. Our algorithms make assumptions that may not align with your specific trading circumstances. Historical performance analysis cannot predict future market outcomes.",
+                        size="sm",
+                    ),
+                ],
+                gap="xs",
+                mb="md",
+            ),
+            dmc.Stack(
+                children=[
+                    dmc.Text("Financial Risk Acknowledgment", fw=600, size="md", c="red.7"),
+                    dmc.Text(
+                        "Trading and investing carry substantial risk of loss. You may lose part or all of your investment capital. Before making any financial decisions, consult with qualified financial professionals who understand your individual situation.",
+                        size="sm",
+                    ),
+                ],
+                gap="xs",
+                mb="md",
+            ),
+            dmc.Stack(
+                children=[
+                    dmc.Text("Privacy & Data Handling", fw=600, size="md", c="gray.7"),
+                    dmc.Text(
+                        "TradeBlocks operates entirely in your browser using local storage and session cookies to maintain your data and preferences. We do not transmit, store, or access your trading data on external servers.",
+                        size="sm",
+                    ),
+                ],
+                gap="xs",
+                mb="md",
+            ),
+            dmc.Alert(
+                children=[
+                    dmc.Text(
+                        "🧱 Remember: TradeBlocks builds insights, not investment advice.",
+                        fw=700,
+                        ta="center",
+                        size="md",
+                        style={"fontStyle": "italic"},
+                    )
+                ],
+                color="gray",
+                variant="filled",
+                mt="md",
+            ),
+        ],
+        gap="sm",
     )

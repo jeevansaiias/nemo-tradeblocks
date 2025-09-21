@@ -105,3 +105,13 @@ html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"
     background-color: #fafafa !important;
     border-bottom: 1px solid #E5E7EB !important;
 }
+
+/* Professional footer styling - Light theme only */
+[data-mantine-color-scheme="light"] [data-mantine-component="AppShellFooter"],
+:root[data-mantine-color-scheme="light"] [data-mantine-component="AppShellFooter"],
+html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellFooter"],
+[data-mantine-color-scheme="light"] .mantine-AppShell-footer,
+.mantine-AppShell-footer[data-mantine-color-scheme="light"] {
+    background-color: #fafafa !important;
+    border-top: 1px solid #E5E7EB !important;
+}

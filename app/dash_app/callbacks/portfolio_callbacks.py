@@ -874,3 +874,16 @@ def register_callbacks(app):
                 logger.warning(f"Could not calculate initial capital: {e}")
 
         return create_config_indicator(config_data, initial_capital)
+
+    # Disclaimer modal callback
+    @app.callback(
+        Output("disclaimer-modal", "opened"),
+        [Input("disclaimer-link", "n_clicks")],
+        [State("disclaimer-modal", "opened")],
+        prevent_initial_call=True,
+    )
+    def toggle_disclaimer_modal(disclaimer_clicks, modal_opened):
+        """Toggle the disclaimer modal when the footer link is clicked"""
+        if disclaimer_clicks and disclaimer_clicks > 0:
+            return not modal_opened if modal_opened is not None else True
+        return no_update
