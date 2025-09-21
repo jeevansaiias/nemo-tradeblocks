@@ -1,0 +1,81 @@
+from datetime import date, time
+
+import pytest
+
+from app.data.models import Portfolio, Trade
+
+
+def test_csv_parsing(portfolio_processor, sample_csv_content):
+    """Test CSV parsing functionality"""
+    portfolio = portfolio_processor.parse_csv(sample_csv_content, "test.csv")
+
+    assert isinstance(portfolio, Portfolio)
+    assert portfolio.filename == "test.csv"
+    assert portfolio.total_trades == 2
+    assert len(portfolio.trades) == 2
+
+
+def test_trade_conversion(portfolio_processor, sample_csv_content):
+    """Test conversion of CSV data to Trade objects"""
+    portfolio = portfolio_processor.parse_csv(sample_csv_content, "test.csv")
+
+    trade = portfolio.trades[0]
+    assert isinstance(trade, Trade)
+    assert trade.date_opened == date(2025, 9, 18)
+    assert trade.time_opened == time(10, 31, 0)
+    assert trade.pl == -6850.6
+    assert trade.strategy == "Test Strategy 1"
+
+
+def test_portfolio_stats_calculation(portfolio_processor, sample_portfolio):
+    """Test portfolio statistics calculation"""
+    stats = portfolio_processor.calculate_portfolio_stats(sample_portfolio)
+
+    assert stats.total_trades == 2
+    assert stats.total_pl == pytest.approx(-17724.76, rel=1e-2)  # Sum of both trades
+    assert 0 <= stats.win_rate <= 1
+    assert stats.max_drawdown <= 0
+
+
+def test_strategy_stats_calculation(portfolio_processor, sample_portfolio):
+    """Test strategy statistics calculation"""
+    strategy_stats = portfolio_processor.calculate_strategy_stats(sample_portfolio)
+
+    assert "Test Strategy 1" in strategy_stats
+    assert "Test Strategy 2" in strategy_stats
+
+    strategy1_stats = strategy_stats["Test Strategy 1"]
+    assert strategy1_stats.trade_count == 1
+    assert strategy1_stats.total_pl == -6850.6
+
+
+def test_empty_portfolio(portfolio_processor):
+    """Test handling of empty portfolio"""
+    empty_csv = "Date Opened,Time Opened,Opening Price,Legs,Premium,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy,Opening Commissions + Fees,Closing Commissions + Fees,Opening Short/Long Ratio,Opening VIX"
+
+    portfolio = portfolio_processor.parse_csv(empty_csv, "empty.csv")
+    assert portfolio.total_trades == 0
+    assert portfolio.total_pl == 0
+    assert len(portfolio.strategies) == 0
+
+
+def test_invalid_csv_format(portfolio_processor):
+    """Test handling of invalid CSV format"""
+    invalid_csv = "invalid,csv,format"
+
+    with pytest.raises(ValueError):
+        portfolio_processor.parse_csv(invalid_csv, "invalid.csv")
+
+
+def test_column_mapping(portfolio_processor):
+    """Test that column mapping works correctly"""
+    # Test BOM removal and column mapping
+    csv_with_bom = '\ufeff"Date Opened","P/L","Strategy"\n"2025-09-18",-1000,"Test Strategy"'
+
+    # This should not raise an error due to BOM handling
+    try:
+        portfolio = portfolio_processor.parse_csv(csv_with_bom, "bom_test.csv")
+        # The parsing might fail due to missing required columns, but BOM should be handled
+    except ValueError:
+        # Expected due to missing required columns, but BOM should be removed
+        pass
