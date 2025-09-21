@@ -36,18 +36,32 @@ def create_main_layout():
                                 align="center",
                             ),
                             # Center - NinjaTaco tribute
-                            dmc.Group(
-                                [
-                                    dmc.Text(
-                                        "Inspired by NinjaTaco", size="xs", c="orange.6", fw=500
-                                    ),
-                                    html.Img(
-                                        src="/assets/ninjataco-tribute.png",
-                                        style={"height": "24px", "width": "auto", "opacity": "0.7"},
-                                    ),
+                            dmc.Anchor(
+                                children=[
+                                    dmc.Group(
+                                        [
+                                            dmc.Text(
+                                                "Inspired by NinjaTaco",
+                                                size="xs",
+                                                c="orange.6",
+                                                fw=500,
+                                            ),
+                                            html.Img(
+                                                src="/assets/ninjataco-tribute.png",
+                                                style={
+                                                    "height": "24px",
+                                                    "width": "auto",
+                                                    "opacity": "0.7",
+                                                },
+                                            ),
+                                        ],
+                                        gap="xs",
+                                        align="center",
+                                    )
                                 ],
-                                gap="xs",
-                                align="center",
+                                href="https://ninjata.co/",
+                                target="_blank",
+                                style={"textDecoration": "none"},
                             ),
                             # Right side items
                             dmc.Group(
@@ -101,6 +115,20 @@ def create_main_layout():
                                         ],
                                         size="sm",
                                         radius="md",
+                                    ),
+                                    # GitHub link
+                                    dmc.Anchor(
+                                        children=[
+                                            dmc.ActionIcon(
+                                                DashIconify(icon="tabler:brand-github", width=20),
+                                                variant="subtle",
+                                                color="gray",
+                                                size="md",
+                                            )
+                                        ],
+                                        href="https://github.com/davidromeo/tradeblocks",
+                                        target="_blank",
+                                        style={"textDecoration": "none"},
                                     ),
                                 ],
                                 gap="sm",
