@@ -1,5 +1,6 @@
 from datetime import date, time
 
+import pandas as pd
 import pytest
 
 from app.data.models import Portfolio, Trade
@@ -25,6 +26,17 @@ def test_trade_conversion(portfolio_processor, sample_csv_content):
     assert trade.time_opened == time(10, 31, 0)
     assert trade.pl == -6850.6
     assert trade.strategy == "Test Strategy 1"
+
+
+def test_trade_conversion_single_backtest(portfolio_processor, sample_single_backtest_csv_content):
+    """Test conversion of CSV data to Trade objects"""
+    portfolio = portfolio_processor.parse_csv(sample_single_backtest_csv_content, "test.csv")
+
+    trade = portfolio.trades[0]
+    assert isinstance(trade, Trade)
+    assert trade.strategy == ""
+    assert pd.isna(trade.opening_vix) is True
+    assert pd.isna(trade.closing_vix) is True
 
 
 def test_portfolio_stats_calculation(portfolio_processor, sample_portfolio):
