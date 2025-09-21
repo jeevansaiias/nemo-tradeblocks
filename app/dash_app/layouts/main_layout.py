@@ -120,10 +120,10 @@ def create_main_layout():
                                         description="Risk Simulation",
                                     ),
                                     dmc.NavLink(
-                                        label="🔗 Connection Matrix",
+                                        label="🔗 Correlation Matrix",
                                         leftSection=DashIconify(icon="tabler:grid-dots"),
                                         id="nav-correlation",
-                                        description="Strategy Connections",
+                                        description="Strategy Correlations",
                                     ),
                                     dmc.NavLink(
                                         label="📊 Trade Blocks",
