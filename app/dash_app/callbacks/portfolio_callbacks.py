@@ -132,7 +132,7 @@ def register_callbacks(app):
                 children=[
                     dmc.Stack(
                         [
-                            dmc.Text("🧱 Active Blocks", size="sm", fw=500, c="blue.6"),
+                            dmc.Text("🧱 Active Blocks", size="sm", fw=500),
                             dmc.Text(
                                 f"🧱 {filename}", size="xs", c="dimmed", style={"fontWeight": 600}
                             ),
@@ -148,7 +148,7 @@ def register_callbacks(app):
                                         "Change Files",
                                         id="change-files-button",
                                         variant="subtle",
-                                        color="blue",
+                                        color="gray",
                                         size="xs",
                                         leftSection=DashIconify(icon="tabler:edit"),
                                     ),
@@ -184,7 +184,7 @@ def register_callbacks(app):
                                 id="upload-button",
                                 leftSection=DashIconify(icon="tabler:upload"),
                                 variant="light",
-                                color="blue",
+                                color="gray",
                                 size="sm",
                                 fullWidth=True,
                             ),
@@ -874,3 +874,16 @@ def register_callbacks(app):
                 logger.warning(f"Could not calculate initial capital: {e}")
 
         return create_config_indicator(config_data, initial_capital)
+
+    # Disclaimer modal callback
+    @app.callback(
+        Output("disclaimer-modal", "opened"),
+        [Input("disclaimer-link", "n_clicks")],
+        [State("disclaimer-modal", "opened")],
+        prevent_initial_call=True,
+    )
+    def toggle_disclaimer_modal(disclaimer_clicks, modal_opened):
+        """Toggle the disclaimer modal when the footer link is clicked"""
+        if disclaimer_clicks and disclaimer_clicks > 0:
+            return not modal_opened if modal_opened is not None else True
+        return no_update

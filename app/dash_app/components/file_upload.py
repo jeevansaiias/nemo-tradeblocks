@@ -47,9 +47,29 @@ def create_upload_component(
                         wrap="nowrap",
                     )
                 ],
-                color="blue",
+                color="gray",
                 variant="light",
                 style={"marginBottom": "10px"},
+            ),
+            dmc.Alert(
+                children=[
+                    dmc.Group(
+                        [
+                            DashIconify(icon="tabler:alert-triangle", width=16),
+                            dmc.Text(
+                                "⚠️ Educational use only • Not financial advice • See footer for full disclaimer",
+                                size="sm",
+                                fw=500,
+                            ),
+                        ],
+                        gap="xs",
+                        align="flex-start",
+                        wrap="nowrap",
+                    )
+                ],
+                color="orange",
+                variant="light",
+                style={"marginBottom": "15px"},
             ),
             dmc.SimpleGrid(
                 children=[
@@ -82,7 +102,7 @@ def create_upload_component(
                         "Done",
                         id="upload-done-button",
                         variant="filled",
-                        color="blue",
+                        color="gray",
                         size="md",
                         leftSection=DashIconify(icon="tabler:check", width=16),
                     )
@@ -156,7 +176,7 @@ def create_single_upload(
                         "display": "flex",
                         "alignItems": "center",
                         "justifyContent": "center",
-                        "backgroundColor": "#f8f9fa" if show_success else "transparent",
+                        "backgroundColor": "transparent",
                     },
                     className="upload-area",
                 ),
@@ -271,13 +291,13 @@ def create_upload_loading_area(file_type):
                 children=[
                     dmc.Stack(
                         children=[
-                            dmc.Loader(size="lg", variant="dots", color="blue"),
+                            dmc.Loader(size="lg", variant="dots", color="gray"),
                             dmc.Text(
                                 f"Processing {file_type}...",
                                 size="sm",
                                 ta="center",
                                 fw=500,
-                                c="blue",
+                                c="gray.8",
                             ),
                             dmc.Text(
                                 "Validating columns and parsing data",

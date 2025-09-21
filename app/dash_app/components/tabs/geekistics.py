@@ -35,7 +35,7 @@ def create_geekistics_tab():
     )
 
 
-def create_metric_card(title, value, subtitle=None, icon=None, color="blue"):
+def create_metric_card(title, value, subtitle=None, icon=None, color="gray"):
     """Create a metric card component"""
     return dmc.Paper(
         children=[
@@ -169,7 +169,7 @@ def create_comprehensive_stats(
                             dmc.Group(
                                 [
                                     dmc.Text("📅 Trade Period:", size="sm", fw=600, c="dimmed"),
-                                    dmc.Text(date_range, size="md", fw=500, c="blue"),
+                                    dmc.Text(date_range, size="md", fw=500),
                                 ],
                                 justify="center",
                                 align="center",
@@ -182,9 +182,9 @@ def create_comprehensive_stats(
                     ),
                     dmc.SimpleGrid(
                         [
-                            create_stat_card("Number of Trades", f"{total_trades:,}", color="blue"),
+                            create_stat_card("Number of Trades", f"{total_trades:,}", color="gray"),
                             create_stat_card(
-                                "Starting Capital", f"${initial_capital:,.0f}", color="blue"
+                                "Starting Capital", f"${initial_capital:,.0f}", color="gray"
                             ),
                             create_stat_card(
                                 "Avg Return on Margin",
@@ -214,7 +214,7 @@ def create_comprehensive_stats(
                         [
                             dmc.Text("📈 Return Metrics", size="lg", fw=600, c="orange.5"),
                             dmc.Badge(
-                                "Position-Size Dependent", variant="light", color="blue", size="sm"
+                                "Position-Size Dependent", variant="light", color="gray", size="sm"
                             ),
                         ],
                         justify="space-between",
@@ -232,7 +232,7 @@ def create_comprehensive_stats(
                                 "CAGR", f"{cagr:.2f}%", color="green" if cagr > 0 else "red"
                             ),
                             create_stat_card(
-                                "Avg RoM", f"{avg_return_on_margin:.2f}%", color="blue"
+                                "Avg RoM", f"{avg_return_on_margin:.2f}%", color="gray"
                             ),
                             create_stat_card(
                                 "Win Rate",
@@ -276,8 +276,8 @@ def create_comprehensive_stats(
                                 color="red",
                             ),
                             create_stat_card("Time in DD", f"{time_in_dd:.2f}%", color="orange"),
-                            create_stat_card("Sharpe Ratio", f"{sharpe_ratio:.2f}", color="blue"),
-                            create_stat_card("Sortino Ratio", f"{sortino_ratio:.2f}", color="blue"),
+                            create_stat_card("Sharpe Ratio", f"{sharpe_ratio:.2f}", color="gray"),
+                            create_stat_card("Sortino Ratio", f"{sortino_ratio:.2f}", color="gray"),
                             create_stat_card("Calmar Ratio", f"{calmar_ratio:.2f}", color="green"),
                         ],
                         cols=5,
@@ -308,7 +308,7 @@ def create_comprehensive_stats(
                             create_stat_card("Win Streak", f"{max_win_streak}", color="green"),
                             create_stat_card("Loss Streak", f"{max_loss_streak}", color="red"),
                             create_stat_card("Monthly WR", f"{monthly_wr:.2f}%", color="green"),
-                            create_stat_card("Weekly WR", f"{weekly_wr:.2f}%", color="blue"),
+                            create_stat_card("Weekly WR", f"{weekly_wr:.2f}%", color="gray"),
                             create_stat_card(
                                 "Kelly %",
                                 f"{kelly_criterion:.2f}%",
@@ -328,7 +328,7 @@ def create_comprehensive_stats(
     )
 
 
-def create_stat_card(title, value, subtitle=None, color="blue"):
+def create_stat_card(title, value, subtitle=None, color="gray"):
     """Create a statistic card with modern styling"""
     return dmc.Paper(
         [

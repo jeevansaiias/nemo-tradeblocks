@@ -44,7 +44,7 @@ def create_monte_carlo_tab():
                                 "Run Simulation",
                                 id="run-mc-button",
                                 leftSection=DashIconify(icon="tabler:play"),
-                                color="blue",
+                                color="gray",
                             ),
                         ],
                         gap="md",
@@ -185,7 +185,7 @@ def create_risk_metrics_display(mc_result):
     return dmc.Stack(
         children=[
             dmc.Group(
-                children=[dmc.Text(label, fw=500), dmc.Text(value, c="blue")],
+                children=[dmc.Text(label, fw=500), dmc.Text(value, c="gray.8")],
                 justify="space-between",
             )
             for label, value in metrics
@@ -206,7 +206,7 @@ def create_percentiles_display(mc_result):
             dmc.Group(
                 children=[
                     dmc.Text(f"{key.replace('p', '')}th Percentile", fw=500),
-                    dmc.Text(f"{value:.2f}", c="blue"),
+                    dmc.Text(f"{value:.2f}", c="gray.8"),
                 ],
                 justify="space-between",
             )

@@ -85,7 +85,7 @@ def create_correlation_matrix_tab():
                             dmc.Divider(),
                             dmc.Group(
                                 [
-                                    dmc.Badge("Pearson", color="blue", variant="light", size="xs"),
+                                    dmc.Badge("Pearson", color="gray", variant="light", size="xs"),
                                     dmc.Text(
                                         "Linear relationships (normal)", size="xs", c="dimmed"
                                     ),
@@ -106,7 +106,7 @@ def create_correlation_matrix_tab():
                         gap="xs",
                     )
                 ],
-                color="blue",
+                color="gray",
                 variant="light",
                 mb="lg",
             ),
@@ -221,7 +221,7 @@ def create_correlation_header():
                         "Refresh",
                         id="correlation-refresh-btn",
                         variant="light",
-                        color="blue",
+                        color="gray",
                         leftSection=DashIconify(icon="tabler:refresh", width=16),
                     ),
                 ],
@@ -251,7 +251,7 @@ def create_correlation_insights_cards():
                 value_id="weakest-correlation-value",
                 subtitle_id="weakest-correlation-pair",
                 icon="tabler:trending-down",
-                color="blue",
+                color="gray",
             ),
             create_metric_card(
                 title="Most Diversified",
@@ -359,7 +359,7 @@ def create_heatmap_section():
                                 [
                                     dmc.Badge("Strong: >0.7", color="red", variant="light"),
                                     dmc.Badge("Moderate: 0.3-0.7", color="yellow", variant="light"),
-                                    dmc.Badge("Weak: <0.3", color="blue", variant="light"),
+                                    dmc.Badge("Weak: <0.3", color="gray", variant="light"),
                                 ],
                                 gap="xs",
                             ),
@@ -594,7 +594,7 @@ def create_risk_insights_panel():
                                 ]
                             ),
                         ],
-                        color="blue",
+                        color="gray",
                         variant="light",
                     ),
                     html.Div(id="risk-insights-content"),
@@ -635,7 +635,7 @@ def create_export_panel():
                         "Generate Report",
                         id="export-correlation-report",
                         variant="filled",
-                        color="blue",
+                        color="gray",
                         leftSection=DashIconify(icon="tabler:report", width=16),
                     ),
                 ],

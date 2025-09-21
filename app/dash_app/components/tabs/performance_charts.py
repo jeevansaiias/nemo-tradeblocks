@@ -132,7 +132,7 @@ def create_cumulative_pl_chart(performance_data):
             y=cumulative_pl,
             mode="lines",
             name="Cumulative P/L",
-            line=dict(color="blue", width=2),
+            line=dict(color="gray", width=2),
         )
     )
 

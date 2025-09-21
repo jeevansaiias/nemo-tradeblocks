@@ -1,12 +1,12 @@
-/* TradeBlocks Custom Styles */
+/* TradeBlocks Professional Styles */
 
-/* Add some blocks flair to the body */
+/* Clean, professional backgrounds */
 body.theme-dark {
-    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    background: #1a1a1a;
 }
 
 body.theme-light {
-    background: linear-gradient(135deg, #ebf4ff 0%, #c3dafe 100%);
+    background: #ffffff;
 }
 
 /* Add subtle animations to navigation items */
@@ -15,32 +15,42 @@ body.theme-light {
     transition: transform 0.2s ease;
 }
 
-/* Style the logo with a subtle glow effect */
+/* Clean logo styling */
 .tb-logo {
-    filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.3));
-    transition: filter 0.3s ease;
+    transition: opacity 0.3s ease;
 }
 
 .tb-logo:hover {
-    filter: drop-shadow(0 0 12px rgba(102, 126, 234, 0.5));
+    opacity: 0.8;
 }
 
-/* Add some building shadows to cards */
+/* Professional card shadows */
 [data-mantine-component="Paper"],
 [data-mantine-component="Card"] {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1),
-                0 0 20px rgba(102, 126, 234, 0.05) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Theme the upload area */
+/* Professional upload area */
 .upload-area {
-    border: 2px dashed #667eea !important;
+    border: 2px dashed #9CA3AF !important;
     transition: all 0.3s ease;
+    background-color: var(--mantine-color-gray-0) !important;
 }
 
 .upload-area:hover {
-    border-color: #5a67d8 !important;
-    background-color: rgba(102, 126, 234, 0.05) !important;
+    border-color: #6B7280 !important;
+    background-color: var(--mantine-color-gray-1) !important;
+}
+
+/* Dark theme upload area */
+body.theme-dark .upload-area {
+    background-color: var(--mantine-color-dark-7) !important;
+    border-color: var(--mantine-color-dark-4) !important;
+}
+
+body.theme-dark .upload-area:hover {
+    background-color: var(--mantine-color-dark-6) !important;
+    border-color: var(--mantine-color-dark-3) !important;
 }
 
 /* Add block building animations */
@@ -59,19 +69,49 @@ body.theme-light {
     animation: blocks-fade-in 0.6s ease-out;
 }
 
-/* Style the theme toggle with blocks colors */
+/* Professional theme toggle */
 [data-mantine-component="SegmentedControl"] {
-    background-color: rgba(102, 126, 234, 0.1) !important;
+    background-color: rgba(156, 163, 175, 0.1) !important;
 }
 
-/* Add some building power to buttons */
+/* Professional gradient buttons */
 [data-mantine-component="Button"][data-variant="gradient"] {
-    background: linear-gradient(45deg, #667eea, #5a67d8, #4c51bf) !important;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+    background: linear-gradient(45deg, #374151, #4B5563, #6B7280) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
 [data-mantine-component="Button"][data-variant="gradient"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
     transition: all 0.2s ease;
+}
+
+/* Professional sidebar styling - Light theme only */
+[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"],
+:root[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"],
+html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"],
+[data-mantine-color-scheme="light"] .mantine-AppShell-navbar,
+.mantine-AppShell-navbar[data-mantine-color-scheme="light"] {
+    background-color: #fafafa !important;
+    border-right: 1px solid #E5E7EB !important;
+}
+
+/* Professional header styling - Light theme only */
+[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"],
+:root[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"],
+html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"],
+[data-mantine-color-scheme="light"] .mantine-AppShell-header,
+.mantine-AppShell-header[data-mantine-color-scheme="light"] {
+    background-color: #fafafa !important;
+    border-bottom: 1px solid #E5E7EB !important;
+}
+
+/* Professional footer styling - Light theme only */
+[data-mantine-color-scheme="light"] [data-mantine-component="AppShellFooter"],
+:root[data-mantine-color-scheme="light"] [data-mantine-component="AppShellFooter"],
+html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellFooter"],
+[data-mantine-color-scheme="light"] .mantine-AppShell-footer,
+.mantine-AppShell-footer[data-mantine-color-scheme="light"] {
+    background-color: #fafafa !important;
+    border-top: 1px solid #E5E7EB !important;
 }

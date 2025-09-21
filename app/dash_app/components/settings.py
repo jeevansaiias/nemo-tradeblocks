@@ -151,7 +151,7 @@ def create_config_indicator(config_data, initial_capital=None):
     # Add initial capital if available
     if initial_capital is not None:
         badges.append(
-            dmc.Badge(f"${initial_capital:,.0f}", variant="light", color="blue", size="sm")
+            dmc.Badge(f"${initial_capital:,.0f}", variant="light", color="gray", size="sm")
         )
 
     # Add other config badges
