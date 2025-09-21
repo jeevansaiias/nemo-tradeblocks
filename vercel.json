@@ -3,11 +3,7 @@
   "builds": [
     {
       "src": "app/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "250mb",
-        "requirementsFile": "requirements-prod.txt"
-      }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -22,12 +18,5 @@
   ],
   "env": {
     "PYTHONPATH": "."
-  },
-  "functions": {
-    "app/main.py": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  },
-  "installCommand": "pip install -r requirements-prod.txt"
+  }
 }
