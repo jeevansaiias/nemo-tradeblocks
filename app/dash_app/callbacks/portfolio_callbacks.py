@@ -6,6 +6,7 @@ import io
 import json
 import requests
 import logging
+import os
 
 from app.dash_app.layouts.main_layout import create_welcome_content, create_main_layout
 from app.dash_app.components.file_upload import (
@@ -37,8 +38,8 @@ from app.dash_app.components.settings import (
 
 logger = logging.getLogger(__name__)
 
-# API base URL - in production, this would come from environment variables
-API_BASE_URL = "http://localhost:8000/api/v1"
+# API base URL - environment-based for production compatibility
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
 
 
 def register_callbacks(app):
