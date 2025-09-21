@@ -3,6 +3,7 @@ Correlation Matrix Calculator
 
 Calculates correlation matrices between strategies for the correlation tab.
 """
+
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Any
@@ -31,11 +32,11 @@ class CorrelationCalculator:
             strategies = list(strategy_daily_returns.keys())
             if len(strategies) < 2:
                 # Return identity matrix if less than 2 strategies
-                correlation_data = [[1.0 if i == j else 0.0 for j in range(len(strategies))] for i in range(len(strategies))]
-                return CorrelationMatrix(
-                    strategies=strategies,
-                    correlation_data=correlation_data
-                )
+                correlation_data = [
+                    [1.0 if i == j else 0.0 for j in range(len(strategies))]
+                    for i in range(len(strategies))
+                ]
+                return CorrelationMatrix(strategies=strategies, correlation_data=correlation_data)
 
             # Get all unique dates
             all_dates = set()
@@ -45,7 +46,9 @@ class CorrelationCalculator:
             # Create DataFrame
             data = {}
             for strategy in strategies:
-                data[strategy] = [strategy_daily_returns[strategy].get(date, 0.0) for date in sorted(all_dates)]
+                data[strategy] = [
+                    strategy_daily_returns[strategy].get(date, 0.0) for date in sorted(all_dates)
+                ]
 
             df = pd.DataFrame(data)
             correlation_matrix = df.corr()
@@ -53,10 +56,7 @@ class CorrelationCalculator:
             # Convert to list format
             correlation_data = correlation_matrix.values.tolist()
 
-            return CorrelationMatrix(
-                strategies=strategies,
-                correlation_data=correlation_data
-            )
+            return CorrelationMatrix(strategies=strategies, correlation_data=correlation_data)
 
         except Exception as e:
             logger.error(f"Error calculating correlation matrix: {str(e)}")

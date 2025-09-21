@@ -1,0 +1,31 @@
+# TradeBlocks Pre-commit Configuration
+# Simple, practical checks only
+
+repos:
+  # Essential file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: ✂️  Remove trailing whitespace
+      - id: end-of-file-fixer
+        name: 📄 Fix end of files
+      - id: check-merge-conflict
+        name: 🔀 Check for merge conflicts
+      - id: check-added-large-files
+        name: 📦 Check for large files
+        args: ['--maxkb=1000']
+
+  # Python code formatting (optional)
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        name: 🎨 Format Python code
+        language_version: python3
+
+
+# Global configuration
+default_stages: [commit]
+fail_fast: true
+minimum_pre_commit_version: '3.0.0'

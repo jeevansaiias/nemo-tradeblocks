@@ -3,7 +3,9 @@ from dash import html, dcc
 from dash_iconify import DashIconify
 
 
-def create_upload_component(portfolio_data=None, daily_log_data=None, portfolio_filename=None, daily_log_filename=None):
+def create_upload_component(
+    portfolio_data=None, daily_log_data=None, portfolio_filename=None, daily_log_filename=None
+):
     """Create the dual file upload component with optional success states"""
 
     # Determine success states
@@ -15,35 +17,39 @@ def create_upload_component(portfolio_data=None, daily_log_data=None, portfolio_
 
     if trade_success:
         trade_success_info = {
-            'filename': portfolio_filename.get('filename', 'Trade Log'),
-            'count': portfolio_filename.get('total_trades', 0),
-            'type': 'Trade Log'
+            "filename": portfolio_filename.get("filename", "Trade Log"),
+            "count": portfolio_filename.get("total_trades", 0),
+            "type": "Trade Log",
         }
 
     if daily_success:
         daily_success_info = {
-            'filename': daily_log_filename.get('filename', 'Daily Log'),
-            'count': daily_log_filename.get('total_entries', 0),
-            'type': 'Daily Log'
+            "filename": daily_log_filename.get("filename", "Daily Log"),
+            "count": daily_log_filename.get("total_entries", 0),
+            "type": "Daily Log",
         }
 
     return dmc.Stack(
         children=[
-            dmc.Text(
-                "Upload your OptionOmega CSV files for analysis",
-                size="lg",
-                fw=500
-            ),
+            dmc.Text("Upload your OptionOmega CSV files for analysis", size="lg", fw=500),
             dmc.Alert(
                 children=[
-                    dmc.Group([
-                        DashIconify(icon="tabler:info-circle", width=16),
-                        dmc.Text("For more accurate metrics with individual backtests: Ensure 'Close Open Trades on Test Completion' is enabled in OptionOmega before exporting", size="sm")
-                    ], gap="xs", align="flex-start", wrap="nowrap")
+                    dmc.Group(
+                        [
+                            DashIconify(icon="tabler:info-circle", width=16),
+                            dmc.Text(
+                                "For more accurate metrics with individual backtests: Ensure 'Close Open Trades on Test Completion' is enabled in OptionOmega before exporting",
+                                size="sm",
+                            ),
+                        ],
+                        gap="xs",
+                        align="flex-start",
+                        wrap="nowrap",
+                    )
                 ],
                 color="blue",
                 variant="light",
-                style={"marginBottom": "10px"}
+                style={"marginBottom": "10px"},
             ),
             dmc.SimpleGrid(
                 children=[
@@ -54,7 +60,7 @@ def create_upload_component(portfolio_data=None, daily_log_data=None, portfolio_
                         feedback_id="trade-upload-feedback",
                         required=True,
                         show_success=trade_success,
-                        success_info=trade_success_info
+                        success_info=trade_success_info,
                     ),
                     create_single_upload(
                         upload_id="daily-log-upload",
@@ -63,12 +69,12 @@ def create_upload_component(portfolio_data=None, daily_log_data=None, portfolio_
                         feedback_id="daily-upload-feedback",
                         required=False,
                         show_success=daily_success,
-                        success_info=daily_success_info
+                        success_info=daily_success_info,
                     ),
                 ],
                 cols=2,
                 spacing="md",
-                verticalSpacing="md"
+                verticalSpacing="md",
             ),
             dmc.Group(
                 children=[
@@ -82,48 +88,40 @@ def create_upload_component(portfolio_data=None, daily_log_data=None, portfolio_
                     )
                 ],
                 justify="flex-end",
-                mt="md"
-            )
+                mt="md",
+            ),
         ],
-        gap="md"
+        gap="md",
     )
 
 
-def create_single_upload(upload_id: str, title: str, description: str, feedback_id: str, required: bool = True, show_success: bool = False, success_info: dict = None):
+def create_single_upload(
+    upload_id: str,
+    title: str,
+    description: str,
+    feedback_id: str,
+    required: bool = True,
+    show_success: bool = False,
+    success_info: dict = None,
+):
     """Create a single upload area with optional success state"""
 
     # Determine upload area content
     if show_success and success_info:
         upload_content = create_upload_success_overlay(
-            success_info['filename'],
-            success_info['count'],
-            success_info['type']
+            success_info["filename"], success_info["count"], success_info["type"]
         )
     else:
         upload_content = dmc.Center(
             children=[
                 dmc.Stack(
                     children=[
-                        DashIconify(
-                            icon="tabler:cloud-upload",
-                            width=48,
-                            height=48,
-                            color="gray"
-                        ),
-                        dmc.Text(
-                            "Drag and drop or click to upload",
-                            size="sm",
-                            ta="center"
-                        ),
-                        dmc.Text(
-                            "Supported format: CSV",
-                            size="xs",
-                            ta="center",
-                            c="dimmed"
-                        )
+                        DashIconify(icon="tabler:cloud-upload", width=48, height=48, color="gray"),
+                        dmc.Text("Drag and drop or click to upload", size="sm", ta="center"),
+                        dmc.Text("Supported format: CSV", size="xs", ta="center", c="dimmed"),
                     ],
                     align="center",
-                    gap="sm"
+                    gap="sm",
                 )
             ]
         )
@@ -133,12 +131,15 @@ def create_single_upload(upload_id: str, title: str, description: str, feedback_
             dmc.Group(
                 children=[
                     dmc.Text(title, size="md", fw=500),
-                    dmc.Badge("Required" if required else "Optional",
-                             color="red" if required else "blue",
-                             variant="light", size="sm")
+                    dmc.Badge(
+                        "Required" if required else "Optional",
+                        color="red" if required else "blue",
+                        variant="light",
+                        size="sm",
+                    ),
                 ],
                 justify="space-between",
-                align="center"
+                align="center",
             ),
             dmc.Text(description, size="sm", c="dimmed"),
             dcc.Upload(
@@ -155,16 +156,16 @@ def create_single_upload(upload_id: str, title: str, description: str, feedback_
                         "display": "flex",
                         "alignItems": "center",
                         "justifyContent": "center",
-                        "backgroundColor": "#f8f9fa" if show_success else "transparent"
+                        "backgroundColor": "#f8f9fa" if show_success else "transparent",
                     },
-                    className="upload-area"
+                    className="upload-area",
                 ),
                 multiple=False,
-                accept=".csv"
+                accept=".csv",
             ),
-            html.Div(id=feedback_id)
+            html.Div(id=feedback_id),
         ],
-        gap="sm"
+        gap="sm",
     )
 
 
@@ -178,16 +179,19 @@ def create_upload_success_message(filename, trade_count, total_pl):
                     dmc.Stack(
                         children=[
                             dmc.Text(f"Successfully uploaded: {filename}", fw=500),
-                            dmc.Text(f"Loaded {trade_count} trades with total P/L: ${total_pl:,.2f}", size="sm")
+                            dmc.Text(
+                                f"Loaded {trade_count} trades with total P/L: ${total_pl:,.2f}",
+                                size="sm",
+                            ),
                         ],
-                        gap="xs"
-                    )
+                        gap="xs",
+                    ),
                 ],
-                gap="sm"
+                gap="sm",
             )
         ],
         color="green",
-        variant="light"
+        variant="light",
     )
 
 
@@ -201,16 +205,16 @@ def create_upload_error_message(error_msg):
                     dmc.Stack(
                         children=[
                             dmc.Text("Upload failed", fw=500),
-                            dmc.Text(str(error_msg), size="sm")
+                            dmc.Text(str(error_msg), size="sm"),
                         ],
-                        gap="xs"
-                    )
+                        gap="xs",
+                    ),
                 ],
-                gap="sm"
+                gap="sm",
             )
         ],
         color="red",
-        variant="light"
+        variant="light",
     )
 
 
@@ -224,27 +228,22 @@ def create_upload_success_overlay(filename, count, file_type):
                     dmc.Stack(
                         children=[
                             DashIconify(
-                                icon="tabler:check-circle",
-                                width=32,
-                                height=32,
-                                color="green"
+                                icon="tabler:check-circle", width=32, height=32, color="green"
                             ),
+                            dmc.Text(f"✅ {filename}", size="sm", ta="center", fw=500, c="green"),
                             dmc.Text(
-                                f"✅ {filename}",
-                                size="sm",
-                                ta="center",
-                                fw=500,
-                                c="green"
-                            ),
-                            dmc.Text(
-                                f"{count} {file_type.lower()} entries" if file_type == "Daily Log" else f"{count} trades",
+                                (
+                                    f"{count} {file_type.lower()} entries"
+                                    if file_type == "Daily Log"
+                                    else f"{count} trades"
+                                ),
                                 size="xs",
                                 ta="center",
-                                c="dimmed"
-                            )
+                                c="dimmed",
+                            ),
                         ],
                         align="center",
-                        gap="xs"
+                        gap="xs",
                     )
                 ],
                 style={
@@ -252,25 +251,15 @@ def create_upload_success_overlay(filename, count, file_type):
                     "border": "2px solid #51cf66",
                     "borderRadius": "8px",
                     "padding": "20px",
-                    "marginBottom": "10px"
-                }
+                    "marginBottom": "10px",
+                },
             ),
             # Keep drag and drop text
-            dmc.Text(
-                "Drag and drop or click to upload",
-                size="sm",
-                ta="center",
-                c="dimmed"
-            ),
-            dmc.Text(
-                "Supported format: CSV",
-                size="xs",
-                ta="center",
-                c="dimmed"
-            )
+            dmc.Text("Drag and drop or click to upload", size="sm", ta="center", c="dimmed"),
+            dmc.Text("Supported format: CSV", size="xs", ta="center", c="dimmed"),
         ],
         align="center",
-        gap="sm"
+        gap="sm",
     )
 
 
@@ -282,27 +271,23 @@ def create_upload_loading_area(file_type):
                 children=[
                     dmc.Stack(
                         children=[
-                            dmc.Loader(
-                                size="lg",
-                                variant="dots",
-                                color="blue"
-                            ),
+                            dmc.Loader(size="lg", variant="dots", color="blue"),
                             dmc.Text(
                                 f"Processing {file_type}...",
                                 size="sm",
                                 ta="center",
                                 fw=500,
-                                c="blue"
+                                c="blue",
                             ),
                             dmc.Text(
                                 "Validating columns and parsing data",
                                 size="xs",
                                 ta="center",
-                                c="dimmed"
-                            )
+                                c="dimmed",
+                            ),
                         ],
                         align="center",
-                        gap="sm"
+                        gap="sm",
                     )
                 ]
             )
@@ -315,7 +300,7 @@ def create_upload_loading_area(file_type):
             "display": "flex",
             "alignItems": "center",
             "justifyContent": "center",
-            "backgroundColor": "#f8f9fa"
+            "backgroundColor": "#f8f9fa",
         },
-        className="upload-loading"
+        className="upload-loading",
     )

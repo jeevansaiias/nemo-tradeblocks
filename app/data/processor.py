@@ -4,6 +4,7 @@ Portfolio CSV Processor
 Handles CSV parsing, cleaning, and conversion to structured models.
 No calculations - only data processing and transformation.
 """
+
 import pandas as pd
 from datetime import datetime, time
 from typing import List
@@ -44,7 +45,7 @@ class PortfolioProcessor:
             "Gap": "gap",
             "Movement": "movement",
             "Max Profit": "max_profit",
-            "Max Loss": "max_loss"
+            "Max Loss": "max_loss",
         }
 
     def parse_csv(self, file_content: str, filename: str) -> Portfolio:
@@ -72,36 +73,52 @@ class PortfolioProcessor:
     def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and standardize the dataframe"""
         # Remove BOM character if present
-        df.columns = df.columns.str.replace('\ufeff', '')
+        df.columns = df.columns.str.replace("\ufeff", "")
 
         # Rename columns using mapping
         df = df.rename(columns=self.column_mapping)
 
         # Convert date columns
-        df['date_opened'] = pd.to_datetime(df['date_opened']).dt.date
-        df['date_closed'] = pd.to_datetime(df['date_closed'], errors='coerce').dt.date
+        df["date_opened"] = pd.to_datetime(df["date_opened"]).dt.date
+        df["date_closed"] = pd.to_datetime(df["date_closed"], errors="coerce").dt.date
 
         # Convert time columns
-        df['time_opened'] = pd.to_datetime(df['time_opened'], format='%H:%M:%S').dt.time
-        df['time_closed'] = pd.to_datetime(df['time_closed'], format='%H:%M:%S', errors='coerce').dt.time
+        df["time_opened"] = pd.to_datetime(df["time_opened"], format="%H:%M:%S").dt.time
+        df["time_closed"] = pd.to_datetime(
+            df["time_closed"], format="%H:%M:%S", errors="coerce"
+        ).dt.time
 
         # Convert numeric columns
         numeric_columns = [
-            'opening_price', 'premium', 'closing_price', 'avg_closing_cost', 'pl',
-            'num_contracts', 'funds_at_close', 'margin_req', 'opening_commissions_fees',
-            'closing_commissions_fees', 'opening_short_long_ratio', 'closing_short_long_ratio',
-            'opening_vix', 'closing_vix', 'gap', 'movement', 'max_profit', 'max_loss'
+            "opening_price",
+            "premium",
+            "closing_price",
+            "avg_closing_cost",
+            "pl",
+            "num_contracts",
+            "funds_at_close",
+            "margin_req",
+            "opening_commissions_fees",
+            "closing_commissions_fees",
+            "opening_short_long_ratio",
+            "closing_short_long_ratio",
+            "opening_vix",
+            "closing_vix",
+            "gap",
+            "movement",
+            "max_profit",
+            "max_loss",
         ]
 
         for col in numeric_columns:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Fill NaN values appropriately - use empty string for text fields, keep NaN for numeric
-        text_columns = ['reason_for_close']
+        text_columns = ["reason_for_close"]
         for col in text_columns:
             if col in df.columns:
-                df[col] = df[col].fillna('')
+                df[col] = df[col].fillna("")
 
         # For other columns, NaN/None values will be handled in the Trade model conversion
 
@@ -116,9 +133,19 @@ class PortfolioProcessor:
                 trade_data = row.to_dict()
 
                 # Handle None values for optional fields
-                for field in ['closing_price', 'date_closed', 'time_closed', 'avg_closing_cost',
-                             'reason_for_close', 'closing_short_long_ratio', 'closing_vix',
-                             'gap', 'movement', 'max_profit', 'max_loss']:
+                for field in [
+                    "closing_price",
+                    "date_closed",
+                    "time_closed",
+                    "avg_closing_cost",
+                    "reason_for_close",
+                    "closing_short_long_ratio",
+                    "closing_vix",
+                    "gap",
+                    "movement",
+                    "max_profit",
+                    "max_loss",
+                ]:
                     if pd.isna(trade_data.get(field)):
                         trade_data[field] = None
 

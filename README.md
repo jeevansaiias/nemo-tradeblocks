@@ -56,7 +56,23 @@ cp .env.example .env
 # Edit .env file with your settings (optional for local development)
 ```
 
-### 3. Run the Application
+### 3. Set Up Development Tools (Optional)
+
+```bash
+# Install development dependencies (includes pre-commit, linting, etc.)
+pip install -r dev-requirements.txt
+
+# Install pre-commit hooks for automatic code quality checks
+pre-commit install
+
+# Run code quality checks locally
+./scripts/check-code.sh
+
+# Auto-fix common issues
+./scripts/fix-code.sh
+```
+
+### 4. Run the Application
 
 ```bash
 # Start the application
