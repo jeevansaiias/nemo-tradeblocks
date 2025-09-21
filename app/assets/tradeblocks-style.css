@@ -87,15 +87,21 @@ body.theme-dark .upload-area:hover {
 }
 
 /* Professional sidebar styling - Light theme only */
-body.theme-light [data-mantine-component="AppShellNavbar"],
-[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"] {
-    background-color: #F9FAFB !important;
+[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"],
+:root[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"],
+html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellNavbar"],
+[data-mantine-color-scheme="light"] .mantine-AppShell-navbar,
+.mantine-AppShell-navbar[data-mantine-color-scheme="light"] {
+    background-color: #fafafa !important;
     border-right: 1px solid #E5E7EB !important;
 }
 
 /* Professional header styling - Light theme only */
-body.theme-light [data-mantine-component="AppShellHeader"],
-[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"] {
-    background-color: #F9FAFB !important;
+[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"],
+:root[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"],
+html[data-mantine-color-scheme="light"] [data-mantine-component="AppShellHeader"],
+[data-mantine-color-scheme="light"] .mantine-AppShell-header,
+.mantine-AppShell-header[data-mantine-color-scheme="light"] {
+    background-color: #fafafa !important;
     border-bottom: 1px solid #E5E7EB !important;
 }
