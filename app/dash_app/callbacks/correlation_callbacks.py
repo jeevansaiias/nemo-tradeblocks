@@ -329,8 +329,11 @@ def create_analytics_content(analytics):
 
 
 # Empty/Error state functions
-def create_empty_heatmap():
+def create_empty_heatmap(is_dark_mode=False):
     """Create empty heatmap placeholder"""
+    bg_color = "#1a1a1a" if is_dark_mode else "white"
+    text_color = "#e0e0e0" if is_dark_mode else "gray"
+
     fig = go.Figure()
     fig.add_annotation(
         text="Upload portfolio data to see correlation matrix",
@@ -339,13 +342,14 @@ def create_empty_heatmap():
         x=0.5,
         y=0.5,
         showarrow=False,
-        font=dict(size=16, color="gray"),
+        font=dict(size=16, color=text_color),
     )
     fig.update_layout(
         xaxis=dict(showgrid=False, showticklabels=False),
         yaxis=dict(showgrid=False, showticklabels=False),
         height=500,
-        plot_bgcolor="white",
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
     )
     return fig
 
@@ -528,7 +532,7 @@ def calculate_strategy_correlations(trades_data, method="pearson"):
     return correlation_matrix, strategies
 
 
-def create_correlation_heatmap_from_matrix(correlation_matrix, strategies):
+def create_correlation_heatmap_from_matrix(correlation_matrix, strategies, is_dark_mode=False):
     """Create large, readable correlation heatmap focused on clarity"""
     import plotly.graph_objects as go
 
@@ -548,19 +552,35 @@ def create_correlation_heatmap_from_matrix(correlation_matrix, strategies):
         else:
             short_strategies.append(s)
 
+    # Theme-based heatmap colors
+    if is_dark_mode:
+        colorscale = [
+            [0.0, "#1e3a8a"],  # Strong negative - darker blue
+            [0.25, "#3b82f6"],  # Weak negative - medium blue
+            [0.5, "#374151"],  # Zero - dark gray
+            [0.75, "#f87171"],  # Weak positive - light red
+            [1.0, "#dc2626"],  # Strong positive - strong red
+        ]
+        text_color_heatmap = "#e5e7eb"
+        colorbar_color = "#e5e7eb"
+    else:
+        colorscale = [
+            [0.0, "#3d52a0"],  # Strong negative - dark blue
+            [0.25, "#7888c0"],  # Weak negative - light blue
+            [0.5, "#f8fafc"],  # Zero - very light gray instead of white
+            [0.75, "#ff9999"],  # Weak positive - light red
+            [1.0, "#cc0000"],  # Strong positive - dark red
+        ]
+        text_color_heatmap = "#111827"
+        colorbar_color = "#111827"
+
     # Use a better color scheme with higher contrast
     fig = go.Figure(
         data=go.Heatmap(
             z=correlation_matrix,
             x=short_strategies,
             y=short_strategies,
-            colorscale=[
-                [0.0, "#3d52a0"],  # Strong negative - dark blue
-                [0.25, "#7888c0"],  # Weak negative - light blue
-                [0.5, "#ffffff"],  # Zero - white
-                [0.75, "#ff9999"],  # Weak positive - light red
-                [1.0, "#cc0000"],  # Strong positive - dark red
-            ],
+            colorscale=colorscale,
             zmid=0,
             zmin=-1,
             zmax=1,
@@ -568,7 +588,7 @@ def create_correlation_heatmap_from_matrix(correlation_matrix, strategies):
             texttemplate="%{text}",
             textfont={
                 "size": 14,
-                "color": "black",  # Use black text for better readability
+                "color": text_color_heatmap,
                 "family": "Arial, sans-serif",
             },
             showscale=True,
@@ -577,7 +597,8 @@ def create_correlation_heatmap_from_matrix(correlation_matrix, strategies):
                 titleside="right",
                 thickness=20,
                 len=0.8,
-                tickfont=dict(size=12),
+                tickfont=dict(size=12, color=colorbar_color),
+                titlefont=dict(color=colorbar_color),
             ),
             hovertemplate="<b>%{customdata}</b><br>Correlation: %{z}<extra></extra>",
             customdata=[
@@ -587,18 +608,22 @@ def create_correlation_heatmap_from_matrix(correlation_matrix, strategies):
         )
     )
 
+    # Theme-based colors
+    bg_color = "#1a1a1a" if is_dark_mode else "white"
+    text_color = "#e0e0e0" if is_dark_mode else "#222"
+
     fig.update_layout(
         title="",
         xaxis=dict(
             tickangle=45,
-            tickfont=dict(size=14, family="Arial, sans-serif", color="#222", weight="bold"),
+            tickfont=dict(size=14, family="Arial, sans-serif", color=text_color, weight="bold"),
             side="bottom",
             tickmode="array",
             tickvals=list(range(len(short_strategies))),
             ticktext=short_strategies,
         ),
         yaxis=dict(
-            tickfont=dict(size=14, family="Arial, sans-serif", color="#222", weight="bold"),
+            tickfont=dict(size=14, family="Arial, sans-serif", color=text_color, weight="bold"),
             autorange="reversed",  # Start from top
             tickmode="array",
             tickvals=list(range(len(short_strategies))),
@@ -608,8 +633,8 @@ def create_correlation_heatmap_from_matrix(correlation_matrix, strategies):
         height=600,
         margin=dict(l=100, r=50, t=20, b=100),
         autosize=True,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
     )
 
     return fig
@@ -775,8 +800,11 @@ def create_correlation_analytics_from_matrix(correlation_matrix, strategies):
     )
 
 
-def create_insufficient_strategies_heatmap():
+def create_insufficient_strategies_heatmap(is_dark_mode=False):
     """Create placeholder for insufficient strategies"""
+    bg_color = "#1a1a1a" if is_dark_mode else "white"
+    text_color = "#ff8c42" if is_dark_mode else "orange"
+
     import plotly.graph_objects as go
 
     fig = go.Figure()
@@ -787,13 +815,14 @@ def create_insufficient_strategies_heatmap():
         x=0.5,
         y=0.5,
         showarrow=False,
-        font=dict(size=16, color="orange"),
+        font=dict(size=16, color=text_color),
     )
     fig.update_layout(
         xaxis=dict(showgrid=False, showticklabels=False),
         yaxis=dict(showgrid=False, showticklabels=False),
         height=500,
-        plot_bgcolor="white",
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
     )
     return fig
 
@@ -809,14 +838,21 @@ def register_correlation_callbacks(app):
         [
             Input("current-portfolio-data", "data"),
             Input("correlation-method", "value"),
+            Input("theme-store", "data"),
         ],
         prevent_initial_call=False,
     )
-    def update_correlation_analysis(portfolio_data, method):
+    def update_correlation_analysis(portfolio_data, method, theme_data):
         """Update correlation analysis with simple heatmap and analytics"""
+        # Determine current theme
+        is_dark_mode = False
+        if theme_data and isinstance(theme_data, dict):
+            current_theme = theme_data.get("theme", "light")
+            is_dark_mode = current_theme == "dark"
+
         if not portfolio_data:
             return (
-                create_empty_heatmap(),
+                create_empty_heatmap(is_dark_mode),
                 dmc.Text(
                     "Upload portfolio data to see correlation analysis", c="dimmed", ta="center"
                 ),
@@ -832,7 +868,7 @@ def register_correlation_callbacks(app):
 
             if not trades_data:
                 return (
-                    create_empty_heatmap(),
+                    create_empty_heatmap(is_dark_mode),
                     dmc.Text("No trades found in portfolio data", c="dimmed", ta="center"),
                 )
 
@@ -843,7 +879,7 @@ def register_correlation_callbacks(app):
 
             if len(strategies) < 2:
                 return (
-                    create_insufficient_strategies_heatmap(),
+                    create_insufficient_strategies_heatmap(is_dark_mode),
                     dmc.Text(
                         "Need at least 2 strategies with 10+ trading days to calculate correlations",
                         c="orange",
@@ -852,7 +888,9 @@ def register_correlation_callbacks(app):
                 )
 
             # Create visualizations with real data
-            heatmap = create_correlation_heatmap_from_matrix(correlation_matrix, strategies)
+            heatmap = create_correlation_heatmap_from_matrix(
+                correlation_matrix, strategies, is_dark_mode
+            )
             analytics = create_correlation_analytics_from_matrix(correlation_matrix, strategies)
 
             return heatmap, analytics
@@ -860,6 +898,6 @@ def register_correlation_callbacks(app):
         except Exception as e:
             logger.error(f"Error in correlation analysis: {str(e)}")
             return (
-                create_empty_heatmap(),
+                create_empty_heatmap(is_dark_mode),
                 dmc.Text(f"Error calculating correlations: {str(e)}", c="red", ta="center"),
             )
