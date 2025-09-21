@@ -40,22 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 # API base URL - environment-based for production compatibility
-def get_api_base_url():
-    # Check if we have a custom API_BASE_URL first
-    api_url = os.getenv("API_BASE_URL")
-    if api_url:
-        return api_url
-
-    # In Vercel, use the VERCEL_URL environment variable
-    vercel_url = os.getenv("VERCEL_URL")
-    if vercel_url:
-        return f"https://{vercel_url}/api/v1"
-
-    # Default for local development
-    return "http://localhost:8000/api/v1"
-
-
-API_BASE_URL = get_api_base_url()
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
 
 
 def register_callbacks(app):
