@@ -52,6 +52,9 @@ from app.dash_app.components.tabs.correlation_matrix import (
 from app.dash_app.components.tabs.risk_simulator import (
     create_risk_simulator_tab,
 )
+from app.dash_app.components.tabs.position_sizing import (
+    create_position_sizing_tab,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +69,11 @@ def register_callbacks(app):
     # Import and register correlation callbacks
     from app.dash_app.callbacks.correlation_callbacks import register_correlation_callbacks
     from app.dash_app.callbacks.monte_carlo_callbacks import register_monte_carlo_callbacks
+    from app.dash_app.callbacks.position_sizing_callbacks import register_position_sizing_callbacks
 
     register_correlation_callbacks(app)
     register_monte_carlo_callbacks(app)
+    register_position_sizing_callbacks(app)
 
     # Use clientside callback to update MantineProvider theme
     app.clientside_callback(
@@ -420,6 +425,7 @@ def register_callbacks(app):
             Output("nav-performance", "active"),
             Output("nav-trade-data", "active"),
             Output("nav-monte-carlo", "active"),
+            Output("nav-position-sizing", "active"),
             Output("nav-correlation", "active"),
             Output("nav-margin", "active"),
             Output("nav-optimizer", "active"),
@@ -429,6 +435,7 @@ def register_callbacks(app):
             Input("nav-performance", "n_clicks"),
             Input("nav-trade-data", "n_clicks"),
             Input("nav-monte-carlo", "n_clicks"),
+            Input("nav-position-sizing", "n_clicks"),
             Input("nav-correlation", "n_clicks"),
             Input("nav-margin", "n_clicks"),
             Input("nav-optimizer", "n_clicks"),
@@ -441,6 +448,7 @@ def register_callbacks(app):
         perf_clicks,
         trade_clicks,
         monte_clicks,
+        position_clicks,
         corr_clicks,
         margin_clicks,
         opt_clicks,
@@ -448,12 +456,12 @@ def register_callbacks(app):
     ):
         """Update main content and navigation highlighting"""
         if not portfolio_data:
-            return create_welcome_content(), True, False, False, False, False, False, False
+            return create_welcome_content(), True, False, False, False, False, False, False, False
 
         triggered = ctx.triggered_id
 
         # Reset all nav states
-        nav_states = [False] * 7
+        nav_states = [False] * 8
 
         if triggered == "nav-geekistics":
             nav_states[0] = True  # geekistics active
@@ -494,14 +502,17 @@ def register_callbacks(app):
         elif triggered == "nav-monte-carlo":
             nav_states[3] = True  # monte-carlo active
             return create_risk_simulator_tab(), *nav_states  # New risk simulator tab
+        elif triggered == "nav-position-sizing":
+            nav_states[4] = True  # position-sizing active
+            return create_position_sizing_tab(), *nav_states
         elif triggered == "nav-correlation":
-            nav_states[4] = True  # correlation active
+            nav_states[5] = True  # correlation active
             return create_correlation_matrix_tab(), *nav_states
         elif triggered == "nav-margin":
-            nav_states[5] = True  # margin active
+            nav_states[6] = True  # margin active
             return create_capital_blocks_coming_soon(), *nav_states  # Coming soon page
         elif triggered == "nav-optimizer":
-            nav_states[6] = True  # optimizer active
+            nav_states[7] = True  # optimizer active
             return create_walk_forward_coming_soon(), *nav_states  # Coming soon page
         else:
             nav_states[0] = True  # Default to geekistics

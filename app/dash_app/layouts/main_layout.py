@@ -109,6 +109,11 @@ def create_main_layout():
                                         description="Risk Simulation",
                                     ),
                                     dmc.NavLink(
+                                        label="🎯 Position Sizing",
+                                        id="nav-position-sizing",
+                                        description="Optimal Position Sizing",
+                                    ),
+                                    dmc.NavLink(
                                         label="🔗 Correlation Matrix",
                                         id="nav-correlation",
                                         description="Strategy Correlations",

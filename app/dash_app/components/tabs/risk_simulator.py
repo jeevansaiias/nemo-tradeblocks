@@ -6,7 +6,7 @@ Features bootstrap resampling to preserve real distribution characteristics.
 """
 
 import dash_mantine_components as dmc
-from dash import html, dcc
+from dash import dcc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
 
@@ -623,22 +623,6 @@ def create_analysis_tabs():
                                 ),
                                 value="drawdown",
                             ),
-                            dmc.TabsTab(
-                                dmc.Group(
-                                    [
-                                        DashIconify(icon="tabler:target", width=16),
-                                        "Position Sizing",
-                                        create_info_tooltip(
-                                            title="🎯 Kelly Criterion Position Sizing",
-                                            content="Calculates optimal position sizes based on your historical win rate and average win/loss ratios. Helps balance growth with risk of ruin.",
-                                            detailed_content="Kelly Criterion maximizes long-term growth while controlling risk. Fractional Kelly (like 25%) is often recommended for real trading. TradeBlocks builds insights, not investment advice.",
-                                            tooltip_id="position-sizing",
-                                        ),
-                                    ],
-                                    gap="xs",
-                                ),
-                                value="kelly",
-                            ),
                         ]
                     ),
                     # Distribution Tab
@@ -669,23 +653,6 @@ def create_analysis_tabs():
                             )
                         ],
                         value="drawdown",
-                    ),
-                    # Kelly Tab
-                    dmc.TabsPanel(
-                        children=[
-                            dmc.Stack(
-                                [
-                                    dmc.Alert(
-                                        children="Position sizing recommendations based on Kelly Criterion",
-                                        color="blue",
-                                        variant="light",
-                                    ),
-                                    html.Div(id="mc-kelly-analysis"),
-                                ],
-                                gap="md",
-                            )
-                        ],
-                        value="kelly",
                     ),
                 ],
             )
