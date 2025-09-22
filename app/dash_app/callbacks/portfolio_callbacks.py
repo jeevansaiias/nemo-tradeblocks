@@ -137,11 +137,10 @@ def register_callbacks(app):
                 daily_entries = daily_log_filename_data.get("total_entries", 0)
                 daily_log_info.extend(
                     [
+                        dmc.Text("Daily Log:", size="xs", c="green.6", fw=500),
+                        dmc.Text(daily_filename, size="xs", c="dimmed", style={"fontWeight": 600}),
                         dmc.Text(
-                            f"📊 {daily_filename}", size="xs", c="dimmed", style={"fontWeight": 600}
-                        ),
-                        dmc.Text(
-                            f"📅 {daily_entries} daily entries",
+                            f"{daily_entries} daily entries",
                             size="xs",
                             c="dimmed",
                         ),
@@ -153,11 +152,10 @@ def register_callbacks(app):
                     dmc.Stack(
                         [
                             dmc.Text("🧱 Active Blocks", size="sm", fw=500),
+                            dmc.Text("Trade Log:", size="xs", c="blue.6", fw=500),
+                            dmc.Text(filename, size="xs", c="dimmed", style={"fontWeight": 600}),
                             dmc.Text(
-                                f"🧱 {filename}", size="xs", c="dimmed", style={"fontWeight": 600}
-                            ),
-                            dmc.Text(
-                                f"📈 {total_trades} trades",
+                                f"{total_trades} trades",
                                 size="xs",
                                 c="dimmed",
                             ),
@@ -165,20 +163,18 @@ def register_callbacks(app):
                             dmc.Group(
                                 children=[
                                     dmc.Button(
-                                        "Change Files",
+                                        "📁 Change Files",
                                         id="change-files-button",
                                         variant="subtle",
                                         color="gray",
                                         size="xs",
-                                        leftSection=DashIconify(icon="tabler:edit"),
                                     ),
                                     dmc.Button(
-                                        "Clear All",
+                                        "🗑️ Clear All",
                                         id="clear-portfolio-button",
                                         variant="subtle",
                                         color="red",
                                         size="xs",
-                                        leftSection=DashIconify(icon="tabler:trash"),
                                     ),
                                 ],
                                 gap="xs",
