@@ -709,7 +709,7 @@ def create_trade_sequence_chart(
         yaxis_title="Return ($)",
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
     return fig
@@ -770,7 +770,7 @@ def create_rom_timeline_chart(rom_data: Dict[str, Any], ma_period_value: str = "
         yaxis_title="Return on Margin (%)",
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
 
@@ -845,7 +845,7 @@ def create_risk_evolution_chart(rolling_data: Dict[str, Any]) -> go.Figure:
         yaxis_title="Volatility",
         margin=dict(l=0, r=0, t=40, b=0),
         showlegend=True,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
 
@@ -1356,11 +1356,9 @@ def create_time_based_analysis_section():
 
 def create_advanced_metrics_section():
     """Create advanced metrics section"""
-    return dmc.SimpleGrid(
-        cols={"base": 1, "md": 2, "lg": 3},
-        spacing="md",
+    return dmc.Stack(
         children=[
-            # ROM Over Time
+            # ROM Over Time - Full Width
             dmc.Paper(
                 children=[
                     dmc.Group(
@@ -1386,57 +1384,73 @@ def create_advanced_metrics_section():
                     dcc.Graph(
                         id="rom-timeline-chart",
                         config={"responsive": True, "displayModeBar": False},
-                        style={"height": "min(300px, 35vh)", "minHeight": "250px", "width": "100%"},
+                        style={"height": "min(350px, 40vh)", "minHeight": "300px", "width": "100%"},
                     ),
                 ],
                 p="md",
                 withBorder=True,
             ),
-            # Rolling Metrics
-            dmc.Paper(
+            # Rolling Metrics + Risk Evolution - Side by Side
+            dmc.SimpleGrid(
+                cols={"base": 1, "lg": 2},
+                spacing="md",
                 children=[
-                    dmc.Group(
+                    # Rolling Metrics
+                    dmc.Paper(
                         children=[
-                            dmc.Title("📊 Rolling Metrics", order=4),
-                            dmc.Select(
-                                id="rolling-metric-type",
-                                data=[
-                                    {"value": "win_rate", "label": "Win Rate"},
-                                    {"value": "sharpe", "label": "Sharpe Ratio"},
-                                    {"value": "profit_factor", "label": "Profit Factor"},
+                            dmc.Group(
+                                children=[
+                                    dmc.Title("📊 Rolling Metrics", order=4),
+                                    dmc.Select(
+                                        id="rolling-metric-type",
+                                        data=[
+                                            {"value": "win_rate", "label": "Win Rate"},
+                                            {"value": "sharpe", "label": "Sharpe Ratio"},
+                                            {"value": "profit_factor", "label": "Profit Factor"},
+                                        ],
+                                        value="win_rate",
+                                        size="xs",
+                                        style={"width": "120px"},
+                                    ),
                                 ],
-                                value="win_rate",
-                                size="xs",
-                                style={"width": "120px"},
+                                justify="space-between",
+                                align="center",
+                                mb="md",
+                            ),
+                            dcc.Graph(
+                                id="rolling-metrics-chart",
+                                config={"responsive": True, "displayModeBar": False},
+                                style={
+                                    "height": "min(300px, 35vh)",
+                                    "minHeight": "250px",
+                                    "width": "100%",
+                                },
                             ),
                         ],
-                        justify="space-between",
-                        align="center",
-                        mb="md",
+                        p="md",
+                        withBorder=True,
                     ),
-                    dcc.Graph(
-                        id="rolling-metrics-chart",
-                        config={"responsive": True, "displayModeBar": False},
-                        style={"height": "min(300px, 35vh)", "minHeight": "250px", "width": "100%"},
-                    ),
-                ],
-                p="md",
-                withBorder=True,
-            ),
-            # Risk Evolution
-            dmc.Paper(
-                children=[
-                    dmc.Title("⚠️ Risk Evolution", order=4, mb="md"),
-                    dcc.Graph(
-                        id="risk-evolution-chart",
-                        config={"responsive": True, "displayModeBar": False},
-                        style={"height": "min(300px, 35vh)", "minHeight": "250px", "width": "100%"},
+                    # Risk Evolution
+                    dmc.Paper(
+                        children=[
+                            dmc.Title("⚠️ Risk Evolution", order=4, mb="md"),
+                            dcc.Graph(
+                                id="risk-evolution-chart",
+                                config={"responsive": True, "displayModeBar": False},
+                                style={
+                                    "height": "min(300px, 35vh)",
+                                    "minHeight": "250px",
+                                    "width": "100%",
+                                },
+                            ),
+                        ],
+                        p="md",
+                        withBorder=True,
                     ),
                 ],
-                p="md",
-                withBorder=True,
             ),
         ],
+        gap="md",
     )
 
 
