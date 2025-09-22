@@ -9,23 +9,40 @@ def create_geekistics_tab():
     """Create the Geekistics tab with comprehensive portfolio statistics"""
     return dmc.Stack(
         children=[
-            # Title and strategy filter
+            # Header with title and controls
             dmc.Group(
-                [
-                    dmc.Title("🧱 Block Stats & Analytics", order=2),
-                    dmc.MultiSelect(
-                        id="geekistics-strategy-filter",
-                        placeholder="All strategies",
-                        data=[],
-                        value=[],
-                        style={"width": "300px"},
-                        clearable=True,
-                        searchable=True,
-                        maxDropdownHeight=200,
+                children=[
+                    # Title with icon
+                    dmc.Group(
+                        children=[
+                            dmc.Title("🧱 Block Stats & Analytics", order=2),
+                        ],
+                        gap="sm",
+                        align="center",
+                    ),
+                    # Controls
+                    dmc.Group(
+                        children=[
+                            # Strategy Filter
+                            dmc.MultiSelect(
+                                id="geekistics-strategy-filter",
+                                label="Strategies",
+                                placeholder="All strategies",
+                                data=[],
+                                value=[],
+                                style={"minWidth": "200px"},
+                                leftSection=DashIconify(icon="tabler:filter"),
+                                clearable=True,
+                                searchable=True,
+                                maxDropdownHeight=200,
+                            ),
+                        ],
+                        gap="md",
+                        wrap="wrap",
                     ),
                 ],
                 justify="space-between",
-                align="center",
+                align="flex-end",
                 mb="lg",
             ),
             # All stats content will be populated by callback

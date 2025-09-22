@@ -481,7 +481,6 @@ def register_callbacks(app):
             try:
                 ids = set()
                 _collect_ids(tab_layout, ids)
-                logger.info(f"Performance tab component IDs at runtime: {sorted(list(ids))}")
             except Exception as e:
                 logger.warning(f"Could not collect performance tab IDs: {e}")
 
@@ -677,7 +676,6 @@ def register_callbacks(app):
             Input("perf-date-range", "value"),
             Input("equity-scale-toggle", "value"),
             Input("equity-drawdown-areas", "checked"),
-            Input("perf-comparison-mode", "checked"),
             Input("sequence-show-trend", "checked"),
             Input("rom-ma-period", "value"),
             Input("rolling-metric-type", "value"),
@@ -691,7 +689,6 @@ def register_callbacks(app):
         date_range,
         scale_mode,
         show_drawdown_areas,
-        comparison_mode,
         sequence_show_trend,
         rom_ma_period,
         rolling_metric_type,
