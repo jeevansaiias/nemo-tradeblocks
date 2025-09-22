@@ -5,7 +5,7 @@ Connects the Risk Simulator UI to the bootstrap Monte Carlo engine.
 Handles simulation execution, chart updates, and statistics calculations.
 """
 
-from dash import Input, Output, State, callback, no_update, html
+from dash import Input, Output, State, callback, no_update, html, ctx
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
@@ -103,8 +103,13 @@ def register_monte_carlo_callbacks(app):
             Output("mc-prob-profit-desc", "children"),
             Output("mc-max-drawdown", "children"),
             Output("mc-max-drawdown-desc", "children"),
+            Output("mc-simulation-cache", "data"),
         ],
-        [Input("mc-run-simulation", "n_clicks")],
+        [
+            Input("mc-run-simulation", "n_clicks"),
+            Input("mc-scale-selector", "value"),
+            Input("mc-show-paths", "checked"),
+        ],
         [
             State("current-portfolio-data", "data"),
             State("mc-num-simulations", "value"),
@@ -112,25 +117,59 @@ def register_monte_carlo_callbacks(app):
             State("mc-bootstrap-method", "value"),
             State("mc-strategy-selection", "value"),
             State("mc-initial-capital", "value"),
-            State("mc-confidence-levels", "value"),
-            State("mc-log-scale", "checked"),
-            State("mc-show-paths", "checked"),
+            State("mc-simulation-cache", "data"),
         ],
         prevent_initial_call=True,
     )
     def run_monte_carlo_simulation(
         n_clicks,
+        scale_selector,
+        show_paths,
         portfolio_data,
         num_simulations,
         time_horizon,
         bootstrap_method,
         selected_strategies,
         initial_capital,
-        confidence_levels,
-        log_scale,
-        show_paths,
+        cached_data,
     ):
         """Run Monte Carlo simulation and update all charts and statistics"""
+        # Check if we're just updating chart display options
+        triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+
+        if triggered_id in ["mc-scale-selector", "mc-show-paths"] and cached_data:
+            # Just updating chart display with cached data
+            result_data = cached_data["result"]
+            initial_capital = cached_data["initial_capital"]
+            time_horizon = cached_data["time_horizon"]
+
+            # Recreate the result object (simplified)
+            from types import SimpleNamespace
+
+            result = SimpleNamespace(**result_data)
+
+            # Generate updated chart
+            log_scale = scale_selector == "log"
+            equity_curve_fig = create_equity_curve_chart(
+                result, initial_capital, int(time_horizon), log_scale, show_paths
+            )
+
+            # Return updated chart with cached statistics and same cache
+            return (
+                equity_curve_fig,
+                cached_data["distribution_fig"],
+                cached_data["drawdown_fig"],
+                cached_data["expected_return_text"],
+                cached_data["expected_return_desc"],
+                cached_data["var_text"],
+                cached_data["var_desc"],
+                cached_data["prob_profit_text"],
+                cached_data["prob_profit_desc"],
+                cached_data["max_dd_text"],
+                cached_data["max_dd_desc"],
+                cached_data,  # Keep same cache
+            )
+
         if not n_clicks or not portfolio_data:
             return (
                 create_placeholder_equity_curve(),
@@ -144,6 +183,7 @@ def register_monte_carlo_callbacks(app):
                 "Waiting for simulation",
                 "--",
                 "Waiting for simulation",
+                None,  # No cache
             )
 
         try:
@@ -155,19 +195,8 @@ def register_monte_carlo_callbacks(app):
             if selected_strategies and selected_strategies != "all":
                 strategy_filter = selected_strategies
 
-            # Parse confidence levels
-            confidence_level_map = {
-                "p5": 0.05,
-                "p25": 0.25,
-                "p50": 0.5,
-                "p75": 0.75,
-                "p95": 0.95,
-            }
-            parsed_confidence_levels = [
-                confidence_level_map[level]
-                for level in confidence_levels
-                if level in confidence_level_map
-            ]
+            # Use standard confidence levels (always show all percentiles)
+            parsed_confidence_levels = [0.05, 0.25, 0.5, 0.75, 0.95]
 
             # Create Monte Carlo request
             request = MonteCarloRequest(
@@ -183,6 +212,7 @@ def register_monte_carlo_callbacks(app):
             result = simulator.run_bootstrap_simulation(portfolio, request, use_daily_returns)
 
             # Generate charts
+            log_scale = scale_selector == "log"
             equity_curve_fig = create_equity_curve_chart(
                 result, initial_capital, int(time_horizon), log_scale, show_paths
             )
@@ -208,6 +238,29 @@ def register_monte_carlo_callbacks(app):
             max_dd_text = f"{max_dd:.1%}"
             max_dd_desc = f"95th percentile worst case"
 
+            # Cache the simulation data for chart updates
+            cache_data = {
+                "result": {
+                    "simulations": result.simulations,  # This is a list of cumulative return paths
+                    "final_values": result.final_values,
+                    "percentiles": result.percentiles,
+                    "expected_return": result.expected_return,
+                    "var_95": result.var_95,
+                },
+                "initial_capital": initial_capital,
+                "time_horizon": time_horizon,
+                "distribution_fig": distribution_fig,
+                "drawdown_fig": drawdown_fig,
+                "expected_return_text": expected_return_text,
+                "expected_return_desc": expected_return_desc,
+                "var_text": var_text,
+                "var_desc": var_desc,
+                "prob_profit_text": prob_profit_text,
+                "prob_profit_desc": prob_profit_desc,
+                "max_dd_text": max_dd_text,
+                "max_dd_desc": max_dd_desc,
+            }
+
             return (
                 equity_curve_fig,
                 distribution_fig,
@@ -220,6 +273,7 @@ def register_monte_carlo_callbacks(app):
                 prob_profit_desc,
                 max_dd_text,
                 max_dd_desc,
+                cache_data,
             )
 
         except Exception as e:
@@ -236,6 +290,7 @@ def register_monte_carlo_callbacks(app):
                 str(e),
                 "Error",
                 str(e),
+                None,  # No cache on error
             )
 
     @app.callback(
@@ -243,7 +298,6 @@ def register_monte_carlo_callbacks(app):
             Output("mc-num-simulations", "value"),
             Output("mc-time-horizon", "value"),
             Output("mc-bootstrap-method", "value"),
-            Output("mc-confidence-levels", "value"),
         ],
         [Input("mc-reset", "n_clicks")],
         prevent_initial_call=True,
@@ -255,7 +309,6 @@ def register_monte_carlo_callbacks(app):
                 1000,  # num_simulations
                 "252",  # time_horizon (1 year)
                 "trades",  # bootstrap_method
-                ["p5", "p25", "p50", "p75", "p95"],  # confidence_levels
             )
         return no_update
 
@@ -271,6 +324,7 @@ def create_equity_curve_chart(
         simulations_array = np.array(result.simulations)
 
         # Convert cumulative returns to portfolio values
+        # simulations_array is 2D: [num_simulations x time_steps]
         portfolio_values = initial_capital * (1 + simulations_array)
 
         # Calculate percentiles at each time step
@@ -346,19 +400,21 @@ def create_equity_curve_chart(
             )
 
         # Add individual paths if requested (max 20 for performance)
-        if show_paths:
-            sample_indices = np.random.choice(
-                len(portfolio_values), min(20, len(portfolio_values)), replace=False
-            )
+        if show_paths and len(portfolio_values) > 0:
+            num_paths = min(20, len(portfolio_values))
+            np.random.seed(42)  # Consistent paths
+            sample_indices = np.random.choice(len(portfolio_values), num_paths, replace=False)
+
             for i, idx in enumerate(sample_indices):
+                path_values = portfolio_values[idx]
                 fig.add_trace(
                     go.Scatter(
                         x=days,
-                        y=portfolio_values[idx],
+                        y=path_values,
                         mode="lines",
-                        name=f"Sample Path {i+1}" if i < 5 else None,
-                        line=dict(color="rgba(128,128,128,0.3)", width=1),
-                        showlegend=i < 5,
+                        name=f"Sample Path {i+1}" if i < 3 else None,
+                        line=dict(color="rgba(128,128,128,0.4)", width=1),
+                        showlegend=i < 3,
                         hoverinfo="skip",
                     )
                 )
@@ -369,7 +425,6 @@ def create_equity_curve_chart(
         )
 
         fig.update_layout(
-            title="Portfolio Value Projections",
             xaxis_title="Days Forward",
             yaxis_title="Portfolio Value ($)",
             yaxis_type="log" if log_scale else "linear",

@@ -16,6 +16,8 @@ def create_risk_simulator_tab():
     """Create the Risk Simulator tab with Monte Carlo controls"""
     return dmc.Stack(
         children=[
+            # Store for cached simulation results
+            dcc.Store(id="mc-simulation-cache", storage_type="memory"),
             # Header with title
             dmc.Group(
                 [
@@ -199,33 +201,20 @@ def create_equity_curve_section():
                             dmc.Text("Portfolio Growth Projections", size="lg", fw=600),
                             dmc.Group(
                                 [
-                                    dmc.Switch(
-                                        id="mc-log-scale",
-                                        label="Log Scale",
+                                    dmc.SegmentedControl(
+                                        id="mc-scale-selector",
+                                        value="linear",
+                                        data=[
+                                            {"value": "linear", "label": "Linear"},
+                                            {"value": "log", "label": "Log"},
+                                        ],
                                         size="sm",
-                                        checked=False,
                                     ),
                                     dmc.Switch(
                                         id="mc-show-paths",
                                         label="Show Individual Paths",
                                         size="sm",
                                         checked=False,
-                                    ),
-                                    dmc.Divider(orientation="vertical"),
-                                    dmc.CheckboxGroup(
-                                        id="mc-confidence-levels",
-                                        label="Percentiles:",
-                                        value=["p5", "p25", "p50", "p75", "p95"],
-                                        children=dmc.Group(
-                                            [
-                                                dmc.Checkbox("5th", value="p5", size="xs"),
-                                                dmc.Checkbox("25th", value="p25", size="xs"),
-                                                dmc.Checkbox("50th", value="p50", size="xs"),
-                                                dmc.Checkbox("75th", value="p75", size="xs"),
-                                                dmc.Checkbox("95th", value="p95", size="xs"),
-                                            ],
-                                            gap="xs",
-                                        ),
                                     ),
                                 ],
                                 gap="md",
@@ -242,7 +231,7 @@ def create_equity_curve_section():
                         style={"height": "500px"},
                         figure=create_empty_chart(
                             "Upload data and click 'Run Simulation' to see projections",
-                            "Portfolio Value Projections",
+                            "",
                         ),
                     ),
                     # Legend
