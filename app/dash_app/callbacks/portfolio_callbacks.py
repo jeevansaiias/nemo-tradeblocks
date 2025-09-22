@@ -859,12 +859,11 @@ def register_callbacks(app):
         [
             Input("current-portfolio-data", "data"),
             Input("trade-strategy-filter", "value"),
-            Input("split-legs-toggle", "checked"),
             Input("nav-trade-data", "n_clicks"),
         ],
         prevent_initial_call=False,
     )
-    def update_trade_data_tab(portfolio_data, strategy_filter, split_legs, nav_clicks):
+    def update_trade_data_tab(portfolio_data, strategy_filter, nav_clicks):
         """Update the Trade Data tab"""
         if not portfolio_data:
             return "", [], []
@@ -896,7 +895,7 @@ def register_callbacks(app):
             ]
 
             # Create table and summary
-            trades_table = create_trades_table(trades_data, split_legs)
+            trades_table = create_trades_table(trades_data)
             summary_stats = create_trade_summary_stats(trades_data)
 
             return trades_table, summary_stats, strategy_options

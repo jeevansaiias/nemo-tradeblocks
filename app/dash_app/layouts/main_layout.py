@@ -114,11 +114,6 @@ def create_main_layout():
                                         description="Strategy Correlations",
                                     ),
                                     dmc.NavLink(
-                                        label="📊 Trade Blocks",
-                                        id="nav-trade-data",
-                                        description="Trading Block History",
-                                    ),
-                                    dmc.NavLink(
                                         label="💰 Capital Blocks",
                                         id="nav-margin",
                                         description="Capital Management",
@@ -127,6 +122,11 @@ def create_main_layout():
                                         label="⏰ Time Machine",
                                         id="nav-optimizer",
                                         description="Walk-Forward Analysis",
+                                    ),
+                                    dmc.NavLink(
+                                        label="📊 Trade Blocks",
+                                        id="nav-trade-data",
+                                        description="Trading Block History",
                                     ),
                                 ],
                                 gap="xs",
