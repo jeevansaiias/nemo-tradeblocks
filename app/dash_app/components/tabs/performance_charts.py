@@ -11,6 +11,61 @@ from typing import List, Dict, Any, Optional
 from app.utils.theme import get_theme_colors, apply_theme_layout
 
 
+def create_info_tooltip(tooltip_id, title, content, detailed_content=None):
+    """Create an info icon with popover tooltip for charts and metrics"""
+    return dmc.HoverCard(
+        width=320,
+        shadow="md",
+        children=[
+            dmc.HoverCardTarget(
+                dmc.ActionIcon(
+                    DashIconify(icon="tabler:info-circle", width=16),
+                    size="sm",
+                    variant="subtle",
+                    color="gray",
+                    id=f"{tooltip_id}-info",
+                )
+            ),
+            dmc.HoverCardDropdown(
+                children=[
+                    dmc.Stack(
+                        [
+                            dmc.Text(title, fw=600, size="sm", c="blue"),
+                            dmc.Text(content, size="sm"),
+                            dmc.Divider() if detailed_content else None,
+                            (
+                                dmc.Text(detailed_content, size="xs", c="dimmed")
+                                if detailed_content
+                                else None
+                            ),
+                        ],
+                        gap="xs",
+                    )
+                ]
+            ),
+        ],
+    )
+
+
+def create_chart_title(title, order=4, tooltip_content=None, tooltip_detailed=None, **kwargs):
+    """Create a chart title with optional info tooltip"""
+    if tooltip_content:
+        return dmc.Group(
+            [
+                dmc.Title(title, order=order, **kwargs),
+                create_info_tooltip(
+                    f"chart-{title.lower().replace(' ', '-').replace('/', '-')}",
+                    title,
+                    tooltip_content,
+                    tooltip_detailed,
+                ),
+            ],
+            gap="sm",
+            align="center",
+        )
+    return dmc.Title(title, order=order, **kwargs)
+
+
 # =============================================================================
 # REAL CHART IMPLEMENTATIONS - Phase 2 Core Charts
 # =============================================================================
@@ -979,9 +1034,13 @@ def create_performance_charts_tab():
             create_main_equity_section(),
             # Distribution Analysis (2-column grid)
             create_distribution_analysis_section(),
+            # Win/Loss Streaks Analysis (full width)
+            create_win_loss_streaks_section(),
             # Time-Based Analysis (2-column grid)
             create_time_based_analysis_section(),
-            # Advanced Metrics (3-column grid)
+            # Return on Margin Analysis (dedicated section)
+            create_return_on_margin_section(),
+            # Advanced Metrics (rolling metrics and risk evolution)
             create_advanced_metrics_section(),
         ],
         gap="lg",
@@ -1056,19 +1115,44 @@ def create_key_metrics_bar():
                         id="perf-metrics-bar",
                         children=[
                             create_metric_indicator(
-                                "Active Period", "Loading...", "Chart timespan", "blue"
+                                "Active Period",
+                                "Loading...",
+                                "Chart timespan",
+                                "blue",
+                                "The total time span covered by your trading data analysis.",
+                                "Longer periods provide more statistical significance for performance metrics. Shorter periods might show high volatility in metrics due to limited sample size.",
                             ),
                             create_metric_indicator(
-                                "Best Month", "Loading...", "Calculating", "green"
+                                "Best Month",
+                                "Loading...",
+                                "Calculating",
+                                "green",
+                                "Your highest monthly return during the analysis period.",
+                                "While good performance is positive, extremely high months (>20-30%) might indicate excessive risk-taking or luck. Consistent moderate gains often indicate better long-term strategy.",
                             ),
                             create_metric_indicator(
-                                "Worst Month", "Loading...", "Calculating", "red"
+                                "Worst Month",
+                                "Loading...",
+                                "Calculating",
+                                "red",
+                                "Your worst monthly loss, showing maximum monthly drawdown.",
+                                "This helps assess your downside risk tolerance. Professional traders often target worst months no worse than -5% to -10% depending on strategy. Large losses may indicate poor risk management.",
                             ),
                             create_metric_indicator(
-                                "Avg Trade Duration", "Loading...", "Hold time", "gray"
+                                "Avg Trade Duration",
+                                "Loading...",
+                                "Hold time",
+                                "gray",
+                                "Average time you hold positions from open to close.",
+                                "Shorter durations (hours/days) suggest scalping or day trading strategies. Longer durations (weeks/months) indicate swing or position trading. Should align with your intended strategy.",
                             ),
                             create_metric_indicator(
-                                "Win Streak", "Loading...", "Max consecutive", "green"
+                                "Win Streak",
+                                "Loading...",
+                                "Max consecutive",
+                                "green",
+                                "Maximum number of consecutive winning trades achieved.",
+                                "Long win streaks (10+ trades) can indicate good strategy but also potential overconfidence. Very long streaks might suggest you're not taking profits soon enough or avoiding necessary stop losses.",
                             ),
                         ],
                         justify="space-around",
@@ -1083,11 +1167,35 @@ def create_key_metrics_bar():
     )
 
 
-def create_metric_indicator(label, value, subtitle, color):
-    """Create individual metric indicator"""
+def create_metric_indicator(
+    label, value, subtitle, color, tooltip_content=None, tooltip_detailed=None
+):
+    """Create individual metric indicator with optional tooltip"""
+    label_with_tooltip = (
+        dmc.Group(
+            [
+                dmc.Text(label, size="xs", c="dimmed", ta="center"),
+                (
+                    create_info_tooltip(
+                        f"metric-{label.lower().replace(' ', '-')}",
+                        label,
+                        tooltip_content,
+                        tooltip_detailed,
+                    )
+                    if tooltip_content
+                    else None
+                ),
+            ],
+            gap="xs",
+            justify="center",
+        )
+        if tooltip_content
+        else dmc.Text(label, size="xs", c="dimmed", ta="center")
+    )
+
     return dmc.Stack(
         children=[
-            dmc.Text(label, size="xs", c="dimmed", ta="center"),
+            label_with_tooltip,
             dmc.Text(value, size="lg", fw=700, c=color, ta="center"),
             dmc.Text(subtitle, size="xs", c="dimmed", ta="center") if subtitle else html.Div(),
         ],
@@ -1105,7 +1213,11 @@ def create_main_equity_section():
                 children=[
                     dmc.Group(
                         children=[
-                            dmc.Title("Equity Curve", order=4),
+                            create_chart_title(
+                                "Equity Curve",
+                                tooltip_content="Your portfolio's building blocks stacked over time - every peak, valley, and milestone along the way.",
+                                tooltip_detailed="This shows your account value after each trade. Steady upward movement indicates consistent profitability, while volatility reveals periods of mixed results. The overall trend tells you if your trading approach is generating wealth over time or if adjustments might be needed.",
+                            ),
                             dmc.Group(
                                 children=[
                                     dmc.SegmentedControl(
@@ -1153,7 +1265,14 @@ def create_main_equity_section():
             # Drawdown Chart
             dmc.Paper(
                 children=[
-                    dmc.Title("Drawdown", order=4, mb="md"),
+                    dmc.Box(
+                        create_chart_title(
+                            "Drawdown",
+                            tooltip_content="When your trading blocks tumbled - measuring how far you fell from your highest tower.",
+                            tooltip_detailed="Drawdowns show the worst-case scenarios you've experienced - how much your account declined from peak values. This is crucial for understanding your risk tolerance and whether your strategy's downside matches what you can psychologically and financially handle. Recovery time shows resilience.",
+                        ),
+                        mb="md",
+                    ),
                     dcc.Loading(
                         id="drawdown-loading",
                         type="default",
@@ -1178,103 +1297,136 @@ def create_main_equity_section():
     )
 
 
+def create_day_of_week_analysis_section():
+    """Create dedicated day of week trading pattern analysis section"""
+    return dmc.Paper(
+        children=[
+            dmc.Box(
+                create_chart_title(
+                    "📅 Day of Week Patterns",
+                    tooltip_content="Building blocks of your week - are you laying stronger foundations on Mondays or Fridays?",
+                    tooltip_detailed="Different weekdays often show distinct performance patterns due to market behavior, news cycles, and trader psychology. Identifying your strongest and weakest days can help you understand when your strategy works best and potentially adjust your trading schedule or position sizing.",
+                ),
+                mb="md",
+            ),
+            dcc.Loading(
+                id="day-of-week-loading",
+                type="circle",
+                children=[
+                    dcc.Graph(
+                        id="day-of-week-chart",
+                        config={"responsive": True, "displayModeBar": False},
+                        style={
+                            "height": "min(300px, 35vh)",
+                            "minHeight": "250px",
+                            "width": "100%",
+                        },
+                    )
+                ],
+            ),
+        ],
+        p="md",
+        withBorder=True,
+    )
+
+
+def create_return_distribution_section():
+    """Create dedicated return distribution analysis section"""
+    return dmc.Paper(
+        children=[
+            dmc.Box(
+                create_chart_title(
+                    "📊 Return Distribution",
+                    tooltip_content="The building blocks of your trading style - are you stacking steady bricks or placing bold cornerstone moves?",
+                    tooltip_detailed="The distribution of your returns reveals important characteristics about your trading style. Are you consistently hitting small wins, occasionally landing big winners, or something in between? Understanding this helps you assess whether your risk/reward profile matches your goals and personality.",
+                ),
+                mb="md",
+            ),
+            dcc.Loading(
+                id="return-distribution-loading",
+                type="circle",
+                children=[
+                    dcc.Graph(
+                        id="rom-distribution-chart",
+                        config={"responsive": True, "displayModeBar": False},
+                        style={
+                            "height": "min(300px, 35vh)",
+                            "minHeight": "250px",
+                            "width": "100%",
+                        },
+                    )
+                ],
+            ),
+        ],
+        p="md",
+        withBorder=True,
+    )
+
+
+def create_win_loss_streaks_section():
+    """Create dedicated Win/Loss Streaks analysis section (full width)"""
+    return dmc.Paper(
+        children=[
+            dmc.Group(
+                children=[
+                    create_chart_title(
+                        "🎯 Win/Loss Streak Analysis",
+                        tooltip_content="Building momentum - when your blocks stack smoothly versus when they keep toppling over.",
+                        tooltip_detailed="Winning and losing streaks are natural in trading, but their patterns tell important stories. Long streaks might indicate strong strategy alignment or the need for position size adjustments. Understanding your streak tendencies helps with psychological preparation and knowing when variance is normal versus when changes are needed.",
+                    ),
+                ],
+                gap="xs",
+                align="center",
+                mb="md",
+            ),
+            dmc.Stack(
+                children=[
+                    dcc.Loading(
+                        id="streak-loading",
+                        type="circle",
+                        children=[
+                            dcc.Graph(
+                                id="streak-distribution-chart",
+                                config={"responsive": True, "displayModeBar": False},
+                                style={
+                                    "height": "min(400px, 45vh)",
+                                    "minHeight": "350px",
+                                    "width": "100%",
+                                },
+                            )
+                        ],
+                    ),
+                    # Streak Statistics (populated by callback)
+                    dmc.Group(
+                        id="streak-statistics-group",
+                        children=[
+                            create_streak_stat("Max Win", "0", "green"),
+                            create_streak_stat("Max Loss", "0", "red"),
+                            create_streak_stat("Avg Win", "0", "teal"),
+                            create_streak_stat("Avg Loss", "0", "orange"),
+                        ],
+                        justify="space-around",
+                        w="100%",
+                    ),
+                ],
+                gap="md",
+            ),
+        ],
+        p="md",
+        withBorder=True,
+    )
+
+
 def create_distribution_analysis_section():
-    """Create trade distribution and streak analysis section"""
+    """Create distribution analysis section with day-of-week and return distribution cards"""
     return dmc.SimpleGrid(
         cols={"base": 1, "lg": 2},
         spacing="md",
         children=[
-            # Trade Distribution Panel
-            dmc.Paper(
-                children=[
-                    dmc.Group(
-                        children=[
-                            dmc.Title("Trade Distribution", order=4),
-                        ],
-                        gap="xs",
-                        align="center",
-                        mb="md",
-                    ),
-                    dmc.Stack(
-                        children=[
-                            dcc.Loading(
-                                id="distribution-loading",
-                                type="circle",
-                                children=[
-                                    dcc.Graph(
-                                        id="day-of-week-chart",
-                                        config={"responsive": True, "displayModeBar": False},
-                                        style={
-                                            "height": "min(250px, 30vh)",
-                                            "minHeight": "200px",
-                                            "width": "100%",
-                                        },
-                                    ),
-                                    dcc.Graph(
-                                        id="rom-distribution-chart",
-                                        config={"responsive": True, "displayModeBar": False},
-                                        style={
-                                            "height": "min(250px, 30vh)",
-                                            "minHeight": "200px",
-                                            "width": "100%",
-                                        },
-                                    ),
-                                ],
-                            ),
-                        ],
-                        gap="md",
-                    ),
-                ],
-                p="md",
-                withBorder=True,
-            ),
-            # Streak Analysis Panel
-            dmc.Paper(
-                children=[
-                    dmc.Group(
-                        children=[
-                            dmc.Title("Win/Loss Streaks", order=4),
-                        ],
-                        gap="xs",
-                        align="center",
-                        mb="md",
-                    ),
-                    dmc.Stack(
-                        children=[
-                            dcc.Loading(
-                                id="streak-loading",
-                                type="circle",
-                                children=[
-                                    dcc.Graph(
-                                        id="streak-distribution-chart",
-                                        config={"responsive": True, "displayModeBar": False},
-                                        style={
-                                            "height": "min(380px, 45vh)",
-                                            "minHeight": "320px",
-                                            "width": "100%",
-                                        },
-                                    )
-                                ],
-                            ),
-                            # Streak Statistics (populated by callback)
-                            dmc.Group(
-                                id="streak-statistics-group",
-                                children=[
-                                    create_streak_stat("Max Win", "0", "green"),
-                                    create_streak_stat("Max Loss", "0", "red"),
-                                    create_streak_stat("Avg Win", "0", "teal"),
-                                    create_streak_stat("Avg Loss", "0", "orange"),
-                                ],
-                                justify="space-around",
-                                w="100%",
-                            ),
-                        ],
-                        gap="md",
-                    ),
-                ],
-                p="md",
-                withBorder=True,
-            ),
+            # Day of Week Patterns
+            create_day_of_week_analysis_section(),
+            # Return Distribution
+            create_return_distribution_section(),
         ],
     )
 
@@ -1362,7 +1514,11 @@ def create_time_based_analysis_section():
                 children=[
                     dmc.Group(
                         children=[
-                            dmc.Title("Monthly Returns", order=4),
+                            create_chart_title(
+                                "Monthly Returns",
+                                tooltip_content="Your trading foundation year by year - which months added strong blocks and which needed rebuilding.",
+                                tooltip_detailed="Monthly performance patterns can reveal seasonal effects, consistency issues, and how your strategy performs across different market environments. Some strategies work better in certain market conditions that tend to cluster around calendar periods. This helps identify when to be more or less aggressive.",
+                            ),
                         ],
                         gap="xs",
                         align="center",
@@ -1392,7 +1548,11 @@ def create_time_based_analysis_section():
                 children=[
                     dmc.Group(
                         children=[
-                            dmc.Title("Trade Sequence", order=4),
+                            create_chart_title(
+                                "Trade Sequence",
+                                tooltip_content="Every building block placed in order - your complete construction timeline with all the additions and reconstructions.",
+                                tooltip_detailed="This chronological view shows every trade outcome and helps identify improvement trends, clustering of similar results, and overall progression. You can spot if your wins are getting bigger, losses smaller, or if certain periods produced notably different results due to market conditions or strategy evolution.",
+                            ),
                             dmc.Switch(
                                 id="sequence-show-trend",
                                 label="Show Trend",
@@ -1417,42 +1577,49 @@ def create_time_based_analysis_section():
     )
 
 
-def create_advanced_metrics_section():
-    """Create advanced metrics section"""
-    return dmc.Stack(
+def create_return_on_margin_section():
+    """Create dedicated Return on Margin analysis section"""
+    return dmc.Paper(
         children=[
-            # ROM Over Time - Full Width
-            dmc.Paper(
+            dmc.Group(
                 children=[
-                    dmc.Group(
-                        children=[
-                            dmc.Title("Return on Margin", order=4),
-                            dmc.Select(
-                                id="rom-ma-period",
-                                data=[
-                                    {"value": "none", "label": "No MA"},
-                                    {"value": "10", "label": "10-trade MA"},
-                                    {"value": "30", "label": "30-trade MA"},
-                                    {"value": "60", "label": "60-trade MA"},
-                                ],
-                                value="30",
-                                size="xs",
-                                style={"width": "120px"},
-                            ),
-                        ],
-                        justify="space-between",
-                        align="center",
-                        mb="md",
+                    create_chart_title(
+                        "📊 Return on Margin Analysis",
+                        tooltip_content="Building efficiency - how much structure you're creating with each block of borrowed capital.",
+                        tooltip_detailed="Return on Margin shows how efficiently you're using borrowed capital by comparing profits/losses to the margin required. This is especially important for options trading where margin requirements vary significantly. Higher RoM indicates better capital efficiency, while trends show if your effectiveness is improving over time.",
                     ),
-                    dcc.Graph(
-                        id="rom-timeline-chart",
-                        config={"responsive": True, "displayModeBar": False},
-                        style={"height": "min(350px, 40vh)", "minHeight": "300px", "width": "100%"},
+                    dmc.Select(
+                        id="rom-ma-period",
+                        data=[
+                            {"value": "none", "label": "No MA"},
+                            {"value": "10", "label": "10-trade MA"},
+                            {"value": "30", "label": "30-trade MA"},
+                            {"value": "60", "label": "60-trade MA"},
+                        ],
+                        value="30",
+                        size="xs",
+                        style={"width": "120px"},
                     ),
                 ],
-                p="md",
-                withBorder=True,
+                justify="space-between",
+                align="center",
+                mb="md",
             ),
+            dcc.Graph(
+                id="rom-timeline-chart",
+                config={"responsive": True, "displayModeBar": False},
+                style={"height": "min(350px, 40vh)", "minHeight": "300px", "width": "100%"},
+            ),
+        ],
+        p="md",
+        withBorder=True,
+    )
+
+
+def create_advanced_metrics_section():
+    """Create advanced metrics section with rolling metrics and risk evolution"""
+    return dmc.Stack(
+        children=[
             # Rolling Metrics + Risk Evolution - Side by Side
             dmc.SimpleGrid(
                 cols={"base": 1, "lg": 2},
@@ -1463,7 +1630,11 @@ def create_advanced_metrics_section():
                         children=[
                             dmc.Group(
                                 children=[
-                                    dmc.Title("📊 Rolling Metrics", order=4),
+                                    create_chart_title(
+                                        "📊 Rolling Metrics",
+                                        tooltip_content="Your building progress through a moving window - examining your last 30 blocks at each construction milestone.",
+                                        tooltip_detailed="Rolling calculations show how your performance metrics evolve using moving time windows, giving you a dynamic view of improvement or deterioration. This is more responsive than looking at all-time statistics and helps identify when your trading effectiveness is trending up or down.",
+                                    ),
                                     dmc.Select(
                                         id="rolling-metric-type",
                                         data=[
@@ -1496,7 +1667,14 @@ def create_advanced_metrics_section():
                     # Risk Evolution
                     dmc.Paper(
                         children=[
-                            dmc.Title("⚠️ Risk Evolution", order=4, mb="md"),
+                            dmc.Box(
+                                create_chart_title(
+                                    "⚠️ Risk Evolution",
+                                    tooltip_content="Your construction style evolution - are you building bolder structures or laying more careful foundations over time?",
+                                    tooltip_detailed="Risk evolution tracks how your exposure to volatility and drawdowns changes over time. Increasing risk might indicate growing confidence, larger position sizes, or changing market conditions. Decreasing risk could show improved discipline or more conservative positioning. Both trends provide insights into your trading development.",
+                                ),
+                                mb="md",
+                            ),
                             dcc.Graph(
                                 id="risk-evolution-chart",
                                 config={"responsive": True, "displayModeBar": False},
