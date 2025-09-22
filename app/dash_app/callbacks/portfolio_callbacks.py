@@ -809,14 +809,13 @@ def register_callbacks(app):
             # Generate streak statistics
             streak_stats = generate_streak_statistics_group(streak_data)
 
-            # Metrics bar
-            metrics = dmc.Group(
-                children=[
-                    create_metric_indicator("Active Period", "", "", "blue"),
-                ]
-            )
+            # Metrics bar - generate from already calculated data
             try:
-                metrics = generate_performance_charts(trades).get("metrics", get_mock_metrics())
+                from app.dash_app.components.tabs.performance_charts import generate_real_metrics
+
+                metrics = generate_real_metrics(
+                    equity_data, distribution_data, streak_data, trades, monthly_data
+                )
             except Exception:
                 metrics = get_mock_metrics()
 

@@ -30,11 +30,12 @@ def create_geekistics_tab():
                                 placeholder="All strategies",
                                 data=[],
                                 value=[],
-                                style={"minWidth": "200px"},
+                                style={"minWidth": "250px", "maxWidth": "400px"},
                                 leftSection=DashIconify(icon="tabler:filter"),
                                 clearable=True,
                                 searchable=True,
                                 maxDropdownHeight=200,
+                                maxValues=3,  # Show max 3 pills, then "+X more"
                             ),
                         ],
                         gap="md",
@@ -146,30 +147,8 @@ def create_comprehensive_stats(
     # Kelly criterion
     kelly_criterion = advanced_stats.get("kelly_criterion", 0) if advanced_stats else 0
 
-    # Filter indicator
-    filter_badge = None
-    if selected_strategies:
-        filter_badge = dmc.Group(
-            [
-                dmc.Badge(
-                    f"Filtered by {len(selected_strategies)} strategy{'ies' if len(selected_strategies) > 1 else 'y'}",
-                    variant="light",
-                    color="orange",
-                    size="lg",
-                ),
-                dmc.Text(
-                    f"({', '.join(selected_strategies[:3])}{'...' if len(selected_strategies) > 3 else ''})",
-                    size="sm",
-                    c="dimmed",
-                ),
-            ],
-            gap="xs",
-        )
-
     return dmc.Stack(
         [
-            # Filter indicator (if active)
-            filter_badge,
             # Basic Overview Section
             dmc.Stack(
                 [

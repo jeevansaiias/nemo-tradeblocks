@@ -558,6 +558,7 @@ def generate_performance_charts(trades: List[Any]) -> Dict[str, Any]:
         equity_data = calc.calculate_enhanced_cumulative_equity(trades)
         distribution_data = calc.calculate_trade_distributions(trades)
         streak_data = calc.calculate_streak_distributions(trades)
+        monthly_data = calc.calculate_monthly_heatmap_data(trades)
 
         # Generate charts
         charts = {
@@ -570,7 +571,7 @@ def generate_performance_charts(trades: List[Any]) -> Dict[str, Any]:
 
         # Generate real metrics
         charts["metrics"] = generate_real_metrics(
-            equity_data, distribution_data, streak_data, trades
+            equity_data, distribution_data, streak_data, trades, monthly_data
         )
 
         return charts
@@ -882,6 +883,7 @@ def generate_real_metrics(
     distribution_data: Dict[str, Any],
     streak_data: Dict[str, Any],
     trades: List[Any],
+    monthly_data: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """
     Generate real metrics for the key metrics bar.
@@ -911,9 +913,22 @@ def generate_real_metrics(
         else:
             active_period = "No data"
 
-        # Find best and worst months from distribution data if available
-        best_month = "+12.4%"
-        worst_month = "-5.2%"
+        # Calculate best and worst months from monthly data
+        best_month = "N/A"
+        worst_month = "N/A"
+        if monthly_data and monthly_data.get("monthly_returns"):
+            monthly_returns = monthly_data["monthly_returns"]
+            all_values = []
+            for year_data in monthly_returns.values():
+                for month_value in year_data.values():
+                    if month_value != 0:  # Skip zero values (no trades)
+                        all_values.append(month_value)
+
+            if all_values:
+                best_value = max(all_values)
+                worst_value = min(all_values)
+                best_month = f"+${best_value:,.0f}" if best_value > 0 else f"${best_value:,.0f}"
+                worst_month = f"${worst_value:,.0f}"
 
         # Calculate average trade duration
         durations = []
@@ -1012,9 +1027,11 @@ def create_performance_header():
                         placeholder="All strategies",
                         data=[],  # Will be populated by callback
                         value=[],
-                        style={"minWidth": "200px"},
+                        style={"minWidth": "250px", "maxWidth": "400px"},
                         leftSection=DashIconify(icon="tabler:filter"),
                         clearable=True,
+                        maxValues=3,  # Show max 3 pills, then "+X more"
+                        searchable=True,
                     ),
                 ],
                 gap="md",
