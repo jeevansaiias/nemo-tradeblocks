@@ -728,26 +728,42 @@ def create_return_distribution_chart(result):
                     marker_color="rgba(0,128,255,0.7)",
                     marker_line_color="rgba(0,128,255,1)",
                     marker_line_width=1,
+                    showlegend=False,
                 )
             ]
         )
 
-        # Add percentile lines
-        for p_name, p_val in result.percentiles.items():
-            if p_name in ["p5", "p50", "p95"]:
-                color = "red" if p_name == "p5" else "blue" if p_name == "p50" else "green"
-                fig.add_vline(
-                    x=p_val,
-                    line_dash="dash",
-                    line_color=color,
-                    annotation_text=f"{p_name.upper()}: {p_val:.1%}",
-                    annotation_position="top",
+        # Add percentile lines as scatter traces for interactive legend
+        percentile_info = {
+            "p5": {"color": "red", "name": f"P5: {result.percentiles.get('p5', 0):.1%}"},
+            "p50": {"color": "blue", "name": f"P50: {result.percentiles.get('p50', 0):.1%}"},
+            "p95": {"color": "green", "name": f"P95: {result.percentiles.get('p95', 0):.1%}"},
+        }
+
+        # Calculate histogram to get y_max for vertical lines
+        hist_counts, _ = np.histogram(result.final_values, bins=50)
+        y_max = max(hist_counts) * 1.1  # Add 10% padding
+
+        for p_name, info in percentile_info.items():
+            if p_name in result.percentiles:
+                # Add vertical line as scatter trace (interactive)
+                fig.add_trace(
+                    go.Scatter(
+                        x=[result.percentiles[p_name], result.percentiles[p_name]],
+                        y=[0, y_max],
+                        mode="lines",
+                        line=dict(color=info["color"], dash="dash", width=2),
+                        name=info["name"],
+                        showlegend=True,
+                        hoverinfo="skip",
+                    )
                 )
 
         fig.update_layout(
             xaxis_title="Cumulative Return",
             yaxis_title="Frequency",
-            showlegend=False,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
 
         # Apply theme
@@ -785,25 +801,46 @@ def create_drawdown_analysis_chart(result, portfolio=None):
                     marker_color="rgba(255,128,0,0.7)",
                     marker_line_color="rgba(255,128,0,1)",
                     marker_line_width=1,
+                    showlegend=False,
                 )
             ]
         )
 
-        # Add percentile lines
+        # Add percentile lines as interactive scatter traces
         percentiles = np.percentile(drawdowns, [5, 50, 95])
-        for i, (p, color) in enumerate(zip(percentiles, ["red", "orange", "green"])):
-            fig.add_vline(
-                x=p * 100,
-                line_dash="dash",
-                line_color=color,
-                annotation_text=f"P{[5,50,95][i]}: {p:.1%}",
+        percentile_info = [
+            {"value": percentiles[0] * 100, "color": "red", "name": f"P5: {percentiles[0]:.1%}"},
+            {
+                "value": percentiles[1] * 100,
+                "color": "orange",
+                "name": f"P50: {percentiles[1]:.1%}",
+            },
+            {"value": percentiles[2] * 100, "color": "green", "name": f"P95: {percentiles[2]:.1%}"},
+        ]
+
+        # Calculate histogram to get y_max for vertical lines
+        hist_counts, _ = np.histogram(np.array(drawdowns) * 100, bins=30)
+        y_max = max(hist_counts) * 1.1  # Add 10% padding
+
+        for info in percentile_info:
+            # Add vertical line as scatter trace (interactive)
+            fig.add_trace(
+                go.Scatter(
+                    x=[info["value"], info["value"]],
+                    y=[0, y_max],
+                    mode="lines",
+                    line=dict(color=info["color"], dash="dash", width=2),
+                    name=info["name"],
+                    showlegend=True,
+                    hoverinfo="skip",
+                )
             )
 
         fig.update_layout(
-            title="Drawdown Distribution",
             xaxis_title="Drawdown (%)",
             yaxis_title="Frequency",
-            showlegend=False,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
 
         # Apply theme
