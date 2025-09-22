@@ -112,46 +112,39 @@ def create_main_layout():
                                     # Navigation items - TradeBlocks themed
                                     dmc.NavLink(
                                         label="🧱 Block Stats",
-                                        leftSection=DashIconify(icon="tabler:chart-bar"),
                                         id="nav-geekistics",
                                         active=True,
                                         description="Block Stats & Analytics",
                                     ),
                                     dmc.NavLink(
                                         label="📈 Performance Blocks",
-                                        leftSection=DashIconify(icon="tabler:chart-line"),
                                         id="nav-performance",
                                         description="Performance Analytics",
                                     ),
                                     dmc.NavLink(
                                         label="🎲 Risk Simulator",
-                                        leftSection=DashIconify(icon="tabler:dice"),
                                         id="nav-monte-carlo",
                                         description="Risk Simulation",
                                     ),
                                     dmc.NavLink(
                                         label="🔗 Correlation Matrix",
-                                        leftSection=DashIconify(icon="tabler:grid-dots"),
                                         id="nav-correlation",
                                         description="Strategy Correlations",
                                     ),
                                     dmc.NavLink(
                                         label="📊 Trade Blocks",
-                                        leftSection=DashIconify(icon="tabler:table"),
                                         id="nav-trade-data",
                                         description="Trading Block History",
                                     ),
                                     dmc.NavLink(
                                         label="💰 Capital Blocks",
-                                        leftSection=DashIconify(icon="tabler:percentage"),
                                         id="nav-margin",
                                         description="Capital Management",
                                     ),
                                     dmc.NavLink(
-                                        label="🎯 Builder's Edge",
-                                        leftSection=DashIconify(icon="tabler:target"),
+                                        label="⏰ Time Machine",
                                         id="nav-optimizer",
-                                        description="Portfolio Builder",
+                                        description="Walk-Forward Analysis",
                                     ),
                                 ],
                                 gap="xs",
@@ -494,4 +487,219 @@ def create_disclaimer_content():
             ),
         ],
         gap="sm",
+    )
+
+
+def create_coming_soon_content():
+    """Create coming soon content for features under development"""
+    return dmc.Center(
+        children=[
+            dmc.Stack(
+                children=[
+                    # Large dice icon
+                    dmc.Center(
+                        dmc.Text("🎲", size="120px", style={"lineHeight": "1", "fontSize": "120px"})
+                    ),
+                    dmc.Title("🛠️ Building in Progress", order=2, ta="center", c="orange.6"),
+                    dmc.Title("Risk Simulator Coming Soon", order=3, ta="center", c="dimmed"),
+                    dmc.Text(
+                        "We're crafting powerful risk simulation blocks to help you stress-test your trading strategies!",
+                        size="lg",
+                        ta="center",
+                        c="dimmed",
+                        style={"maxWidth": "600px"},
+                    ),
+                    dmc.Stack(
+                        children=[
+                            dmc.Paper(
+                                children=[
+                                    dmc.Text("🎲 Planned Features:", fw=600, size="md", mb="sm"),
+                                    dmc.List(
+                                        children=[
+                                            dmc.ListItem(
+                                                "Monte Carlo simulation with multiple scenarios"
+                                            ),
+                                            dmc.ListItem(
+                                                "Portfolio stress testing under extreme market conditions"
+                                            ),
+                                            dmc.ListItem(
+                                                "Risk metrics and Value at Risk (VaR) calculations"
+                                            ),
+                                            dmc.ListItem("Drawdown probability analysis"),
+                                        ],
+                                        spacing="xs",
+                                        size="sm",
+                                        c="dimmed",
+                                    ),
+                                ],
+                                p="md",
+                                withBorder=True,
+                                radius="md",
+                                style={"maxWidth": "500px"},
+                            ),
+                            dmc.Text(
+                                "Check back soon - we're laying these blocks as fast as we can! 🧱",
+                                size="md",
+                                ta="center",
+                                c="orange.6",
+                                fw=500,
+                                mt="md",
+                            ),
+                        ],
+                        align="center",
+                        gap="md",
+                    ),
+                ],
+                align="center",
+                gap="xl",
+            )
+        ],
+        style={"minHeight": "60vh"},
+    )
+
+
+def create_capital_blocks_coming_soon():
+    """Create coming soon content for Capital Blocks margin analysis tool"""
+    return dmc.Center(
+        children=[
+            dmc.Stack(
+                children=[
+                    # Large money bag icon
+                    dmc.Center(
+                        dmc.Text("💰", size="120px", style={"lineHeight": "1", "fontSize": "120px"})
+                    ),
+                    dmc.Title("💰 Building Capital Blocks", order=2, ta="center", c="orange.6"),
+                    dmc.Title(
+                        "Margin Analysis Tools Coming Soon", order=3, ta="center", c="dimmed"
+                    ),
+                    dmc.Text(
+                        "We're constructing powerful margin analysis blocks to help you optimize your capital efficiency!",
+                        size="lg",
+                        ta="center",
+                        c="dimmed",
+                        style={"maxWidth": "600px"},
+                    ),
+                    dmc.Stack(
+                        children=[
+                            dmc.Paper(
+                                children=[
+                                    dmc.Text("💼 Planned Features:", fw=600, size="md", mb="sm"),
+                                    dmc.List(
+                                        children=[
+                                            dmc.ListItem(
+                                                "Margin utilization analysis and optimization"
+                                            ),
+                                            dmc.ListItem(
+                                                "Capital efficiency metrics across strategies"
+                                            ),
+                                            dmc.ListItem("Buying power allocation insights"),
+                                            dmc.ListItem(
+                                                "Position sizing based on available margin"
+                                            ),
+                                            dmc.ListItem(
+                                                "Risk-adjusted capital deployment analysis"
+                                            ),
+                                        ],
+                                        spacing="xs",
+                                        size="sm",
+                                        c="dimmed",
+                                    ),
+                                ],
+                                p="md",
+                                withBorder=True,
+                                radius="md",
+                                style={"maxWidth": "500px"},
+                            ),
+                            dmc.Text(
+                                "Stay tuned - we're building these capital blocks with precision! 💎",
+                                size="md",
+                                ta="center",
+                                c="orange.6",
+                                fw=500,
+                                mt="md",
+                            ),
+                        ],
+                        align="center",
+                        gap="md",
+                    ),
+                ],
+                align="center",
+                gap="xl",
+            )
+        ],
+        style={"minHeight": "60vh"},
+    )
+
+
+def create_walk_forward_coming_soon():
+    """Create coming soon content for Walk-Forward Analysis tool"""
+    return dmc.Center(
+        children=[
+            dmc.Stack(
+                children=[
+                    dmc.Center(
+                        dmc.Text("⏰", size="120px", style={"lineHeight": "1", "fontSize": "120px"})
+                    ),
+                    dmc.Title(
+                        "⏰ Time Machine Under Construction", order=2, ta="center", c="orange.6"
+                    ),
+                    dmc.Title(
+                        "Walk-Forward Analysis Coming Soon", order=3, ta="center", c="dimmed"
+                    ),
+                    dmc.Text(
+                        "Travel through your trading history to see how your strategies evolved over time",
+                        ta="center",
+                        size="lg",
+                        c="dimmed",
+                        w=600,
+                    ),
+                    dmc.Stack(
+                        children=[
+                            dmc.Paper(
+                                children=[
+                                    dmc.Text("⏰ Planned Features:", fw=600, size="md", mb="sm"),
+                                    dmc.List(
+                                        children=[
+                                            dmc.ListItem(
+                                                "Rolling performance windows across time periods"
+                                            ),
+                                            dmc.ListItem(
+                                                "Strategy stability analysis and regime detection"
+                                            ),
+                                            dmc.ListItem("Out-of-sample performance validation"),
+                                            dmc.ListItem(
+                                                "Temporal correlation insights between strategies"
+                                            ),
+                                            dmc.ListItem(
+                                                "Historical pattern recognition in your trading blocks"
+                                            ),
+                                        ],
+                                        spacing="xs",
+                                        size="sm",
+                                        c="dimmed",
+                                    ),
+                                ],
+                                p="md",
+                                withBorder=True,
+                                radius="md",
+                                style={"maxWidth": "500px"},
+                            ),
+                            dmc.Text(
+                                "Perfect your foundation first - then we'll build your time machine! ⚡",
+                                size="md",
+                                ta="center",
+                                c="orange.6",
+                                fw=500,
+                                mt="md",
+                            ),
+                        ],
+                        align="center",
+                        gap="md",
+                    ),
+                ],
+                align="center",
+                gap="xl",
+            )
+        ],
+        style={"minHeight": "60vh"},
     )

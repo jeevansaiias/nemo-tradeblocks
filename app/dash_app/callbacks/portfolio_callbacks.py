@@ -9,7 +9,13 @@ import logging
 import os
 
 from app.data.models import Trade
-from app.dash_app.layouts.main_layout import create_welcome_content, create_main_layout
+from app.dash_app.layouts.main_layout import (
+    create_welcome_content,
+    create_main_layout,
+    create_coming_soon_content,
+    create_capital_blocks_coming_soon,
+    create_walk_forward_coming_soon,
+)
 from app.dash_app.components.file_upload import (
     create_upload_success_message,
     create_upload_error_message,
@@ -490,16 +496,16 @@ def register_callbacks(app):
             return create_trade_data_tab(), *nav_states
         elif triggered == "nav-monte-carlo":
             nav_states[3] = True  # monte-carlo active
-            return create_welcome_content(), *nav_states  # Placeholder for now
+            return create_coming_soon_content(), *nav_states  # Coming soon page
         elif triggered == "nav-correlation":
             nav_states[4] = True  # correlation active
             return create_correlation_matrix_tab(), *nav_states
         elif triggered == "nav-margin":
             nav_states[5] = True  # margin active
-            return create_welcome_content(), *nav_states  # Placeholder for now
+            return create_capital_blocks_coming_soon(), *nav_states  # Coming soon page
         elif triggered == "nav-optimizer":
             nav_states[6] = True  # optimizer active
-            return create_welcome_content(), *nav_states  # Placeholder for now
+            return create_walk_forward_coming_soon(), *nav_states  # Coming soon page
         else:
             nav_states[0] = True  # Default to geekistics
             return create_geekistics_tab(), *nav_states
