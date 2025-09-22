@@ -61,6 +61,19 @@ def create_geekistics_tab():
                     # Controls
                     dmc.Group(
                         children=[
+                            # Risk-Free Rate Input (moved first)
+                            dmc.NumberInput(
+                                id="risk-free-rate-input",
+                                label="Risk-Free Rate (%)",
+                                value=2.0,
+                                min=0.0,
+                                max=20.0,
+                                step=0.1,
+                                suffix="%",
+                                style={"width": "180px"},
+                                leftSection=DashIconify(icon="tabler:chart-line", width=16),
+                                description="For Sharpe/Sortino",
+                            ),
                             # Strategy Filter
                             dmc.MultiSelect(
                                 id="geekistics-strategy-filter",
@@ -78,6 +91,7 @@ def create_geekistics_tab():
                         ],
                         gap="md",
                         wrap="wrap",
+                        align="flex-end",
                     ),
                 ],
                 justify="space-between",

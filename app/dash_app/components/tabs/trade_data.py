@@ -8,10 +8,18 @@ def create_trade_data_tab():
     """Create the Trade Data tab"""
     return dmc.Stack(
         children=[
-            # Title and controls
+            # Header with title and controls
             dmc.Group(
                 children=[
-                    dmc.Title("Trade Data", order=2),
+                    # Title
+                    dmc.Group(
+                        children=[
+                            dmc.Title("📊 Trading Block History", order=2),
+                        ],
+                        gap="sm",
+                        align="center",
+                    ),
+                    # Controls
                     dmc.Group(
                         children=[
                             dmc.Select(
@@ -21,23 +29,28 @@ def create_trade_data_tab():
                                 placeholder="All strategies",
                                 clearable=True,
                                 style={"width": "200px"},
-                            ),
-                            dmc.Switch(id="split-legs-toggle", label="Split Legs", checked=False),
-                            dmc.Button(
-                                "Export CSV",
-                                id="export-trades-button",
-                                leftSection=DashIconify(icon="tabler:download"),
-                                variant="light",
+                                leftSection=DashIconify(icon="tabler:filter", width=16),
                             ),
                         ],
                         gap="md",
+                        align="flex-end",
                     ),
                 ],
                 justify="space-between",
+                align="flex-end",
+                mb="lg",
             ),
             # Summary stats
             dmc.Paper(
-                children=[dmc.Group(id="trade-summary-stats", justify="space-around", children=[])],
+                children=[
+                    dmc.Group(
+                        id="trade-summary-stats",
+                        justify="space-around",
+                        align="center",
+                        w="100%",
+                        children=[],
+                    )
+                ],
                 p="md",
                 withBorder=True,
             ),
@@ -50,7 +63,7 @@ def create_trade_data_tab():
     )
 
 
-def create_trades_table(trades_data, split_legs=False):
+def create_trades_table(trades_data):
     """Create the trades data table"""
     if not trades_data:
         return dmc.Center(
@@ -165,19 +178,15 @@ def create_trade_summary_stats(trades_data):
 
 
 def create_summary_stat(label, value, icon, color="gray"):
-    """Create a summary statistic component"""
-    return dmc.Group(
+    """Create a summary statistic component - matches Performance Blocks style"""
+    return dmc.Stack(
         children=[
-            DashIconify(icon=icon, width=24, height=24, color=color),
-            dmc.Stack(
-                children=[
-                    dmc.Text(label, size="sm", c="dimmed"),
-                    dmc.Text(value, size="lg", fw=600, c=color),
-                ],
-                gap="xs",
-            ),
+            dmc.Text(label, size="xs", c="dimmed", ta="center"),
+            dmc.Text(value, size="lg", fw=700, c=color, ta="center"),
+            html.Div(),  # Empty div to match Performance Blocks 3-element structure
         ],
-        gap="sm",
+        gap="xs",
+        align="center",
     )
 
 

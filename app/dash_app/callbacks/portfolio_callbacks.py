@@ -9,7 +9,13 @@ import logging
 import os
 
 from app.data.models import Trade
-from app.dash_app.layouts.main_layout import create_welcome_content, create_main_layout
+from app.dash_app.layouts.main_layout import (
+    create_welcome_content,
+    create_main_layout,
+    create_coming_soon_content,
+    create_capital_blocks_coming_soon,
+    create_walk_forward_coming_soon,
+)
 from app.dash_app.components.file_upload import (
     create_upload_success_message,
     create_upload_error_message,
@@ -42,10 +48,6 @@ from app.dash_app.components.tabs.trade_data import (
 )
 from app.dash_app.components.tabs.correlation_matrix import (
     create_correlation_matrix_tab,
-)
-from app.dash_app.components.settings import (
-    create_settings_modal_content,
-    create_config_indicator,
 )
 
 logger = logging.getLogger(__name__)
@@ -131,11 +133,10 @@ def register_callbacks(app):
                 daily_entries = daily_log_filename_data.get("total_entries", 0)
                 daily_log_info.extend(
                     [
+                        dmc.Text("Daily Log:", size="xs", c="green.6", fw=500),
+                        dmc.Text(daily_filename, size="xs", c="dimmed", style={"fontWeight": 600}),
                         dmc.Text(
-                            f"📊 {daily_filename}", size="xs", c="dimmed", style={"fontWeight": 600}
-                        ),
-                        dmc.Text(
-                            f"📅 {daily_entries} daily entries",
+                            f"{daily_entries} daily entries",
                             size="xs",
                             c="dimmed",
                         ),
@@ -147,11 +148,10 @@ def register_callbacks(app):
                     dmc.Stack(
                         [
                             dmc.Text("🧱 Active Blocks", size="sm", fw=500),
+                            dmc.Text("Trade Log:", size="xs", c="blue.6", fw=500),
+                            dmc.Text(filename, size="xs", c="dimmed", style={"fontWeight": 600}),
                             dmc.Text(
-                                f"🧱 {filename}", size="xs", c="dimmed", style={"fontWeight": 600}
-                            ),
-                            dmc.Text(
-                                f"📈 {total_trades} trades",
+                                f"{total_trades} trades",
                                 size="xs",
                                 c="dimmed",
                             ),
@@ -159,20 +159,18 @@ def register_callbacks(app):
                             dmc.Group(
                                 children=[
                                     dmc.Button(
-                                        "Change Files",
+                                        "📁 Change Files",
                                         id="change-files-button",
                                         variant="subtle",
                                         color="gray",
                                         size="xs",
-                                        leftSection=DashIconify(icon="tabler:edit"),
                                     ),
                                     dmc.Button(
-                                        "Clear All",
+                                        "🗑️ Clear All",
                                         id="clear-portfolio-button",
                                         variant="subtle",
                                         color="red",
                                         size="xs",
-                                        leftSection=DashIconify(icon="tabler:trash"),
                                     ),
                                 ],
                                 gap="xs",
@@ -490,16 +488,16 @@ def register_callbacks(app):
             return create_trade_data_tab(), *nav_states
         elif triggered == "nav-monte-carlo":
             nav_states[3] = True  # monte-carlo active
-            return create_welcome_content(), *nav_states  # Placeholder for now
+            return create_coming_soon_content(), *nav_states  # Coming soon page
         elif triggered == "nav-correlation":
             nav_states[4] = True  # correlation active
             return create_correlation_matrix_tab(), *nav_states
         elif triggered == "nav-margin":
             nav_states[5] = True  # margin active
-            return create_welcome_content(), *nav_states  # Placeholder for now
+            return create_capital_blocks_coming_soon(), *nav_states  # Coming soon page
         elif triggered == "nav-optimizer":
             nav_states[6] = True  # optimizer active
-            return create_welcome_content(), *nav_states  # Placeholder for now
+            return create_walk_forward_coming_soon(), *nav_states  # Coming soon page
         else:
             nav_states[0] = True  # Default to geekistics
             return create_geekistics_tab(), *nav_states
@@ -513,11 +511,11 @@ def register_callbacks(app):
             Input("current-portfolio-data", "data"),
             Input("current-daily-log-data", "data"),
             Input("geekistics-strategy-filter", "value"),
-            Input("analysis-config-store", "data"),
+            Input("risk-free-rate-input", "value"),
         ],
         prevent_initial_call=False,
     )
-    def update_geekistics_tab(portfolio_data, daily_log_data, selected_strategies, config_data):
+    def update_geekistics_tab(portfolio_data, daily_log_data, selected_strategies, risk_free_rate):
         """Update the Geekistics tab with comprehensive statistics"""
         logger.info(f"Geekistics callback triggered with portfolio_data: {bool(portfolio_data)}")
 
@@ -588,7 +586,7 @@ def register_callbacks(app):
             advanced_stats_request = {
                 "portfolio_data": filtered_portfolio_data,
                 "daily_log_data": daily_log_data,
-                "config": config_data or {},
+                "config": {"risk_free_rate": risk_free_rate or 2.0, "annualization_factor": 252},
                 "is_filtered": is_filtered,
             }
             advanced_stats_response = requests.post(
@@ -861,12 +859,11 @@ def register_callbacks(app):
         [
             Input("current-portfolio-data", "data"),
             Input("trade-strategy-filter", "value"),
-            Input("split-legs-toggle", "checked"),
             Input("nav-trade-data", "n_clicks"),
         ],
         prevent_initial_call=False,
     )
-    def update_trade_data_tab(portfolio_data, strategy_filter, split_legs, nav_clicks):
+    def update_trade_data_tab(portfolio_data, strategy_filter, nav_clicks):
         """Update the Trade Data tab"""
         if not portfolio_data:
             return "", [], []
@@ -898,7 +895,7 @@ def register_callbacks(app):
             ]
 
             # Create table and summary
-            trades_table = create_trades_table(trades_data, split_legs)
+            trades_table = create_trades_table(trades_data)
             summary_stats = create_trade_summary_stats(trades_data)
 
             return trades_table, summary_stats, strategy_options
@@ -964,138 +961,6 @@ def register_callbacks(app):
         if n_clicks:
             return None, None, None, None
         return no_update, no_update, no_update, no_update
-
-    # Settings modal callbacks - using multiple separate callbacks to avoid the issue
-    @app.callback(
-        [Output("settings-modal", "opened"), Output("settings-modal-content", "children")],
-        [Input("settings-button", "n_clicks")],
-        [State("settings-modal", "opened"), State("analysis-config-store", "data")],
-        prevent_initial_call=True,
-    )
-    def open_settings_modal(settings_clicks, modal_opened, config_data):
-        """Open the settings modal and populate content"""
-        if settings_clicks:
-            # Toggle the modal state
-            new_opened = not modal_opened
-            return new_opened, create_settings_modal_content(config_data) if new_opened else ""
-        return no_update, no_update
-
-    # Close modal callback (handles save and cancel)
-    @app.callback(
-        Output("settings-modal", "opened", allow_duplicate=True),
-        [Input("settings-save-button", "n_clicks"), Input("settings-cancel-button", "n_clicks")],
-        prevent_initial_call=True,
-    )
-    def close_settings_modal(save_clicks, cancel_clicks):
-        """Close the settings modal when save or cancel is clicked"""
-        if save_clicks or cancel_clicks:
-            return False
-        return no_update
-
-    # Separate callback for saving configuration
-    @app.callback(
-        Output("analysis-config-store", "data", allow_duplicate=True),
-        [Input("settings-save-button", "n_clicks")],
-        [
-            State("settings-risk-free-rate", "value"),
-            State("settings-use-business-days-only", "checked"),
-            State("settings-annualization-factor", "value"),
-            State("settings-confidence-level", "value"),
-            State("settings-drawdown-threshold", "value"),
-        ],
-        prevent_initial_call=True,
-    )
-    def save_analysis_config(
-        save_clicks,
-        risk_free_rate,
-        use_business_days,
-        annualization_factor,
-        confidence_level,
-        drawdown_threshold,
-    ):
-        """Save analysis configuration to localStorage"""
-        if save_clicks:
-            return {
-                "risk_free_rate": risk_free_rate or 2.0,
-                "use_business_days_only": (
-                    use_business_days if use_business_days is not None else True
-                ),
-                "annualization_factor": annualization_factor or 252,
-                "confidence_level": confidence_level or 0.95,
-                "drawdown_threshold": drawdown_threshold or 0.05,
-            }
-        return no_update
-
-    # Separate callback for reset functionality
-    @app.callback(
-        Output("analysis-config-store", "data", allow_duplicate=True),
-        [Input("settings-reset-button", "n_clicks")],
-        prevent_initial_call=True,
-    )
-    def reset_analysis_config(reset_clicks):
-        """Reset analysis configuration to defaults"""
-        if reset_clicks:
-            return {
-                "risk_free_rate": 2.0,
-                "use_business_days_only": True,
-                "annualization_factor": 252,
-                "confidence_level": 0.95,
-                "drawdown_threshold": 0.05,
-            }
-        return no_update
-
-    # Update modal content when config changes (for reset functionality)
-    @app.callback(
-        Output("settings-modal-content", "children", allow_duplicate=True),
-        [Input("analysis-config-store", "data")],
-        [State("settings-modal", "opened")],
-        prevent_initial_call=True,
-    )
-    def update_modal_content_on_config_change(config_data, modal_opened):
-        """Update modal content when config changes (for reset)"""
-        if modal_opened and config_data:
-            return create_settings_modal_content(config_data)
-        return no_update
-
-    @app.callback(
-        Output("config-indicators", "children"),
-        [Input("analysis-config-store", "data"), Input("current-portfolio-data", "data")],
-        prevent_initial_call=False,
-    )
-    def update_config_indicators(config_data, portfolio_data):
-        """Update configuration indicators in header"""
-        if not config_data:
-            return None
-
-        initial_capital = None
-
-        # Calculate initial capital if portfolio data is available
-        if portfolio_data:
-            try:
-                # Calculate initial capital from the portfolio data
-                all_trades = []
-                if isinstance(portfolio_data, dict) and "trades" in portfolio_data:
-                    all_trades = portfolio_data["trades"]
-                elif isinstance(portfolio_data, list):
-                    all_trades = portfolio_data
-
-                if all_trades:
-                    # Import here to avoid circular imports
-                    from app.data.models import calculate_initial_capital_from_trades
-
-                    # Convert trade objects to dicts if needed
-                    trades_data = []
-                    for trade in all_trades:
-                        if hasattr(trade, "dict"):
-                            trades_data.append(trade.dict())
-                        else:
-                            trades_data.append(trade)
-
-                    initial_capital = calculate_initial_capital_from_trades(trades_data)
-            except Exception as e:
-                logger.warning(f"Could not calculate initial capital: {e}")
-
-        return create_config_indicator(config_data, initial_capital)
 
     # Disclaimer modal callback
     @app.callback(
