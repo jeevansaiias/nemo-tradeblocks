@@ -30,7 +30,7 @@ def get_theme_colors(theme_data):
         return {
             "bg_color": "white",
             "text_color": "#222",
-            "grid_color": "rgba(128,128,128,0.2)",
+            "grid_color": "rgba(128,128,128,0.3)",
             "is_dark_mode": False,
         }
 
@@ -57,6 +57,14 @@ def apply_theme_layout(fig, theme_colors, **kwargs):
             "gridcolor": theme_colors["grid_color"],
         },
     }
+
+    # Deep merge axis settings to preserve grid settings
+    if "xaxis" in kwargs:
+        base_layout["xaxis"].update(kwargs["xaxis"])
+        kwargs["xaxis"] = base_layout["xaxis"]
+    if "yaxis" in kwargs:
+        base_layout["yaxis"].update(kwargs["yaxis"])
+        kwargs["yaxis"] = base_layout["yaxis"]
 
     # Merge with any additional kwargs
     base_layout.update(kwargs)

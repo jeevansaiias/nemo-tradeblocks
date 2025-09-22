@@ -352,7 +352,7 @@ def create_day_of_week_distribution_chart(
     apply_theme_layout(
         fig,
         theme_colors,
-        xaxis=dict(title="Day of Week", showgrid=False),
+        xaxis=dict(title="Day of Week"),
         yaxis=dict(
             title="Number of Trades",
             zeroline=True,
@@ -708,7 +708,6 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any], theme_data=None) 
         xaxis=dict(
             title="Month",
             tickangle=45,  # Angle month labels for better readability
-            showgrid=False,
         ),
         yaxis=dict(
             title="Monthly Return ($)",
