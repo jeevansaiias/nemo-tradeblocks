@@ -437,7 +437,7 @@ def create_equity_curve_section():
                         config={"displayModeBar": True, "displaylogo": False},
                         style={"height": "500px"},
                         figure=create_empty_chart(
-                            "Upload data and click 'Run Simulation' to see projections",
+                            "Run Simulation to see projections",
                             "",
                         ),
                     ),
@@ -591,9 +591,54 @@ def create_analysis_tabs():
                 children=[
                     dmc.TabsList(
                         [
-                            dmc.TabsTab("Return Distribution", value="distribution"),
-                            dmc.TabsTab("Drawdown Analysis", value="drawdown"),
-                            dmc.TabsTab("Position Sizing", value="kelly"),
+                            dmc.TabsTab(
+                                dmc.Group(
+                                    [
+                                        DashIconify(icon="tabler:chart-histogram", width=16),
+                                        "Return Distribution",
+                                        create_info_tooltip(
+                                            title="📊 Return Distribution Analysis",
+                                            content="Shows the spread of potential returns from your Monte Carlo simulation. The histogram reveals how likely different outcomes are.",
+                                            detailed_content="P5/P50/P95 lines show pessimistic, median, and optimistic scenarios. A wider spread means higher uncertainty. TradeBlocks builds insights, not investment advice.",
+                                            tooltip_id="return-distribution",
+                                        ),
+                                    ],
+                                    gap="xs",
+                                ),
+                                value="distribution",
+                            ),
+                            dmc.TabsTab(
+                                dmc.Group(
+                                    [
+                                        DashIconify(icon="tabler:trending-down", width=16),
+                                        "Drawdown Analysis",
+                                        create_info_tooltip(
+                                            title="📉 Drawdown Analysis",
+                                            content="Shows the distribution of maximum drawdowns from your simulations. Helps you understand worst-case scenarios and prepare for losing streaks.",
+                                            detailed_content="Each simulation's worst drawdown is captured. P5 shows the worst 5% of outcomes. Use this to size your account and manage risk. TradeBlocks builds insights, not investment advice.",
+                                            tooltip_id="drawdown-analysis",
+                                        ),
+                                    ],
+                                    gap="xs",
+                                ),
+                                value="drawdown",
+                            ),
+                            dmc.TabsTab(
+                                dmc.Group(
+                                    [
+                                        DashIconify(icon="tabler:target", width=16),
+                                        "Position Sizing",
+                                        create_info_tooltip(
+                                            title="🎯 Kelly Criterion Position Sizing",
+                                            content="Calculates optimal position sizes based on your historical win rate and average win/loss ratios. Helps balance growth with risk of ruin.",
+                                            detailed_content="Kelly Criterion maximizes long-term growth while controlling risk. Fractional Kelly (like 25%) is often recommended for real trading. TradeBlocks builds insights, not investment advice.",
+                                            tooltip_id="position-sizing",
+                                        ),
+                                    ],
+                                    gap="xs",
+                                ),
+                                value="kelly",
+                            ),
                         ]
                     ),
                     # Distribution Tab
@@ -601,11 +646,11 @@ def create_analysis_tabs():
                         children=[
                             dcc.Graph(
                                 id="mc-return-distribution",
-                                config={"displayModeBar": False},
-                                style={"height": "400px"},
+                                config={"displayModeBar": False, "responsive": True},
+                                style={"height": "60vh", "minHeight": "400px"},
                                 figure=create_empty_chart(
                                     "Run simulation to see return distribution",
-                                    "Return Distribution",
+                                    "",
                                 ),
                             )
                         ],
@@ -616,10 +661,10 @@ def create_analysis_tabs():
                         children=[
                             dcc.Graph(
                                 id="mc-drawdown-analysis",
-                                config={"displayModeBar": False},
-                                style={"height": "400px"},
+                                config={"displayModeBar": False, "responsive": True},
+                                style={"height": "60vh", "minHeight": "400px"},
                                 figure=create_empty_chart(
-                                    "Run simulation to see drawdown analysis", "Drawdown Analysis"
+                                    "Run simulation to see drawdown analysis", ""
                                 ),
                             )
                         ],
@@ -673,6 +718,118 @@ def create_empty_chart(message, title):
         ],
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
+    )
+
+    return fig
+
+
+def create_preview_chart(chart_type):
+    """Create an informative preview chart showing what users will see"""
+    fig = go.Figure()
+
+    if chart_type == "distribution":
+        # Create a preview histogram shape
+        preview_annotations = [
+            dict(
+                text="📊 Return Distribution Preview",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.85,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=18, color="#1976d2", weight="bold"),
+                showarrow=False,
+            ),
+            dict(
+                text="Your simulation will show:",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.7,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=14, color="gray"),
+                showarrow=False,
+            ),
+            dict(
+                text="• Histogram of potential returns<br>• P5, P50, P95 percentile lines<br>• Risk/reward distribution<br>• Outcome probability ranges",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=13, color="#333"),
+                showarrow=False,
+            ),
+            dict(
+                text="🚀 Run simulation above to see your results",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.25,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=14, color="#1976d2"),
+                showarrow=False,
+            ),
+        ]
+    elif chart_type == "drawdown":
+        preview_annotations = [
+            dict(
+                text="📉 Drawdown Analysis Preview",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.85,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=18, color="#1976d2", weight="bold"),
+                showarrow=False,
+            ),
+            dict(
+                text="Your simulation will show:",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.7,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=14, color="gray"),
+                showarrow=False,
+            ),
+            dict(
+                text="• Maximum drawdown distribution<br>• Worst-case scenario planning<br>• Risk tolerance insights<br>• Account sizing guidance",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=13, color="#333"),
+                showarrow=False,
+            ),
+            dict(
+                text="🚀 Run simulation above to see your results",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.25,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=14, color="#1976d2"),
+                showarrow=False,
+            ),
+        ]
+
+    fig.update_layout(
+        xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        annotations=preview_annotations,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=20, b=20, l=20, r=20),
     )
 
     return fig

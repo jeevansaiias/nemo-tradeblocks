@@ -742,7 +742,7 @@ def create_return_distribution_chart(result):
 
         # Calculate histogram to get y_max for vertical lines
         hist_counts, _ = np.histogram(result.final_values, bins=50)
-        y_max = max(hist_counts) * 1.1  # Add 10% padding
+        y_max = max(hist_counts) if len(hist_counts) > 0 else 1
 
         for p_name, info in percentile_info.items():
             if p_name in result.percentiles:
@@ -780,23 +780,30 @@ def create_return_distribution_chart(result):
 def create_drawdown_analysis_chart(result, portfolio=None):
     """Create drawdown analysis chart"""
     try:
-        # Calculate drawdowns from simulation paths
-        drawdowns = []
+        # Calculate maximum drawdowns from simulation paths (one per simulation)
+        max_drawdowns = []
         for simulation in result.simulations:
             # simulation already contains cumulative returns
             # Convert to portfolio values (1 + return)
             portfolio_values = np.array([1 + r for r in simulation])
             running_max = np.maximum.accumulate(portfolio_values)
             drawdown = (portfolio_values - running_max) / running_max
-            drawdowns.extend(drawdown[drawdown < 0])  # Only negative drawdowns
 
-        if not drawdowns:
-            drawdowns = [0]  # Fallback
+            # Take the minimum (most negative) drawdown for this simulation
+            max_dd = np.min(drawdown) if len(drawdown) > 0 else 0
+            max_drawdowns.append(max_dd)
+
+        # Use max drawdowns for percentile calculation (should all be negative or zero)
+        drawdowns = max_drawdowns
+        if not drawdowns or all(dd == 0 for dd in drawdowns):
+            drawdowns = [-0.01, -0.005, 0]  # Fallback with some sample negative values
+
+        drawdowns_pct = np.array(drawdowns) * 100  # Convert to percentage for consistency
 
         fig = go.Figure(
             data=[
                 go.Histogram(
-                    x=np.array(drawdowns) * 100,  # Convert to percentage
+                    x=drawdowns_pct,
                     nbinsx=30,
                     marker_color="rgba(255,128,0,0.7)",
                     marker_line_color="rgba(255,128,0,1)",
@@ -808,21 +815,37 @@ def create_drawdown_analysis_chart(result, portfolio=None):
 
         # Add percentile lines as interactive scatter traces
         percentiles = np.percentile(drawdowns, [5, 50, 95])
+
+        # Debug: Log the actual percentile values and drawdown range
+        logger.info(f"Max drawdowns range: {min(drawdowns):.4f} to {max(drawdowns):.4f}")
+        logger.info(
+            f"Max DD Percentiles: P5={percentiles[0]:.4f}, P50={percentiles[1]:.4f}, P95={percentiles[2]:.4f}"
+        )
+        logger.info(f"Number of simulations: {len(drawdowns)}")
+
         percentile_info = [
             {"value": percentiles[0] * 100, "color": "red", "name": f"P5: {percentiles[0]:.1%}"},
             {
                 "value": percentiles[1] * 100,
-                "color": "orange",
+                "color": "blue",
                 "name": f"P50: {percentiles[1]:.1%}",
             },
             {"value": percentiles[2] * 100, "color": "green", "name": f"P95: {percentiles[2]:.1%}"},
         ]
 
         # Calculate histogram to get y_max for vertical lines
-        hist_counts, _ = np.histogram(np.array(drawdowns) * 100, bins=30)
-        y_max = max(hist_counts) * 1.1  # Add 10% padding
+        # Use the same bin calculation that Plotly uses internally
+        hist_counts, hist_bins = np.histogram(drawdowns_pct, bins=30)
+        y_max = max(hist_counts) if len(hist_counts) > 0 else 1
+
+        # Debug: Log histogram range and drawdown range
+        logger.info(f"Histogram x-range: {min(drawdowns_pct):.2f}% to {max(drawdowns_pct):.2f}%")
+        logger.info(f"Histogram bins range: {hist_bins[0]:.2f}% to {hist_bins[-1]:.2f}%")
 
         for info in percentile_info:
+            # Debug: Log trace creation details
+            logger.info(f"Adding trace: {info['name']} at x={info['value']:.2f}, y_max={y_max:.0f}")
+
             # Add vertical line as scatter trace (interactive)
             fig.add_trace(
                 go.Scatter(
