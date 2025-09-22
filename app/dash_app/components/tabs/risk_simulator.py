@@ -94,46 +94,26 @@ def create_simulation_controls():
                                                     icon="tabler:calendar", width=16
                                                 ),
                                             ),
-                                            # Bootstrap method
-                                            dmc.RadioGroup(
-                                                id="mc-bootstrap-method",
-                                                label="Sampling Method",
-                                                description="How to resample historical data",
-                                                value="trades",
-                                                children=dmc.Group(
-                                                    [
-                                                        dmc.Radio(
-                                                            "Individual Trades", value="trades"
-                                                        ),
-                                                        dmc.Radio("Daily Returns", value="daily"),
-                                                    ]
-                                                ),
-                                            ),
                                         ],
                                         gap="md",
                                     )
                                 ],
                                 span=4,
                             ),
-                            # Middle column - Strategy selection
+                            # Right column - Strategy and capital
                             dmc.GridCol(
                                 [
                                     dmc.Stack(
                                         [
-                                            dmc.Text("Strategy Selection", size="sm", fw=500),
-                                            dmc.CheckboxGroup(
+                                            # Strategy selector (consistent with other screens)
+                                            dmc.Select(
                                                 id="mc-strategy-selection",
-                                                label="Include Strategies",
-                                                description="Select strategies to simulate",
-                                                value=["all"],
-                                                children=dmc.Stack(
-                                                    [
-                                                        dmc.Checkbox(
-                                                            label="All Strategies",
-                                                            value="all",
-                                                        ),
-                                                    ],
-                                                    gap="xs",
+                                                label="Strategy",
+                                                description="Strategy to simulate",
+                                                value="all",
+                                                data=[{"value": "all", "label": "All Strategies"}],
+                                                leftSection=DashIconify(
+                                                    icon="tabler:chart-line", width=16
                                                 ),
                                             ),
                                             # Initial capital
@@ -153,46 +133,29 @@ def create_simulation_controls():
                                         gap="md",
                                     )
                                 ],
-                                span=4,
-                            ),
-                            # Right column - Advanced settings
-                            dmc.GridCol(
-                                [
-                                    dmc.Stack(
-                                        [
-                                            dmc.Text("Confidence Levels", size="sm", fw=500),
-                                            dmc.CheckboxGroup(
-                                                id="mc-confidence-levels",
-                                                label="Display Percentiles",
-                                                description="Confidence bands to show",
-                                                value=["p5", "p25", "p50", "p75", "p95"],
-                                                children=dmc.Stack(
-                                                    [
-                                                        dmc.Checkbox("5th Percentile", value="p5"),
-                                                        dmc.Checkbox(
-                                                            "25th Percentile", value="p25"
-                                                        ),
-                                                        dmc.Checkbox(
-                                                            "50th Percentile (Median)", value="p50"
-                                                        ),
-                                                        dmc.Checkbox(
-                                                            "75th Percentile", value="p75"
-                                                        ),
-                                                        dmc.Checkbox(
-                                                            "95th Percentile", value="p95"
-                                                        ),
-                                                    ],
-                                                    gap="xs",
-                                                ),
-                                            ),
-                                        ],
-                                        gap="md",
-                                    )
-                                ],
-                                span=4,
+                                span=8,
                             ),
                         ],
                         gutter="xl",
+                    ),
+                    # Advanced sampling method
+                    dmc.Group(
+                        [
+                            dmc.Text("Sampling Method:", size="sm", fw=500),
+                            dmc.RadioGroup(
+                                id="mc-bootstrap-method",
+                                value="trades",
+                                children=dmc.Group(
+                                    [
+                                        dmc.Radio("Individual Trades", value="trades"),
+                                        dmc.Radio("Daily Returns", value="daily"),
+                                    ],
+                                    gap="md",
+                                ),
+                            ),
+                        ],
+                        align="center",
+                        gap="md",
                     ),
                     # Run Simulation Button
                     dmc.Group(
@@ -202,7 +165,7 @@ def create_simulation_controls():
                                 id="mc-run-simulation",
                                 leftSection=DashIconify(icon="tabler:player-play", width=16),
                                 variant="filled",
-                                size="lg",
+                                size="md",
                                 color="green",
                             ),
                             dmc.Button(
@@ -210,16 +173,11 @@ def create_simulation_controls():
                                 id="mc-reset",
                                 leftSection=DashIconify(icon="tabler:refresh", width=16),
                                 variant="light",
-                                size="lg",
-                            ),
-                            dmc.Text(
-                                id="mc-status",
-                                children="Ready to simulate",
-                                c="dimmed",
-                                size="sm",
+                                size="md",
                             ),
                         ],
                         justify="center",
+                        gap="md",
                     ),
                 ],
                 gap="lg",
@@ -253,8 +211,25 @@ def create_equity_curve_section():
                                         size="sm",
                                         checked=False,
                                     ),
+                                    dmc.Divider(orientation="vertical"),
+                                    dmc.CheckboxGroup(
+                                        id="mc-confidence-levels",
+                                        label="Percentiles:",
+                                        value=["p5", "p25", "p50", "p75", "p95"],
+                                        children=dmc.Group(
+                                            [
+                                                dmc.Checkbox("5th", value="p5", size="xs"),
+                                                dmc.Checkbox("25th", value="p25", size="xs"),
+                                                dmc.Checkbox("50th", value="p50", size="xs"),
+                                                dmc.Checkbox("75th", value="p75", size="xs"),
+                                                dmc.Checkbox("95th", value="p95", size="xs"),
+                                            ],
+                                            gap="xs",
+                                        ),
+                                    ),
                                 ],
                                 gap="md",
+                                align="center",
                             ),
                         ],
                         justify="space-between",

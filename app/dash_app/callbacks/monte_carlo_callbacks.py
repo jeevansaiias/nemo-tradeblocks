@@ -29,7 +29,7 @@ def register_monte_carlo_callbacks(app):
 
     @app.callback(
         [
-            Output("mc-strategy-selection", "children"),
+            Output("mc-strategy-selection", "data"),
             Output("mc-initial-capital", "value"),
         ],
         [Input("current-portfolio-data", "data")],
@@ -38,19 +38,10 @@ def register_monte_carlo_callbacks(app):
     )
     def update_strategy_options_and_capital(portfolio_data, daily_log_data):
         """Update strategy selection options and initial capital based on loaded portfolio"""
-        default_strategy_options = dmc.Stack(
-            [
-                dmc.Checkbox(
-                    label="All Strategies",
-                    value="all",
-                    checked=True,
-                ),
-            ],
-            gap="xs",
-        )
+        default_strategy_options = [{"value": "all", "label": "All Strategies"}]
 
         if not portfolio_data:
-            return [default_strategy_options], 100000  # Default capital
+            return default_strategy_options, 100000  # Default capital
 
         try:
             # Parse portfolio data
@@ -84,35 +75,20 @@ def register_monte_carlo_callbacks(app):
             if initial_capital <= 0:
                 initial_capital = 100000
 
-            # Create checkbox options
-            strategy_options = [
-                dmc.Checkbox(
-                    label="All Strategies",
-                    value="all",
-                    checked=True,
-                )
-            ]
+            # Create dropdown options
+            strategy_options = [{"value": "all", "label": "All Strategies"}]
 
             for strategy in strategies:
                 trade_count = len([t for t in portfolio.trades if t.strategy == strategy])
                 strategy_options.append(
-                    dmc.Checkbox(
-                        label=f"{strategy} ({trade_count} trades)",
-                        value=strategy,
-                        checked=False,
-                    )
+                    {"value": strategy, "label": f"{strategy} ({trade_count} trades)"}
                 )
 
-            return [
-                dmc.Stack(
-                    strategy_options,
-                    gap="xs",
-                )
-            ], int(initial_capital)
+            return strategy_options, int(initial_capital)
 
         except Exception as e:
             logger.error(f"Error updating strategy options and capital: {str(e)}")
-            return [default_strategy_options], 100000
+            return default_strategy_options, 100000
 
     @app.callback(
         [
@@ -127,7 +103,6 @@ def register_monte_carlo_callbacks(app):
             Output("mc-prob-profit-desc", "children"),
             Output("mc-max-drawdown", "children"),
             Output("mc-max-drawdown-desc", "children"),
-            Output("mc-status", "children"),
         ],
         [Input("mc-run-simulation", "n_clicks")],
         [
@@ -169,7 +144,6 @@ def register_monte_carlo_callbacks(app):
                 "Waiting for simulation",
                 "--",
                 "Waiting for simulation",
-                "Ready to simulate",
             )
 
         try:
@@ -178,9 +152,8 @@ def register_monte_carlo_callbacks(app):
 
             # Determine strategy filter
             strategy_filter = None
-            if selected_strategies and "all" not in selected_strategies:
-                # Use first selected strategy for now (could extend to multi-strategy)
-                strategy_filter = selected_strategies[0] if selected_strategies else None
+            if selected_strategies and selected_strategies != "all":
+                strategy_filter = selected_strategies
 
             # Parse confidence levels
             confidence_level_map = {
@@ -235,8 +208,6 @@ def register_monte_carlo_callbacks(app):
             max_dd_text = f"{max_dd:.1%}"
             max_dd_desc = f"95th percentile worst case"
 
-            status_text = f"✅ Completed {num_simulations:,} simulations"
-
             return (
                 equity_curve_fig,
                 distribution_fig,
@@ -249,13 +220,10 @@ def register_monte_carlo_callbacks(app):
                 prob_profit_desc,
                 max_dd_text,
                 max_dd_desc,
-                status_text,
             )
 
         except Exception as e:
             logger.error(f"Error running Monte Carlo simulation: {str(e)}")
-            error_status = f"❌ Error: {str(e)}"
-
             return (
                 create_placeholder_equity_curve(),
                 create_placeholder_histogram(),
@@ -268,7 +236,6 @@ def register_monte_carlo_callbacks(app):
                 str(e),
                 "Error",
                 str(e),
-                error_status,
             )
 
     @app.callback(
