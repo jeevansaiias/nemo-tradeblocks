@@ -132,7 +132,6 @@ def create_equity_curve_chart(
     apply_theme_layout(
         fig,
         theme_colors,
-        title=dict(text="📈 Portfolio Equity Curve", font=dict(size=20, weight="bold"), x=0.02),
         xaxis=dict(title="Date", gridcolor=theme_colors["grid_color"]),
         yaxis=dict(
             title="Portfolio Value ($)",
@@ -221,7 +220,6 @@ def create_drawdown_chart(equity_data: Dict[str, Any], theme_data=None) -> go.Fi
     apply_theme_layout(
         fig,
         theme_colors,
-        title=dict(text="📉 Portfolio Drawdown", font=dict(size=20, weight="bold"), x=0.02),
         xaxis=dict(title="Date", gridcolor=theme_colors["grid_color"]),
         yaxis=dict(
             title="Drawdown (%)",
@@ -242,7 +240,7 @@ def create_day_of_week_distribution_chart(
     distribution_data: Dict[str, Any], theme_data=None
 ) -> go.Figure:
     """
-    Create day of week trade distribution chart.
+    Create day of week Trade Distribution chart.
 
     Args:
         distribution_data: Output from calculate_trade_distributions
@@ -299,7 +297,6 @@ def create_day_of_week_distribution_chart(
     apply_theme_layout(
         fig,
         theme_colors,
-        title="📅 Trade Distribution by Day",
         xaxis=dict(title="Day of Week", showgrid=False),
         yaxis=dict(
             title="Number of Trades",
@@ -405,9 +402,6 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any], theme_data=
     apply_theme_layout(
         fig,
         theme_colors,
-        title=dict(
-            text="📊 Return on Margin Distribution", font=dict(size=18, weight="bold"), x=0.02
-        ),
         xaxis=dict(
             title="Return on Margin (%)",
             range=[x_min, x_max],  # Focus on where the data actually is
@@ -497,9 +491,6 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any], theme_data=Non
     apply_theme_layout(
         fig,
         theme_colors,
-        title=dict(
-            text="🎯 Win/Loss Streak Distribution", font=dict(size=16, weight="bold"), x=0.02
-        ),
         xaxis=dict(
             title="← Loss Streaks | Win Streaks →",
             zeroline=True,
@@ -658,7 +649,6 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any], theme_data=None) 
     apply_theme_layout(
         fig,
         theme_colors,
-        title="📅 Monthly Performance",
         xaxis=dict(
             title="Month",
             tickangle=45,  # Angle month labels for better readability
@@ -725,7 +715,6 @@ def create_trade_sequence_chart(
     apply_theme_layout(
         fig,
         theme_colors,
-        title=dict(text="📈 Trade Sequence vs Return", font=dict(size=20, weight="bold"), x=0.02),
         xaxis_title="Trade Number",
         yaxis_title="Return ($)",
         margin=dict(l=0, r=0, t=40, b=0),
@@ -794,7 +783,6 @@ def create_rom_timeline_chart(
     apply_theme_layout(
         fig,
         theme_colors,
-        title="Return on Margin Over Time",
         xaxis_title="Date",
         yaxis_title="Return on Margin (%)",
         margin=dict(l=0, r=0, t=40, b=0),
@@ -842,7 +830,6 @@ def create_rolling_metrics_chart(
     apply_theme_layout(
         fig,
         theme_colors,
-        title=f"Rolling {metric_key.replace('_',' ').title()}",
         xaxis_title="Date",
         yaxis_title=metric_key.replace("_", " ").title(),
         margin=dict(l=0, r=0, t=40, b=0),
@@ -881,7 +868,6 @@ def create_risk_evolution_chart(rolling_data: Dict[str, Any], theme_data=None) -
     apply_theme_layout(
         fig,
         theme_colors,
-        title="Risk Metrics Evolution (Volatility)",
         xaxis_title="Date",
         yaxis_title="Volatility",
         margin=dict(l=0, r=0, t=40, b=0),
@@ -995,7 +981,6 @@ def create_performance_header():
             # Title with icon
             dmc.Group(
                 children=[
-                    DashIconify(icon="tabler:chart-line", width=32, height=32),
                     dmc.Title("📈 Performance Blocks", order=2),
                 ],
                 gap="sm",
@@ -1004,17 +989,6 @@ def create_performance_header():
             # Controls
             dmc.Group(
                 children=[
-                    # Strategy Filter
-                    dmc.MultiSelect(
-                        id="perf-strategy-filter",
-                        label="Strategies",
-                        placeholder="All strategies",
-                        data=[],  # Will be populated by callback
-                        value=[],
-                        style={"minWidth": "200px"},
-                        leftSection=DashIconify(icon="tabler:filter"),
-                        clearable=True,
-                    ),
                     # Date Range
                     dmc.Select(
                         id="perf-date-range",
@@ -1031,40 +1005,16 @@ def create_performance_header():
                         style={"width": "150px"},
                         leftSection=DashIconify(icon="tabler:calendar"),
                     ),
-                    # Comparison Mode
-                    dmc.Switch(
-                        id="perf-comparison-mode",
-                        label="Compare",
-                        checked=False,
-                        color="blue",
-                    ),
-                    # Export Menu
-                    dmc.Menu(
-                        children=[
-                            dmc.MenuTarget(
-                                dmc.Button(
-                                    "Export",
-                                    leftSection=DashIconify(icon="tabler:download"),
-                                    variant="light",
-                                    color="gray",
-                                    size="sm",
-                                )
-                            ),
-                            dmc.MenuDropdown(
-                                children=[
-                                    dmc.MenuItem(
-                                        "Download Charts as PDF",
-                                        leftSection=DashIconify(icon="tabler:file-type-pdf"),
-                                        id="export-pdf-btn",
-                                    ),
-                                    dmc.MenuItem(
-                                        "Export Data as CSV",
-                                        leftSection=DashIconify(icon="tabler:file-type-csv"),
-                                        id="export-csv-btn",
-                                    ),
-                                ]
-                            ),
-                        ]
+                    # Strategy Filter
+                    dmc.MultiSelect(
+                        id="perf-strategy-filter",
+                        label="Strategies",
+                        placeholder="All strategies",
+                        data=[],  # Will be populated by callback
+                        value=[],
+                        style={"minWidth": "200px"},
+                        leftSection=DashIconify(icon="tabler:filter"),
+                        clearable=True,
                     ),
                 ],
                 gap="md",
@@ -1185,8 +1135,7 @@ def create_distribution_analysis_section():
                 children=[
                     dmc.Group(
                         children=[
-                            DashIconify(icon="tabler:chart-bar", width=20),
-                            dmc.Title("📊 Trade Distribution", order=4),
+                            dmc.Title("Trade Distribution", order=4),
                         ],
                         gap="xs",
                         align="center",
@@ -1224,8 +1173,7 @@ def create_distribution_analysis_section():
                 children=[
                     dmc.Group(
                         children=[
-                            DashIconify(icon="tabler:target", width=20),
-                            dmc.Title("🎯 Win/Loss Streaks", order=4),
+                            dmc.Title("Win/Loss Streaks", order=4),
                         ],
                         gap="xs",
                         align="center",
@@ -1348,8 +1296,7 @@ def create_time_based_analysis_section():
                 children=[
                     dmc.Group(
                         children=[
-                            DashIconify(icon="tabler:calendar", width=20),
-                            dmc.Title("📅 Monthly Returns", order=4),
+                            dmc.Title("Monthly Returns", order=4),
                         ],
                         gap="xs",
                         align="center",
@@ -1369,8 +1316,7 @@ def create_time_based_analysis_section():
                 children=[
                     dmc.Group(
                         children=[
-                            DashIconify(icon="tabler:trending-up", width=20),
-                            dmc.Title("📈 Trade Sequence", order=4),
+                            dmc.Title("Trade Sequence", order=4),
                             dmc.Switch(
                                 id="sequence-show-trend",
                                 label="Show Trend",
@@ -1404,7 +1350,7 @@ def create_advanced_metrics_section():
                 children=[
                     dmc.Group(
                         children=[
-                            dmc.Title("💰 Return on Margin", order=4),
+                            dmc.Title("Return on Margin", order=4),
                             dmc.Select(
                                 id="rom-ma-period",
                                 data=[
