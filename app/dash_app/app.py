@@ -96,17 +96,6 @@ def create_dash_app():
             dcc.Store(id="daily-log-filename", storage_type="local"),
             dcc.Store(id="theme-store", storage_type="local", data={"theme": "light"}),
             dcc.Store(id="system-theme-store", storage_type="memory"),
-            dcc.Store(
-                id="analysis-config-store",
-                storage_type="local",
-                data={
-                    "risk_free_rate": 2.0,
-                    "use_business_days_only": True,
-                    "annualization_factor": 252,
-                    "confidence_level": 0.95,
-                    "drawdown_threshold": 0.05,
-                },
-            ),
             # Hidden div for theme callback output
             html.Div(id="theme-output", style={"display": "none"}),
             # Main layout

@@ -38,24 +38,6 @@ def create_main_layout():
                             # Right side items
                             dmc.Group(
                                 children=[
-                                    # Configuration indicators
-                                    html.Div(id="config-indicators"),
-                                    # Settings button with label
-                                    dmc.Group(
-                                        [
-                                            dmc.Button(
-                                                "Portfolio Settings",
-                                                id="settings-button",
-                                                leftSection=DashIconify(
-                                                    icon="tabler:settings", width=16
-                                                ),
-                                                variant="light",
-                                                color="gray",
-                                                size="sm",
-                                            ),
-                                        ],
-                                        gap="xs",
-                                    ),
                                     # Theme toggle
                                     dmc.SegmentedControl(
                                         id="theme-toggle",
@@ -312,14 +294,6 @@ def create_main_layout():
                                         gap="md",
                                     )
                                 ],
-                            ),
-                            # Portfolio settings modal
-                            dmc.Modal(
-                                id="settings-modal",
-                                title="⚙️ Portfolio Configuration",
-                                opened=False,
-                                size="lg",
-                                children=[html.Div(id="settings-modal-content")],
                             ),
                             # Disclaimer modal
                             dmc.Modal(
