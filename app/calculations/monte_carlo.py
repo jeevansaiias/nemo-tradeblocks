@@ -183,29 +183,33 @@ class MonteCarloSimulator:
             # Extract P/L values from trades
             trade_pls = [trade.pl for trade in trades]
 
-            # Get base capital (use first trade's funds or default)
-            base_capital = trades[0].funds_at_close if trades[0].funds_at_close > 0 else 100000
+            # Get base capital - should be funds BEFORE first trade, not after
+            # Use funds_at_close - pl to get starting capital
+            if trades[0].funds_at_close > 0:
+                base_capital = trades[0].funds_at_close - trades[0].pl
+            else:
+                base_capital = 100000
 
             simulations = []
             final_values = []
 
             for sim_idx in range(request.num_simulations):
                 # Bootstrap sample trades with replacement
+                # Note: days_forward represents number of trades to simulate, not calendar days
                 sampled_pls = np.random.choice(trade_pls, size=request.days_forward, replace=True)
 
-                # Calculate cumulative returns
+                # Track portfolio value over time (NOT cumsum of returns!)
                 capital = base_capital
-                path = []
+                portfolio_values = []
 
                 for pl in sampled_pls:
-                    # Convert P/L to return
-                    daily_return = pl / capital
-                    capital += pl
-                    path.append(daily_return)
+                    capital += pl  # Apply P/L to capital
+                    # Calculate cumulative return from starting capital
+                    cumulative_return = (capital - base_capital) / base_capital
+                    portfolio_values.append(cumulative_return)
 
-                cumulative_returns = np.cumsum(path)
-                simulations.append(cumulative_returns.tolist())
-                final_values.append(cumulative_returns[-1])
+                simulations.append(portfolio_values)
+                final_values.append(portfolio_values[-1])
 
             # Calculate percentiles
             percentiles = {}

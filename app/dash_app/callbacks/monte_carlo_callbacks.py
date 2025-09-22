@@ -28,6 +28,14 @@ def register_monte_carlo_callbacks(app):
     """Register all Monte Carlo related callbacks"""
 
     @app.callback(
+        Output("mc-seed-value", "disabled"),
+        Input("mc-use-random-seed", "checked"),
+    )
+    def toggle_seed_input(use_fixed_seed):
+        """Enable/disable seed value input based on switch"""
+        return not use_fixed_seed  # Disabled when switch is OFF
+
+    @app.callback(
         [
             Output("mc-strategy-selection", "data"),
             Output("mc-initial-capital", "value"),
@@ -103,6 +111,12 @@ def register_monte_carlo_callbacks(app):
             Output("mc-prob-profit-desc", "children"),
             Output("mc-max-drawdown", "children"),
             Output("mc-max-drawdown-desc", "children"),
+            Output("mc-best-case", "children"),
+            Output("mc-best-case-desc", "children"),
+            Output("mc-median-case", "children"),
+            Output("mc-median-case-desc", "children"),
+            Output("mc-worst-case", "children"),
+            Output("mc-worst-case-desc", "children"),
             Output("mc-simulation-cache", "data"),
         ],
         [
@@ -117,6 +131,9 @@ def register_monte_carlo_callbacks(app):
             State("mc-bootstrap-method", "value"),
             State("mc-strategy-selection", "value"),
             State("mc-initial-capital", "value"),
+            State("mc-trades-per-year", "value"),
+            State("mc-use-random-seed", "checked"),
+            State("mc-seed-value", "value"),
             State("mc-simulation-cache", "data"),
         ],
         prevent_initial_call=True,
@@ -131,6 +148,9 @@ def register_monte_carlo_callbacks(app):
         bootstrap_method,
         selected_strategies,
         initial_capital,
+        trades_per_year,
+        use_random_seed,
+        seed_value,
         cached_data,
     ):
         """Run Monte Carlo simulation and update all charts and statistics"""
@@ -148,7 +168,7 @@ def register_monte_carlo_callbacks(app):
 
             result = SimpleNamespace(**result_data)
 
-            # Generate updated chart
+            # Generate updated chart - show all paths when enabled
             log_scale = scale_selector == "log"
             equity_curve_fig = create_equity_curve_chart(
                 result, initial_capital, int(time_horizon), log_scale, show_paths
@@ -167,6 +187,12 @@ def register_monte_carlo_callbacks(app):
                 cached_data["prob_profit_desc"],
                 cached_data["max_dd_text"],
                 cached_data["max_dd_desc"],
+                cached_data.get("best_case_text", "--"),
+                cached_data.get("best_case_desc", ""),
+                cached_data.get("median_case_text", "--"),
+                cached_data.get("median_case_desc", ""),
+                cached_data.get("worst_case_text", "--"),
+                cached_data.get("worst_case_desc", ""),
                 cached_data,  # Keep same cache
             )
 
@@ -175,6 +201,12 @@ def register_monte_carlo_callbacks(app):
                 create_placeholder_equity_curve(),
                 create_placeholder_histogram(),
                 create_placeholder_histogram(),
+                "--",
+                "Waiting for simulation",
+                "--",
+                "Waiting for simulation",
+                "--",
+                "Waiting for simulation",
                 "--",
                 "Waiting for simulation",
                 "--",
@@ -206,6 +238,14 @@ def register_monte_carlo_callbacks(app):
                 confidence_levels=parsed_confidence_levels,
             )
 
+            # Set random seed if requested (BEFORE running simulation!)
+            if use_random_seed:
+                # Use the user-provided seed value
+                np.random.seed(int(seed_value) if seed_value else 42)
+            else:
+                # Use current time for true randomness
+                np.random.seed(None)
+
             # Run simulation
             simulator = MonteCarloSimulator()
             use_daily_returns = bootstrap_method == "daily"
@@ -219,24 +259,82 @@ def register_monte_carlo_callbacks(app):
             distribution_fig = create_return_distribution_chart(result)
             drawdown_fig = create_drawdown_analysis_chart(result, portfolio)
 
-            # Calculate statistics
-            expected_return_annual = result.expected_return * (252 / int(time_horizon))
-            prob_profit = sum(1 for v in result.final_values if v > 0) / len(result.final_values)
+            # Calculate statistics properly
 
-            # Format statistics
+            # 1. Expected Return (annualized properly)
+            # If time_horizon represents number of trades, we need to know trades per year
+            # Use the user-provided trades_per_year value
+            years_simulated = int(time_horizon) / trades_per_year if trades_per_year > 0 else 1
+
+            # Annualize the expected return
+            if years_simulated > 0:
+                # Convert to annual return using compound formula: (1 + r)^(1/years) - 1
+                expected_return_annual = (1 + result.expected_return) ** (1 / years_simulated) - 1
+            else:
+                expected_return_annual = result.expected_return
+
             expected_return_text = f"{expected_return_annual:.1%}"
-            expected_return_desc = f"Annualized based on {len(portfolio.trades)} trades"
+            expected_return_desc = f"Annualized from {int(time_horizon)} simulated trades"
 
+            # 2. VaR 95% (5th percentile of returns - this is correct)
             var_text = f"{result.var_95:.1%}"
             var_desc = f"95% chance return will be above this"
 
+            # 3. Probability of Profit (final returns > 0)
+            prob_profit = sum(1 for v in result.final_values if v > 0.0) / len(result.final_values)
             prob_profit_text = f"{prob_profit:.1%}"
             prob_profit_desc = f"Out of {num_simulations} simulations"
 
-            # Estimate max drawdown (simplified)
-            max_dd = abs(min(result.final_values)) if result.final_values else 0
+            # Debug: Log statistics for validation
+            logger.info(
+                f"Simulation stats - Expected: {result.expected_return:.2%}, Annual: {expected_return_annual:.2%}"
+            )
+            logger.info(f"VaR 95%: {result.var_95:.2%}, Prob of profit: {prob_profit:.1%}")
+            logger.info(
+                f"Return range: [{min(result.final_values):.2%}, {max(result.final_values):.2%}]"
+            )
+
+            # 4. Max Drawdown (95th percentile of worst drawdowns)
+            # Calculate drawdowns from each simulation path
+            max_drawdowns = []
+            for simulation in result.simulations:
+                if len(simulation) == 0:
+                    continue
+
+                # Convert returns to portfolio values
+                portfolio_values = [1 + r for r in simulation]  # 1 = starting value
+
+                # Calculate running maximum
+                running_max = portfolio_values[0]
+                max_drawdown = 0
+
+                for value in portfolio_values:
+                    running_max = max(running_max, value)
+                    drawdown = (value - running_max) / running_max if running_max > 0 else 0
+                    max_drawdown = min(max_drawdown, drawdown)
+
+                max_drawdowns.append(abs(max_drawdown))
+
+            # Get 95th percentile of max drawdowns (worst 5%)
+            if max_drawdowns:
+                max_dd = np.percentile(max_drawdowns, 95)
+            else:
+                max_dd = 0.0
+
             max_dd_text = f"{max_dd:.1%}"
-            max_dd_desc = f"95th percentile worst case"
+            max_dd_desc = f"95th percentile worst drawdown"
+
+            # Calculate scenario metrics
+            best_case = np.percentile(result.final_values, 95)
+            median_case = np.percentile(result.final_values, 50)
+            worst_case = np.percentile(result.final_values, 5)
+
+            best_case_text = f"{best_case:.1%}"
+            best_case_desc = "Only 5% of simulations exceeded this"
+            median_case_text = f"{median_case:.1%}"
+            median_case_desc = "Half above, half below this level"
+            worst_case_text = f"{worst_case:.1%}"
+            worst_case_desc = "95% of simulations stayed above this"
 
             # Cache the simulation data for chart updates
             cache_data = {
@@ -259,6 +357,12 @@ def register_monte_carlo_callbacks(app):
                 "prob_profit_desc": prob_profit_desc,
                 "max_dd_text": max_dd_text,
                 "max_dd_desc": max_dd_desc,
+                "best_case_text": best_case_text,
+                "best_case_desc": best_case_desc,
+                "median_case_text": median_case_text,
+                "median_case_desc": median_case_desc,
+                "worst_case_text": worst_case_text,
+                "worst_case_desc": worst_case_desc,
             }
 
             return (
@@ -273,6 +377,12 @@ def register_monte_carlo_callbacks(app):
                 prob_profit_desc,
                 max_dd_text,
                 max_dd_desc,
+                best_case_text,
+                best_case_desc,
+                median_case_text,
+                median_case_desc,
+                worst_case_text,
+                worst_case_desc,
                 cache_data,
             )
 
@@ -282,6 +392,12 @@ def register_monte_carlo_callbacks(app):
                 create_placeholder_equity_curve(),
                 create_placeholder_histogram(),
                 create_placeholder_histogram(),
+                "Error",
+                str(e),
+                "Error",
+                str(e),
+                "Error",
+                str(e),
                 "Error",
                 str(e),
                 "Error",
@@ -312,6 +428,163 @@ def register_monte_carlo_callbacks(app):
             )
         return no_update
 
+    @app.callback(
+        Output("mc-kelly-analysis", "children"),
+        [Input("mc-simulation-cache", "data")],
+        [State("current-portfolio-data", "data")],
+    )
+    def update_kelly_analysis(cached_data, portfolio_data):
+        """Update Kelly Criterion based on simulation results"""
+        if not cached_data or not portfolio_data:
+            return dmc.Text("Run simulation to see position sizing recommendations", c="dimmed")
+
+        try:
+            portfolio = Portfolio(**portfolio_data)
+            trades = portfolio.trades
+
+            # Calculate Kelly Criterion from historical trades
+            wins = [trade.pl for trade in trades if trade.pl > 0]
+            losses = [abs(trade.pl) for trade in trades if trade.pl < 0]
+
+            kelly_content = []
+
+            if wins and losses:
+                win_rate = len(wins) / len(trades)
+                avg_win = np.mean(wins)
+                avg_loss = np.mean(losses)
+
+                # Kelly formula: f = (bp - q) / b
+                # where b = avg_win/avg_loss, p = win_probability, q = 1-p
+                b = avg_win / avg_loss
+                p = win_rate
+                q = 1 - p
+
+                kelly_fraction = (b * p - q) / b
+                kelly_pct = kelly_fraction * 100
+
+                kelly_content = [
+                    dmc.Grid(
+                        [
+                            dmc.GridCol(
+                                [
+                                    dmc.Paper(
+                                        [
+                                            dmc.Stack(
+                                                [
+                                                    dmc.Text(
+                                                        "🧱 Kelly Criterion", fw=600, size="lg"
+                                                    ),
+                                                    dmc.Text(
+                                                        f"{kelly_pct:.1f}%",
+                                                        size="xl",
+                                                        fw=700,
+                                                        c="blue",
+                                                    ),
+                                                    dmc.Text(
+                                                        "Optimal position size based on your win rate and payoff ratio",
+                                                        size="sm",
+                                                        c="dimmed",
+                                                    ),
+                                                    dmc.Divider(),
+                                                    dmc.SimpleGrid(
+                                                        cols=2,
+                                                        children=[
+                                                            dmc.Stack(
+                                                                [
+                                                                    dmc.Text(
+                                                                        "Win Rate",
+                                                                        size="xs",
+                                                                        c="dimmed",
+                                                                    ),
+                                                                    dmc.Text(
+                                                                        f"{win_rate:.1%}", fw=600
+                                                                    ),
+                                                                ],
+                                                                gap="xs",
+                                                            ),
+                                                            dmc.Stack(
+                                                                [
+                                                                    dmc.Text(
+                                                                        "Avg Win/Loss Ratio",
+                                                                        size="xs",
+                                                                        c="dimmed",
+                                                                    ),
+                                                                    dmc.Text(f"{b:.2f}x", fw=600),
+                                                                ],
+                                                                gap="xs",
+                                                            ),
+                                                            dmc.Stack(
+                                                                [
+                                                                    dmc.Text(
+                                                                        "Average Win",
+                                                                        size="xs",
+                                                                        c="dimmed",
+                                                                    ),
+                                                                    dmc.Text(
+                                                                        f"${avg_win:,.0f}",
+                                                                        fw=600,
+                                                                        c="green",
+                                                                    ),
+                                                                ],
+                                                                gap="xs",
+                                                            ),
+                                                            dmc.Stack(
+                                                                [
+                                                                    dmc.Text(
+                                                                        "Average Loss",
+                                                                        size="xs",
+                                                                        c="dimmed",
+                                                                    ),
+                                                                    dmc.Text(
+                                                                        f"${avg_loss:,.0f}",
+                                                                        fw=600,
+                                                                        c="red",
+                                                                    ),
+                                                                ],
+                                                                gap="xs",
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    dmc.Alert(
+                                                        children=[
+                                                            dmc.Text(
+                                                                "🎯 Recommendation",
+                                                                fw=600,
+                                                                size="sm",
+                                                            ),
+                                                            dmc.Text(
+                                                                f"Based on your historical performance, the Kelly Criterion suggests risking {kelly_pct:.1f}% of your capital per trade. "
+                                                                f"Many traders use 'Half Kelly' ({kelly_pct/2:.1f}%) or 'Quarter Kelly' ({kelly_pct/4:.1f}%) for more conservative sizing.",
+                                                                size="sm",
+                                                            ),
+                                                        ],
+                                                        color="blue" if kelly_pct > 0 else "red",
+                                                        variant="light",
+                                                    ),
+                                                ],
+                                                gap="md",
+                                            ),
+                                        ],
+                                        p="lg",
+                                        withBorder=True,
+                                    ),
+                                ],
+                                span=12,
+                            ),
+                        ]
+                    ),
+                ]
+            else:
+                kelly_content = [
+                    dmc.Text("Insufficient trade data for Kelly calculation", c="dimmed")
+                ]
+
+            return kelly_content
+
+        except Exception as e:
+            logger.error(f"Error updating Kelly/Scenario analysis: {str(e)}")
+            return dmc.Text(f"Error: {str(e)}", c="red")
+
 
 def create_equity_curve_chart(
     result, initial_capital, days_forward, log_scale=False, show_paths=False
@@ -330,7 +603,7 @@ def create_equity_curve_chart(
         # Calculate percentiles at each time step
         percentiles = {}
         if hasattr(result, "percentiles"):
-            for p_name, p_val in result.percentiles.items():
+            for p_name in result.percentiles.keys():
                 if p_name in ["p5", "p25", "p50", "p75", "p95"]:
                     percentiles[p_name] = np.percentile(portfolio_values, float(p_name[1:]), axis=0)
 
@@ -399,22 +672,22 @@ def create_equity_curve_chart(
                 )
             )
 
-        # Add individual paths if requested (max 20 for performance)
+        # Add ALL individual paths if requested (full transparency, no sampling)
         if show_paths and len(portfolio_values) > 0:
-            num_paths = min(20, len(portfolio_values))
-            np.random.seed(42)  # Consistent paths
-            sample_indices = np.random.choice(len(portfolio_values), num_paths, replace=False)
+            # Show all simulation paths with reduced opacity for clarity
+            # Adjust opacity based on number of simulations to maintain visibility
+            opacity = max(0.1, min(0.4, 20 / len(portfolio_values)))
 
-            for i, idx in enumerate(sample_indices):
+            for idx in range(len(portfolio_values)):
                 path_values = portfolio_values[idx]
                 fig.add_trace(
                     go.Scatter(
                         x=days,
                         y=path_values,
                         mode="lines",
-                        name=f"Sample Path {i+1}" if i < 3 else None,
-                        line=dict(color="rgba(128,128,128,0.4)", width=1),
-                        showlegend=i < 3,
+                        name=None,  # No names for individual paths
+                        line=dict(color=f"rgba(128,128,128,{opacity})", width=0.5),
+                        showlegend=False,  # Never show in legend
                         hoverinfo="skip",
                     )
                 )
@@ -425,7 +698,7 @@ def create_equity_curve_chart(
         )
 
         fig.update_layout(
-            xaxis_title="Days Forward",
+            xaxis_title="Number of Trades",
             yaxis_title="Portfolio Value ($)",
             yaxis_type="log" if log_scale else "linear",
             hovermode="x unified",
@@ -468,10 +741,10 @@ def create_return_distribution_chart(result):
                     line_dash="dash",
                     line_color=color,
                     annotation_text=f"{p_name.upper()}: {p_val:.1%}",
+                    annotation_position="top",
                 )
 
         fig.update_layout(
-            title="Final Return Distribution",
             xaxis_title="Cumulative Return",
             yaxis_title="Frequency",
             showlegend=False,
@@ -488,17 +761,17 @@ def create_return_distribution_chart(result):
         return create_placeholder_histogram()
 
 
-def create_drawdown_analysis_chart(result, portfolio):
+def create_drawdown_analysis_chart(result, portfolio=None):
     """Create drawdown analysis chart"""
     try:
         # Calculate drawdowns from simulation paths
         drawdowns = []
         for simulation in result.simulations:
-            cumulative = np.cumsum(simulation)
-            running_max = np.maximum.accumulate(cumulative)
-            drawdown = (cumulative - running_max) / np.maximum(
-                running_max, 0.001
-            )  # Avoid division by zero
+            # simulation already contains cumulative returns
+            # Convert to portfolio values (1 + return)
+            portfolio_values = np.array([1 + r for r in simulation])
+            running_max = np.maximum.accumulate(portfolio_values)
+            drawdown = (portfolio_values - running_max) / running_max
             drawdowns.extend(drawdown[drawdown < 0])  # Only negative drawdowns
 
         if not drawdowns:
