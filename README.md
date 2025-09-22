@@ -105,6 +105,76 @@ The application expects CSV files with the following columns:
 
 See `sample-portfolio.csv` for a complete example.
 
+## Testing with Your Own Data
+
+TradeBlocks includes a comprehensive testing framework that allows you to test all calculations and features with your own trading data.
+
+### Using Your Trading Data for Testing
+
+1. **Add your data files** to the `tests/data/` directory:
+   ```
+   tests/data/
+   ├── tradelog.csv         # Your trading data
+   ├── dailylog.csv         # Your daily portfolio data (optional)
+   └── README.md            # Testing documentation
+   ```
+
+2. **Required CSV format** for `tradelog.csv`:
+   ```csv
+   Date,Time,Symbol,Side,Quantity,Price,Commission,Proceeds,PnL,Strategy
+   2024-01-15,09:30:00,AAPL,Buy,100,150.00,1.00,-15001.00,0.00,Momentum
+   2024-01-15,15:45:00,AAPL,Sell,100,152.50,1.00,15248.00,246.00,Momentum
+   ```
+
+3. **Run comprehensive tests** with your data:
+   ```bash
+   # Test all performance calculations with your data
+   PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest tests/unit/test_performance_calculator.py -v
+
+   # Run all tests with verbose output
+   PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest tests/ -v -s
+
+   # Test specific calculations
+   PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest tests/unit/test_performance_calculator.py::TestPerformanceCalculator::test_real_data_performance_metrics -v -s
+   ```
+
+4. **What gets tested**:
+   - ✅ All 7 Performance Blocks calculations (equity curve, trade distributions, streaks, etc.)
+   - ✅ Data validation and format checking
+   - ✅ Edge case handling with your actual trading patterns
+   - ✅ Performance metrics calculation accuracy
+   - ✅ Large dataset handling (if you have 1000+ trades)
+
+5. **Privacy & Security**:
+   - 🔒 Your data stays completely local - never transmitted anywhere
+   - 🔒 User data files are automatically excluded from git commits
+   - 🔒 All calculations run in-memory during testing only
+
+### Test Output Example
+```bash
+$ PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest tests/unit/test_performance_calculator.py::TestPerformanceCalculator::test_real_data_performance_metrics -v -s
+
+Using real tradelog data: /path/to/tests/data/tradelog.csv
+Loaded 1,247 trades for testing
+
+Comprehensive performance summary for 1,247 trades:
+  Total P/L: $45,678.90
+  Winning trades: 672 (53.9%)
+  Losing trades: 575 (46.1%)
+  Average winner: $145.23
+  Average loser: $-87.45
+  ✓ All 7 performance calculations completed successfully
+```
+
+**Without your data files:**
+```bash
+Using mock tradelog data (no tradelog.csv found)
+Loaded 5 trades for testing
+✓ All calculations work with mock data
+```
+
+See `tests/data/README.md` for detailed instructions, troubleshooting, and data format requirements.
+
 ## Development
 
 ### Project Structure

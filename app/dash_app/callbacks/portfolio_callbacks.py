@@ -8,6 +8,7 @@ import requests
 import logging
 import os
 
+from app.data.models import Trade
 from app.dash_app.layouts.main_layout import create_welcome_content, create_main_layout
 from app.dash_app.components.file_upload import (
     create_upload_success_message,
@@ -18,10 +19,21 @@ from app.dash_app.components.tabs.geekistics import (
 )
 from app.dash_app.components.tabs.performance_charts import (
     create_performance_charts_tab,
-    create_cumulative_pl_chart,
+    get_mock_charts,
+    get_mock_metrics,
+    generate_performance_charts,
+    create_metric_indicator,
+    create_equity_curve_chart,
     create_drawdown_chart,
-    create_daily_pl_chart,
-    create_monthly_heatmap,
+    create_day_of_week_distribution_chart,
+    create_rom_distribution_chart,
+    create_streak_distribution_chart,
+    create_monthly_heatmap_chart,
+    create_trade_sequence_chart,
+    create_rom_timeline_chart,
+    create_rolling_metrics_chart,
+    create_risk_evolution_chart,
+    generate_streak_statistics_group,
 )
 from app.dash_app.components.tabs.trade_data import (
     create_trade_data_tab,
@@ -445,7 +457,34 @@ def register_callbacks(app):
             return create_geekistics_tab(), *nav_states
         elif triggered == "nav-performance":
             nav_states[1] = True  # performance active
-            return create_performance_charts_tab(), *nav_states
+            # Build layout and log component IDs for debugging
+            tab_layout = create_performance_charts_tab()
+
+            def _collect_ids(node, acc):
+                try:
+                    # Record id if present
+                    comp_id = getattr(node, "id", None)
+                    if comp_id:
+                        acc.add(comp_id)
+                    # Recurse into children-like props
+                    for prop in ("children",):
+                        if hasattr(node, prop):
+                            child = getattr(node, prop)
+                            if isinstance(child, (list, tuple)):
+                                for c in child:
+                                    _collect_ids(c, acc)
+                            else:
+                                _collect_ids(child, acc)
+                except Exception:
+                    pass
+
+            try:
+                ids = set()
+                _collect_ids(tab_layout, ids)
+            except Exception as e:
+                logger.warning(f"Could not collect performance tab IDs: {e}")
+
+            return tab_layout, *nav_states
         elif triggered == "nav-trade-data":
             nav_states[2] = True  # trade-data active
             return create_trade_data_tab(), *nav_states
@@ -594,43 +633,224 @@ def register_callbacks(app):
                 [],
             )
 
+    # Removed old charts callback to avoid ID conflicts with Performance Blocks
+
+    # Populate Performance Blocks strategy filter options
+    @app.callback(
+        Output("perf-strategy-filter", "data"),
+        [Input("current-portfolio-data", "data")],
+        prevent_initial_call=False,
+    )
+    def populate_perf_strategy_filter(portfolio_data):
+        if not portfolio_data:
+            return []
+        try:
+            trades = portfolio_data.get("trades", []) if isinstance(portfolio_data, dict) else []
+            strategies = sorted(
+                list({t.get("strategy", "") for t in trades if isinstance(t, dict)})
+            )
+            return [{"value": s, "label": s} for s in strategies if s]
+        except Exception as e:
+            logger.warning(f"Could not build perf strategy options: {e}")
+            return []
+
+    # Performance Blocks: real-data callback
     @app.callback(
         [
-            Output("cumulative-pl-chart", "figure"),
+            Output("perf-metrics-bar", "children"),
+            Output("equity-curve-chart", "figure"),
             Output("drawdown-chart", "figure"),
-            Output("daily-pl-chart", "figure"),
-            Output("monthly-heatmap", "figure"),
+            Output("day-of-week-chart", "figure"),
+            Output("rom-distribution-chart", "figure"),
+            Output("streak-distribution-chart", "figure"),
+            Output("streak-statistics-group", "children"),
+            Output("monthly-heatmap-chart", "figure"),
+            Output("trade-sequence-chart", "figure"),
+            Output("rom-timeline-chart", "figure"),
+            Output("rolling-metrics-chart", "figure"),
+            Output("risk-evolution-chart", "figure"),
         ],
-        [Input("current-portfolio-data", "data"), Input("chart-timeframe", "value")],
-        prevent_initial_call=True,
+        [
+            Input("current-portfolio-data", "data"),
+            Input("perf-strategy-filter", "value"),
+            Input("perf-date-range", "value"),
+            Input("equity-scale-toggle", "value"),
+            Input("equity-drawdown-areas", "checked"),
+            Input("sequence-show-trend", "checked"),
+            Input("rom-ma-period", "value"),
+            Input("rolling-metric-type", "value"),
+            Input("theme-store", "data"),
+        ],
+        prevent_initial_call=False,
     )
-    def update_performance_charts(portfolio_data, timeframe):
-        """Update the Performance Charts tab"""
-        if not portfolio_data:
-            return {}, {}, {}, {}
-
+    def update_performance_blocks(
+        portfolio_data,
+        strategy_filter,
+        date_range,
+        scale_mode,
+        show_drawdown_areas,
+        sequence_show_trend,
+        rom_ma_period,
+        rolling_metric_type,
+        theme_data,
+    ):
+        """Update Performance Blocks charts from uploaded real data."""
         try:
-            # Send portfolio data to stateless API endpoint
-            response = requests.post(
-                f"{API_BASE_URL}/calculate/performance-data", json=portfolio_data
+            if not portfolio_data:
+                # Nothing loaded yet; show mocks unobtrusively
+                mocks = get_mock_charts()
+                return (
+                    get_mock_metrics(),
+                    mocks["equity_curve"],
+                    mocks["drawdown"],
+                    mocks["day_of_week"],
+                    mocks["rom_distribution"],
+                    mocks["streak_distribution"],
+                    mocks["monthly_heatmap"],
+                    mocks["trade_sequence"],
+                    mocks["rom_timeline"],
+                    mocks["rolling_metrics"],
+                    mocks["risk_evolution"],
+                )
+
+            # Convert dicts to Trade objects
+            all_trades_data = (
+                portfolio_data.get("trades", []) if isinstance(portfolio_data, dict) else []
             )
+            trades = []
+            for t in all_trades_data:
+                try:
+                    # Trade model import placed at top; create instances
+                    trades.append(Trade(**t) if not isinstance(t, Trade) else t)
+                except Exception:
+                    # Skip malformed rows gracefully
+                    continue
 
-            if response.status_code != 200:
-                return {}, {}, {}, {}
+            if not trades:
+                mocks = get_mock_charts()
+                return (
+                    get_mock_metrics(),
+                    mocks["equity_curve"],
+                    mocks["drawdown"],
+                    mocks["day_of_week"],
+                    mocks["rom_distribution"],
+                    mocks["streak_distribution"],
+                    mocks["monthly_heatmap"],
+                    mocks["trade_sequence"],
+                    mocks["rom_timeline"],
+                    mocks["rolling_metrics"],
+                    mocks["risk_evolution"],
+                )
 
-            performance_data = response.json()
+            # Apply strategy filter
+            if strategy_filter:
+                selected = (
+                    set(strategy_filter) if isinstance(strategy_filter, list) else {strategy_filter}
+                )
+                trades = [tr for tr in trades if tr.strategy in selected]
 
-            # Create charts
-            cumulative_chart = create_cumulative_pl_chart(performance_data)
-            drawdown_chart = create_drawdown_chart(performance_data)
-            daily_chart = create_daily_pl_chart(performance_data)
-            monthly_chart = create_monthly_heatmap(performance_data)
+            # Apply date range filter
+            if date_range and date_range != "all":
+                from datetime import date, timedelta
 
-            return cumulative_chart, drawdown_chart, daily_chart, monthly_chart
+                today = max((tr.date_opened for tr in trades), default=None) or date.today()
+                start = None
+                if date_range == "ytd":
+                    start = date(today.year, 1, 1)
+                elif date_range == "1y":
+                    start = today - timedelta(days=365)
+                elif date_range == "6m":
+                    start = today - timedelta(days=182)
+                elif date_range == "3m":
+                    start = today - timedelta(days=91)
+                elif date_range == "1m":
+                    start = today - timedelta(days=30)
 
+                if start:
+                    trades = [tr for tr in trades if tr.date_opened >= start]
+
+            # Compute datasets
+            from app.calculations.performance import PerformanceCalculator
+
+            calc = PerformanceCalculator()
+            equity_data = calc.calculate_enhanced_cumulative_equity(trades)
+            distribution_data = calc.calculate_trade_distributions(trades)
+            streak_data = calc.calculate_streak_distributions(trades)
+            monthly_data = calc.calculate_monthly_heatmap_data(trades)
+            sequence_data = calc.calculate_trade_sequence_data(trades)
+            rom_data = calc.calculate_rom_over_time(trades)
+            rolling_data = calc.calculate_rolling_metrics(trades)
+
+            # Build figures
+            equity_fig = create_equity_curve_chart(
+                equity_data,
+                scale=scale_mode or "linear",
+                show_drawdown_areas=bool(show_drawdown_areas),
+                theme_data=theme_data,
+            )
+            drawdown_fig = create_drawdown_chart(equity_data, theme_data=theme_data)
+            dow_fig = create_day_of_week_distribution_chart(
+                distribution_data, theme_data=theme_data
+            )
+            rom_dist_fig = create_rom_distribution_chart(distribution_data, theme_data=theme_data)
+            streak_fig = create_streak_distribution_chart(streak_data, theme_data=theme_data)
+            heatmap_fig = create_monthly_heatmap_chart(monthly_data, theme_data=theme_data)
+            sequence_fig = create_trade_sequence_chart(
+                sequence_data, bool(sequence_show_trend), theme_data=theme_data
+            )
+            rom_timeline_fig = create_rom_timeline_chart(
+                rom_data, rom_ma_period or "30", theme_data=theme_data
+            )
+            rolling_fig = create_rolling_metrics_chart(
+                rolling_data, rolling_metric_type or "win_rate", theme_data=theme_data
+            )
+            risk_fig = create_risk_evolution_chart(rolling_data, theme_data=theme_data)
+
+            # Generate streak statistics
+            streak_stats = generate_streak_statistics_group(streak_data)
+
+            # Metrics bar - generate from already calculated data
+            try:
+                from app.dash_app.components.tabs.performance_charts import generate_real_metrics
+
+                metrics = generate_real_metrics(
+                    equity_data, distribution_data, streak_data, trades, monthly_data
+                )
+            except Exception:
+                metrics = get_mock_metrics()
+
+            return (
+                metrics,
+                equity_fig,
+                drawdown_fig,
+                dow_fig,
+                rom_dist_fig,
+                streak_fig,
+                streak_stats,
+                heatmap_fig,
+                sequence_fig,
+                rom_timeline_fig,
+                rolling_fig,
+                risk_fig,
+            )
         except Exception as e:
-            logger.error(f"Error updating performance charts: {str(e)}")
-            return {}, {}, {}, {}
+            logger.error(f"Error updating Performance Blocks: {e}")
+            # Fail-safe: return mocks to keep UI responsive
+            mocks = get_mock_charts()
+            return (
+                get_mock_metrics(),
+                mocks.get("equity_curve", {}),
+                mocks.get("drawdown", {}),
+                mocks.get("day_of_week", {}),
+                mocks.get("rom_distribution", {}),
+                mocks.get("streak_distribution", {}),
+                generate_streak_statistics_group({}),  # Default streak stats
+                mocks.get("monthly_heatmap", {}),
+                mocks.get("trade_sequence", {}),
+                mocks.get("rom_timeline", {}),
+                mocks.get("rolling_metrics", {}),
+                mocks.get("risk_evolution", {}),
+            )
 
     @app.callback(
         [
