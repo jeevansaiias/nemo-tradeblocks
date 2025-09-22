@@ -792,16 +792,22 @@ def register_callbacks(app):
                 theme_data=theme_data,
             )
             drawdown_fig = create_drawdown_chart(equity_data, theme_data=theme_data)
-            dow_fig = create_day_of_week_distribution_chart(distribution_data)
-            rom_dist_fig = create_rom_distribution_chart(distribution_data)
-            streak_fig = create_streak_distribution_chart(streak_data)
-            heatmap_fig = create_monthly_heatmap_chart(monthly_data)
-            sequence_fig = create_trade_sequence_chart(sequence_data, bool(sequence_show_trend))
-            rom_timeline_fig = create_rom_timeline_chart(rom_data, rom_ma_period or "30")
-            rolling_fig = create_rolling_metrics_chart(
-                rolling_data, rolling_metric_type or "win_rate"
+            dow_fig = create_day_of_week_distribution_chart(
+                distribution_data, theme_data=theme_data
             )
-            risk_fig = create_risk_evolution_chart(rolling_data)
+            rom_dist_fig = create_rom_distribution_chart(distribution_data, theme_data=theme_data)
+            streak_fig = create_streak_distribution_chart(streak_data, theme_data=theme_data)
+            heatmap_fig = create_monthly_heatmap_chart(monthly_data, theme_data=theme_data)
+            sequence_fig = create_trade_sequence_chart(
+                sequence_data, bool(sequence_show_trend), theme_data=theme_data
+            )
+            rom_timeline_fig = create_rom_timeline_chart(
+                rom_data, rom_ma_period or "30", theme_data=theme_data
+            )
+            rolling_fig = create_rolling_metrics_chart(
+                rolling_data, rolling_metric_type or "win_rate", theme_data=theme_data
+            )
+            risk_fig = create_risk_evolution_chart(rolling_data, theme_data=theme_data)
 
             # Generate streak statistics
             streak_stats = generate_streak_statistics_group(streak_data)

@@ -238,13 +238,19 @@ def create_drawdown_chart(equity_data: Dict[str, Any], theme_data=None) -> go.Fi
     return fig
 
 
-def create_day_of_week_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figure:
+def create_day_of_week_distribution_chart(
+    distribution_data: Dict[str, Any], theme_data=None
+) -> go.Figure:
     """
     Create day of week trade distribution chart.
 
     Args:
         distribution_data: Output from calculate_trade_distributions
+        theme_data: Theme data for styling
     """
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     fig = go.Figure()
 
     if not distribution_data or "day_of_week" not in distribution_data:
@@ -289,19 +295,16 @@ def create_day_of_week_distribution_chart(distribution_data: Dict[str, Any]) -> 
         )
     )
 
-    # Update layout
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title="📅 Trade Distribution by Day",
-        xaxis=dict(
-            title="Day of Week",
-            showgrid=False,
-        ),
+        xaxis=dict(title="Day of Week", showgrid=False),
         yaxis=dict(
             title="Number of Trades",
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
             zeroline=True,
-            zerolinecolor="black",
+            zerolinecolor=theme_colors["grid_color"],
             zerolinewidth=1,
         ),
         showlegend=False,
@@ -311,13 +314,17 @@ def create_day_of_week_distribution_chart(distribution_data: Dict[str, Any]) -> 
     return fig
 
 
-def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figure:
+def create_rom_distribution_chart(distribution_data: Dict[str, Any], theme_data=None) -> go.Figure:
     """
     Create return on margin distribution histogram.
 
     Args:
         distribution_data: Output from calculate_trade_distributions
+        theme_data: Theme data for styling
     """
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     fig = go.Figure()
 
     if not distribution_data or "rom_ranges" not in distribution_data:
@@ -394,18 +401,18 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
     x_min = max(-100, min_rom - range_padding)  # Don't go below -100%
     x_max = min(200, max_rom + range_padding)  # Cap at reasonable upper limit
 
-    # Update layout
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title=dict(
             text="📊 Return on Margin Distribution", font=dict(size=18, weight="bold"), x=0.02
         ),
         xaxis=dict(
             title="Return on Margin (%)",
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
             range=[x_min, x_max],  # Focus on where the data actually is
         ),
-        yaxis=dict(title="Number of Trades", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
+        yaxis=dict(title="Number of Trades"),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(t=100, b=60, l=60, r=60),  # Top margin for legend
@@ -414,13 +421,17 @@ def create_rom_distribution_chart(distribution_data: Dict[str, Any]) -> go.Figur
     return fig
 
 
-def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
+def create_streak_distribution_chart(streak_data: Dict[str, Any], theme_data=None) -> go.Figure:
     """
     Create win/loss streak distribution chart.
 
     Args:
         streak_data: Output from calculate_streak_distributions
+        theme_data: Theme data for styling
     """
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     fig = go.Figure()
 
     if (
@@ -480,22 +491,22 @@ def create_streak_distribution_chart(streak_data: Dict[str, Any]) -> go.Figure:
         )
 
     # Add center line
-    fig.add_vline(x=0, line=dict(color="black", width=1))
+    fig.add_vline(x=0, line=dict(color=theme_colors["grid_color"], width=1))
 
-    # Update layout
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title=dict(
             text="🎯 Win/Loss Streak Distribution", font=dict(size=16, weight="bold"), x=0.02
         ),
         xaxis=dict(
             title="← Loss Streaks | Win Streaks →",
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
             zeroline=True,
-            zerolinecolor="black",
+            zerolinecolor=theme_colors["grid_color"],
             zerolinewidth=2,
         ),
-        yaxis=dict(title="Streak Length (Trades)", showgrid=True, gridcolor="rgba(0,0,0,0.1)"),
+        yaxis=dict(title="Streak Length (Trades)"),
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
         margin=dict(t=60, b=40, l=60, r=40),  # Reduced margins for better space usage
@@ -584,8 +595,11 @@ def generate_performance_charts(trades: List[Any]) -> Dict[str, Any]:
 # =============================================================================
 
 
-def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
+def create_monthly_heatmap_chart(monthly_data: Dict[str, Any], theme_data=None) -> go.Figure:
     """Create monthly returns bar chart from calculated monthly data."""
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     if not monthly_data or not monthly_data.get("monthly_returns"):
         return create_empty_chart("No monthly data available")
 
@@ -640,7 +654,10 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
         )
     )
 
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title="📅 Monthly Performance",
         xaxis=dict(
             title="Month",
@@ -649,10 +666,8 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
         ),
         yaxis=dict(
             title="Monthly Return ($)",
-            showgrid=True,
-            gridcolor="rgba(0,0,0,0.1)",
             zeroline=True,
-            zerolinecolor="black",
+            zerolinecolor=theme_colors["grid_color"],
             zerolinewidth=1,
         ),
         margin=dict(t=60, b=80, l=80, r=40),  # More bottom margin for angled labels
@@ -663,9 +678,12 @@ def create_monthly_heatmap_chart(monthly_data: Dict[str, Any]) -> go.Figure:
 
 
 def create_trade_sequence_chart(
-    sequence_data: Dict[str, Any], show_trend: bool = True
+    sequence_data: Dict[str, Any], show_trend: bool = True, theme_data=None
 ) -> go.Figure:
     """Create trade sequence chart from calculated sequence data."""
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     sequence = sequence_data.get("sequence", []) if sequence_data else []
     if not sequence:
         return create_empty_chart("No trade sequence data")
@@ -701,10 +719,13 @@ def create_trade_sequence_chart(
             )
         )
 
-    fig.add_hline(y=0, line_dash="solid", line_color="#9ca3af", line_width=1)
+    fig.add_hline(y=0, line_dash="solid", line_color=theme_colors["grid_color"], line_width=1)
 
-    fig.update_layout(
-        title="Trade Sequence vs Return",
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
+        title=dict(text="📈 Trade Sequence vs Return", font=dict(size=20, weight="bold"), x=0.02),
         xaxis_title="Trade Number",
         yaxis_title="Return ($)",
         margin=dict(l=0, r=0, t=40, b=0),
@@ -715,8 +736,13 @@ def create_trade_sequence_chart(
     return fig
 
 
-def create_rom_timeline_chart(rom_data: Dict[str, Any], ma_period_value: str = "30") -> go.Figure:
+def create_rom_timeline_chart(
+    rom_data: Dict[str, Any], ma_period_value: str = "30", theme_data=None
+) -> go.Figure:
     """Create ROM over time chart with optional moving average overlay."""
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     if not rom_data or not rom_data.get("rom_timeline"):
         return create_empty_chart("No ROM timeline data")
 
@@ -764,7 +790,10 @@ def create_rom_timeline_chart(rom_data: Dict[str, Any], ma_period_value: str = "
         y=mean_rom, line_dash="dash", line_color="#16a34a", annotation_text=f"Mean: {mean_rom:.1f}%"
     )
 
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title="Return on Margin Over Time",
         xaxis_title="Date",
         yaxis_title="Return on Margin (%)",
@@ -776,9 +805,12 @@ def create_rom_timeline_chart(rom_data: Dict[str, Any], ma_period_value: str = "
 
 
 def create_rolling_metrics_chart(
-    rolling_data: Dict[str, Any], metric_type: str = "win_rate"
+    rolling_data: Dict[str, Any], metric_type: str = "win_rate", theme_data=None
 ) -> go.Figure:
     """Create rolling metrics timeline chart for a chosen metric."""
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     if not rolling_data or not rolling_data.get("metrics_timeline"):
         return create_empty_chart("No rolling metrics available")
 
@@ -806,7 +838,10 @@ def create_rolling_metrics_chart(
         ]
     )
 
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title=f"Rolling {metric_key.replace('_',' ').title()}",
         xaxis_title="Date",
         yaxis_title=metric_key.replace("_", " ").title(),
@@ -816,8 +851,11 @@ def create_rolling_metrics_chart(
     return fig
 
 
-def create_risk_evolution_chart(rolling_data: Dict[str, Any]) -> go.Figure:
+def create_risk_evolution_chart(rolling_data: Dict[str, Any], theme_data=None) -> go.Figure:
     """Create a simple risk evolution chart using rolling volatility as proxy."""
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
+
     if not rolling_data or not rolling_data.get("metrics_timeline"):
         return create_empty_chart("No risk data available")
 
@@ -839,7 +877,10 @@ def create_risk_evolution_chart(rolling_data: Dict[str, Any]) -> go.Figure:
         ]
     )
 
-    fig.update_layout(
+    # Apply theme layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title="Risk Metrics Evolution (Volatility)",
         xaxis_title="Date",
         yaxis_title="Volatility",
