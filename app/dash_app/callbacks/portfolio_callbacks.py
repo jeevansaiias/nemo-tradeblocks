@@ -49,6 +49,9 @@ from app.dash_app.components.tabs.trade_data import (
 from app.dash_app.components.tabs.correlation_matrix import (
     create_correlation_matrix_tab,
 )
+from app.dash_app.components.tabs.risk_simulator import (
+    create_risk_simulator_tab,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +65,10 @@ def register_callbacks(app):
 
     # Import and register correlation callbacks
     from app.dash_app.callbacks.correlation_callbacks import register_correlation_callbacks
+    from app.dash_app.callbacks.monte_carlo_callbacks import register_monte_carlo_callbacks
 
     register_correlation_callbacks(app)
+    register_monte_carlo_callbacks(app)
 
     # Use clientside callback to update MantineProvider theme
     app.clientside_callback(
@@ -488,7 +493,7 @@ def register_callbacks(app):
             return create_trade_data_tab(), *nav_states
         elif triggered == "nav-monte-carlo":
             nav_states[3] = True  # monte-carlo active
-            return create_coming_soon_content(), *nav_states  # Coming soon page
+            return create_risk_simulator_tab(), *nav_states  # New risk simulator tab
         elif triggered == "nav-correlation":
             nav_states[4] = True  # correlation active
             return create_correlation_matrix_tab(), *nav_states
