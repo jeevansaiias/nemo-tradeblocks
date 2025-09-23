@@ -66,8 +66,6 @@ async def upload_portfolio(file: UploadFile = File(...)):
         # Process the CSV
         portfolio = processor.parse_csv(file_content, file.filename)
 
-        logger.info(f"Processed portfolio {file.filename} with {len(portfolio.trades)} trades")
-
         # Generate portfolio ID and store for stateful endpoints
         import uuid
 
@@ -105,8 +103,6 @@ async def upload_daily_log(file: UploadFile = File(...)):
 
         # Process the CSV
         daily_log = daily_log_processor.parse_csv(file_content, file.filename)
-
-        logger.info(f"Processed daily log {file.filename} with {len(daily_log.entries)} entries")
 
         # Return the full daily log data for client-side storage
         return {

@@ -11,12 +11,16 @@ from dash_iconify import DashIconify
 import plotly.graph_objects as go
 
 from ..common import create_info_tooltip
+from app.utils.theme import get_theme_colors
 
 
 # Import placeholder chart functions
 def create_placeholder_equity_curve(theme_data=None):
     """Create an empty state placeholder for equity curve"""
     import plotly.graph_objects as go
+
+    theme_colors = get_theme_colors(theme_data)
+    text_color = theme_colors.get("text_color", "gray")
 
     fig = go.Figure()
 
@@ -28,7 +32,7 @@ def create_placeholder_equity_curve(theme_data=None):
         x=0.5,
         y=0.5,
         showarrow=False,
-        font=dict(size=16, color="gray"),
+        font=dict(size=16, color=text_color),
         xanchor="center",
         yanchor="middle",
     )
@@ -36,6 +40,7 @@ def create_placeholder_equity_curve(theme_data=None):
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=text_color),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
         showlegend=False,
@@ -50,6 +55,9 @@ def create_placeholder_histogram(theme_data=None):
     """Create an empty state placeholder for distribution charts"""
     import plotly.graph_objects as go
 
+    theme_colors = get_theme_colors(theme_data)
+    text_color = theme_colors.get("text_color", "gray")
+
     fig = go.Figure()
 
     # Create an empty chart with just the message
@@ -60,7 +68,7 @@ def create_placeholder_histogram(theme_data=None):
         x=0.5,
         y=0.5,
         showarrow=False,
-        font=dict(size=14, color="gray"),
+        font=dict(size=14, color=text_color),
         xanchor="center",
         yanchor="middle",
     )
@@ -68,6 +76,7 @@ def create_placeholder_histogram(theme_data=None):
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=text_color),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
         showlegend=False,
@@ -82,6 +91,9 @@ def create_placeholder_drawdown(theme_data=None):
     """Create an empty state placeholder for drawdown charts"""
     import plotly.graph_objects as go
 
+    theme_colors = get_theme_colors(theme_data)
+    text_color = theme_colors.get("text_color", "gray")
+
     fig = go.Figure()
 
     # Create an empty chart with just the message
@@ -92,7 +104,7 @@ def create_placeholder_drawdown(theme_data=None):
         x=0.5,
         y=0.5,
         showarrow=False,
-        font=dict(size=14, color="gray"),
+        font=dict(size=14, color=text_color),
         xanchor="center",
         yanchor="middle",
     )
@@ -100,6 +112,7 @@ def create_placeholder_drawdown(theme_data=None):
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=text_color),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
         showlegend=False,
@@ -529,11 +542,17 @@ def create_equity_curve_section():
                         align="center",
                     ),
                     # Chart placeholder
-                    dcc.Graph(
-                        id="mc-equity-curve",
-                        config={"displayModeBar": True, "displaylogo": False},
-                        style={"height": "500px"},
-                        figure=create_placeholder_equity_curve(),
+                    dcc.Loading(
+                        id="mc-equity-loading",
+                        type="default",
+                        children=[
+                            dcc.Graph(
+                                id="mc-equity-curve",
+                                config={"displayModeBar": True, "displaylogo": False},
+                                style={"height": "500px"},
+                                figure=create_placeholder_equity_curve(),
+                            )
+                        ],
                     ),
                 ],
                 gap="md",
@@ -699,19 +718,25 @@ def create_analysis_section():
                         gap="xs",
                         mb="md",
                     ),
-                    dcc.Graph(
-                        id="mc-return-distribution",
-                        config={
-                            "displayModeBar": False,
-                            "responsive": True,
-                            "autosizable": True,
-                        },
-                        style={
-                            "height": "400px",
-                            "width": "100%",
-                        },
-                        figure=create_placeholder_histogram(),
-                        responsive=True,
+                    dcc.Loading(
+                        id="mc-return-loading",
+                        type="default",
+                        children=[
+                            dcc.Graph(
+                                id="mc-return-distribution",
+                                config={
+                                    "displayModeBar": False,
+                                    "responsive": True,
+                                    "autosizable": True,
+                                },
+                                style={
+                                    "height": "400px",
+                                    "width": "100%",
+                                },
+                                figure=create_placeholder_histogram(),
+                                responsive=True,
+                            )
+                        ],
                     ),
                 ],
                 p="md",
@@ -734,19 +759,25 @@ def create_analysis_section():
                         gap="xs",
                         mb="md",
                     ),
-                    dcc.Graph(
-                        id="mc-drawdown-analysis",
-                        config={
-                            "displayModeBar": False,
-                            "responsive": True,
-                            "autosizable": True,
-                        },
-                        style={
-                            "height": "400px",
-                            "width": "100%",
-                        },
-                        figure=create_placeholder_drawdown(),
-                        responsive=True,
+                    dcc.Loading(
+                        id="mc-drawdown-loading",
+                        type="default",
+                        children=[
+                            dcc.Graph(
+                                id="mc-drawdown-analysis",
+                                config={
+                                    "displayModeBar": False,
+                                    "responsive": True,
+                                    "autosizable": True,
+                                },
+                                style={
+                                    "height": "400px",
+                                    "width": "100%",
+                                },
+                                figure=create_placeholder_drawdown(),
+                                responsive=True,
+                            )
+                        ],
                     ),
                 ],
                 p="md",

@@ -577,7 +577,6 @@ def register_callbacks(app):
         """Update the Geekistics tab with comprehensive statistics"""
 
         if not portfolio_data:
-            logger.info("No portfolio data available")
             return (
                 dmc.Center(
                     dmc.Text("No portfolio data available", c="dimmed", size="lg"),
@@ -613,7 +612,6 @@ def register_callbacks(app):
             # Filter trades if strategies are selected
             filtered_trades = all_trades_data
             if selected_strategies:
-                logger.info(f"Filtering by strategies: {selected_strategies}")
                 filtered_trades = [
                     trade
                     for trade in all_trades_data
