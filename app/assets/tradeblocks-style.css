@@ -1,10 +1,15 @@
 /* TradeBlocks Professional Styles */
 
 /* Clean, professional backgrounds */
+/* Ensure background matches early attribute to avoid theme flash */
+html[data-mantine-color-scheme="dark"],
+html[data-mantine-color-scheme="dark"] body,
 body.theme-dark {
     background: #1a1a1a;
 }
 
+html[data-mantine-color-scheme="light"],
+html[data-mantine-color-scheme="light"] body,
 body.theme-light {
     background: #ffffff;
 }
@@ -43,11 +48,13 @@ body.theme-light {
 }
 
 /* Dark theme upload area */
+html[data-mantine-color-scheme="dark"] .upload-area,
 body.theme-dark .upload-area {
     background-color: var(--mantine-color-dark-7) !important;
     border-color: var(--mantine-color-dark-4) !important;
 }
 
+html[data-mantine-color-scheme="dark"] .upload-area:hover,
 body.theme-dark .upload-area:hover {
     background-color: var(--mantine-color-dark-6) !important;
     border-color: var(--mantine-color-dark-3) !important;

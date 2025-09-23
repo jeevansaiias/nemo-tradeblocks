@@ -844,10 +844,10 @@ def register_correlation_callbacks(app):
     )
     def update_correlation_analysis(portfolio_data, method, theme_data):
         """Update correlation analysis with simple heatmap and analytics"""
-        # Determine current theme
+        # Determine current theme (prefer client-resolved value)
         is_dark_mode = False
         if theme_data and isinstance(theme_data, dict):
-            current_theme = theme_data.get("theme", "light")
+            current_theme = theme_data.get("resolved") or theme_data.get("theme", "light")
             is_dark_mode = current_theme == "dark"
 
         if not portfolio_data:
