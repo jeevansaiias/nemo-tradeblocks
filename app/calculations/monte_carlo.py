@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 from collections import defaultdict
 
@@ -134,4 +134,164 @@ class MonteCarloSimulator:
 
         except Exception as e:
             logger.error(f"Error running strategy comparison: {str(e)}")
+            raise
+
+    def run_bootstrap_simulation(
+        self, portfolio: Portfolio, request: MonteCarloRequest, use_daily_returns: bool = False
+    ) -> MonteCarloResult:
+        """
+        Run Monte Carlo simulation using bootstrap resampling from historical data.
+
+        Args:
+            portfolio: Portfolio containing historical trades
+            request: Monte Carlo simulation parameters
+            use_daily_returns: If True, bootstrap daily returns. If False, bootstrap individual trades
+
+        Returns:
+            MonteCarloResult with bootstrap-based simulations
+        """
+        try:
+            # Filter trades by strategy if specified
+            if request.strategy:
+                trades = [trade for trade in portfolio.trades if trade.strategy == request.strategy]
+                if not trades:
+                    raise ValueError(f"No trades found for strategy: {request.strategy}")
+            else:
+                trades = portfolio.trades
+
+            if len(trades) < 10:
+                raise ValueError(
+                    f"Insufficient trades for bootstrap simulation. Found {len(trades)} trades, need at least 10."
+                )
+
+            logger.info(f"Running bootstrap simulation with {len(trades)} historical trades")
+
+            if use_daily_returns:
+                # Bootstrap from daily returns
+                return self._bootstrap_daily_returns(trades, request)
+            else:
+                # Bootstrap from individual trades
+                return self._bootstrap_trades(trades, request)
+
+        except Exception as e:
+            logger.error(f"Error running bootstrap simulation: {str(e)}")
+            raise
+
+    def _bootstrap_trades(self, trades: List, request: MonteCarloRequest) -> MonteCarloResult:
+        """Bootstrap from individual trade P/L values"""
+        try:
+            # Extract P/L values from trades
+            trade_pls = [trade.pl for trade in trades]
+
+            # Get base capital - should be funds BEFORE first trade, not after
+            # Use funds_at_close - pl to get starting capital
+            if trades[0].funds_at_close > 0:
+                base_capital = trades[0].funds_at_close - trades[0].pl
+            else:
+                base_capital = 100000
+
+            simulations = []
+            final_values = []
+
+            for sim_idx in range(request.num_simulations):
+                # Bootstrap sample trades with replacement
+                # Note: days_forward represents number of trades to simulate, not calendar days
+                sampled_pls = np.random.choice(trade_pls, size=request.days_forward, replace=True)
+
+                # Track portfolio value over time (NOT cumsum of returns!)
+                capital = base_capital
+                portfolio_values = []
+
+                for pl in sampled_pls:
+                    capital += pl  # Apply P/L to capital
+                    # Calculate cumulative return from starting capital
+                    cumulative_return = (capital - base_capital) / base_capital
+                    portfolio_values.append(cumulative_return)
+
+                simulations.append(portfolio_values)
+                final_values.append(portfolio_values[-1])
+
+            # Calculate percentiles
+            percentiles = {}
+            for confidence_level in request.confidence_levels:
+                percentile_value = np.percentile(final_values, confidence_level * 100)
+                percentiles[f"p{int(confidence_level * 100)}"] = percentile_value
+
+            # Calculate VaR and statistics
+            var_95 = np.percentile(final_values, 5)
+            expected_return = np.mean(final_values)
+            std_deviation = np.std(final_values)
+
+            logger.info(
+                f"Bootstrap completed. Expected return: {expected_return:.4f}, "
+                f"VaR 95%: {var_95:.4f}, Std: {std_deviation:.4f}"
+            )
+
+            return MonteCarloResult(
+                simulations=simulations,
+                percentiles=percentiles,
+                final_values=final_values,
+                var_95=var_95,
+                expected_return=expected_return,
+                std_deviation=std_deviation,
+            )
+
+        except Exception as e:
+            logger.error(f"Error in bootstrap trades: {str(e)}")
+            raise
+
+    def _bootstrap_daily_returns(
+        self, trades: List, request: MonteCarloRequest
+    ) -> MonteCarloResult:
+        """Bootstrap from daily returns calculated from trades"""
+        try:
+            # Calculate daily returns from trades
+            daily_returns = self._calculate_daily_returns(trades)
+
+            if len(daily_returns) < 5:
+                raise ValueError(
+                    f"Insufficient daily returns for bootstrap. Found {len(daily_returns)}, need at least 5."
+                )
+
+            simulations = []
+            final_values = []
+
+            for sim_idx in range(request.num_simulations):
+                # Bootstrap sample daily returns with replacement
+                sampled_returns = np.random.choice(
+                    daily_returns, size=request.days_forward, replace=True
+                )
+
+                # Calculate cumulative path
+                cumulative_returns = np.cumsum(sampled_returns)
+                simulations.append(cumulative_returns.tolist())
+                final_values.append(cumulative_returns[-1])
+
+            # Calculate percentiles
+            percentiles = {}
+            for confidence_level in request.confidence_levels:
+                percentile_value = np.percentile(final_values, confidence_level * 100)
+                percentiles[f"p{int(confidence_level * 100)}"] = percentile_value
+
+            # Calculate VaR and statistics
+            var_95 = np.percentile(final_values, 5)
+            expected_return = np.mean(final_values)
+            std_deviation = np.std(final_values)
+
+            logger.info(
+                f"Bootstrap (daily) completed. Expected return: {expected_return:.4f}, "
+                f"VaR 95%: {var_95:.4f}, Std: {std_deviation:.4f}"
+            )
+
+            return MonteCarloResult(
+                simulations=simulations,
+                percentiles=percentiles,
+                final_values=final_values,
+                var_95=var_95,
+                expected_return=expected_return,
+                std_deviation=std_deviation,
+            )
+
+        except Exception as e:
+            logger.error(f"Error in bootstrap daily returns: {str(e)}")
             raise

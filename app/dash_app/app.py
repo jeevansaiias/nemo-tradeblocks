@@ -35,13 +35,76 @@ def create_dash_app():
         ],
     )
 
-    # Update favicon in index string
+    # Update favicon in index string with immediate theme detection
     app.index_string = """
     <!DOCTYPE html>
-    <html>
+    <html data-mantine-color-scheme="auto">
         <head>
             {%metas%}
             <title>{%title%}</title>
+            <style>
+                /* Prevent initial white flash on desktop */
+                @media (prefers-color-scheme: dark) {
+                    html[data-mantine-color-scheme="auto"] { color-scheme: dark; background: #1a1a1a !important; }
+                    html[data-mantine-color-scheme="auto"] body { background: #1a1a1a !important; }
+                    html[data-mantine-color-scheme="auto"] #react-entry-point { background: #1a1a1a !important; }
+                }
+                @media (prefers-color-scheme: light) {
+                    html[data-mantine-color-scheme="auto"] { color-scheme: light; background: #ffffff !important; }
+                    html[data-mantine-color-scheme="auto"] body { background: #ffffff !important; }
+                    html[data-mantine-color-scheme="auto"] #react-entry-point { background: #ffffff !important; }
+                }
+                html[data-mantine-color-scheme="dark"] body, html[data-mantine-color-scheme="dark"] #react-entry-point { background: #1a1a1a !important; }
+                html[data-mantine-color-scheme="light"] body, html[data-mantine-color-scheme="light"] #react-entry-point { background: #ffffff !important; }
+            </style>
+            <script>
+                // Apply theme ASAP (before CSS loads) to avoid flash
+                (function() {
+                    try {
+                        var stored = {};
+                        try { stored = JSON.parse(localStorage.getItem('theme-store') || '{}'); } catch (_) {}
+                        var pref = stored.theme || 'auto';
+
+                        // Resolve 'auto' to actual scheme immediately
+                        var actual = pref;
+                        if (pref === 'auto') {
+                            actual = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                        }
+
+                        var root = document.documentElement;
+                        root.setAttribute('data-mantine-color-scheme', actual);
+                        root.style.setProperty('--mantine-color-scheme', actual);
+                        // Hint to the UA for built‑in controls
+                        root.style.colorScheme = actual;
+                        // Force immediate backdrop color before CSS parses
+                        root.style.background = (actual === 'dark' ? '#1a1a1a' : '#ffffff');
+
+                        // Persist a resolved value so server-side chart theming is correct
+                        try {
+                            stored.theme = pref; // keep preference ('auto' allowed)
+                            stored.resolved = actual; // concrete 'dark' or 'light'
+                            localStorage.setItem('theme-store', JSON.stringify(stored));
+                        } catch (_) {}
+
+                        // Add a quick body class as soon as body exists
+                        var applyBodyClass = function() {
+                            if (!document.body) return;
+                            var cls = document.body.className || '';
+                            cls = cls.replace(/\btheme-(dark|light|auto)\b/g, '').trim();
+                            document.body.className = (cls + ' theme-' + actual).trim();
+                            document.body.style.backgroundColor = (actual === 'dark' ? '#1a1a1a' : '#ffffff');
+                            document.removeEventListener('DOMContentLoaded', applyBodyClass);
+                        };
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', applyBodyClass);
+                        } else {
+                            applyBodyClass();
+                        }
+                    } catch (e) {
+                        // Ignore; Dash callback will correct later
+                    }
+                })();
+            </script>
             <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
             <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
             <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
@@ -63,7 +126,6 @@ def create_dash_app():
     # Configure DMC theme - TradeBlocks themed
     app.layout = dmc.MantineProvider(
         theme={
-            "colorScheme": "light",
             "primaryColor": "blue",
             "fontFamily": "'Inter', sans-serif",
             "colors": {
@@ -94,38 +156,11 @@ def create_dash_app():
             dcc.Store(id="portfolio-filename", storage_type="local"),
             dcc.Store(id="current-daily-log-data", storage_type="local"),
             dcc.Store(id="daily-log-filename", storage_type="local"),
-            dcc.Store(id="theme-store", storage_type="local", data={"theme": "light"}),
-            dcc.Store(id="system-theme-store", storage_type="memory"),
+            dcc.Store(id="theme-store", storage_type="local", data={"theme": "auto"}),
             # Hidden div for theme callback output
             html.Div(id="theme-output", style={"display": "none"}),
             # Main layout
             create_main_layout(),
-            # Client-side script for system theme detection
-            html.Script(
-                """
-                // Detect system theme preference
-                function getSystemTheme() {
-                    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-
-                // Listen for system theme changes
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-                    const systemTheme = e.matches ? 'dark' : 'light';
-                    // Update the system theme store
-                    if (window.dash_clientside) {
-                        window.dash_clientside.set_props('system-theme-store', {'data': {'systemTheme': systemTheme}});
-                    }
-                });
-
-                // Set initial system theme
-                document.addEventListener('DOMContentLoaded', function() {
-                    const systemTheme = getSystemTheme();
-                    if (window.dash_clientside) {
-                        window.dash_clientside.set_props('system-theme-store', {'data': {'systemTheme': systemTheme}});
-                    }
-                });
-            """
-            ),
         ],
     )
 

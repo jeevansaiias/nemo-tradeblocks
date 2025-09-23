@@ -49,6 +49,12 @@ from app.dash_app.components.tabs.trade_data import (
 from app.dash_app.components.tabs.correlation_matrix import (
     create_correlation_matrix_tab,
 )
+from app.dash_app.components.tabs.risk_simulator import (
+    create_risk_simulator_tab,
+)
+from app.dash_app.components.tabs.position_sizing import (
+    create_position_sizing_tab,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,50 +68,96 @@ def register_callbacks(app):
 
     # Import and register correlation callbacks
     from app.dash_app.callbacks.correlation_callbacks import register_correlation_callbacks
+    from app.dash_app.callbacks.monte_carlo_callbacks import register_monte_carlo_callbacks
+    from app.dash_app.callbacks.position_sizing_callbacks import register_position_sizing_callbacks
 
     register_correlation_callbacks(app)
+    register_monte_carlo_callbacks(app)
+    register_position_sizing_callbacks(app)
 
     # Use clientside callback to update MantineProvider theme
     app.clientside_callback(
         """
-        function(theme_toggle_value, system_theme_data, theme_store_data) {
-            // Determine current theme
-            let current_theme = theme_toggle_value || (theme_store_data && theme_store_data.theme) || "light";
+        function(theme_toggle_value) {
+            console.log('Theme callback triggered:');
+            console.log('  theme_toggle_value:', theme_toggle_value);
 
-            // Handle auto mode - use system preference
-            let actual_theme = current_theme;
-            if (current_theme === "auto") {
-                actual_theme = (system_theme_data && system_theme_data.systemTheme) || "light";
+            // Function to apply theme
+            function applyTheme(actual_theme) {
+                console.log('  applying theme:', actual_theme);
+
+                // Update Mantine theme
+                const root = document.documentElement;
+                root.setAttribute('data-mantine-color-scheme', actual_theme);
+
+                // Update CSS custom property for proper theme switching
+                root.style.setProperty('--mantine-color-scheme', actual_theme);
+
+                // Apply theme classes to body for additional styling if needed
+                document.body.className = document.body.className.replace(/theme-\\w+/g, '') + ' theme-' + actual_theme;
             }
 
-            // Update Mantine theme
-            const root = document.documentElement;
-            root.setAttribute('data-mantine-color-scheme', actual_theme);
+            // Determine current theme preference
+            let current_theme = theme_toggle_value || "auto";
+            console.log('  current_theme:', current_theme);
 
-            // Update CSS custom property for proper theme switching
-            root.style.setProperty('--mantine-color-scheme', actual_theme);
+            // Handle auto mode - detect system preference directly
+            let actual_theme = current_theme;
+            if (current_theme === "auto") {
+                // Detect system theme preference directly
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                actual_theme = systemPrefersDark ? "dark" : "light";
+                console.log('  auto mode - system prefers dark:', systemPrefersDark);
+                console.log('  auto mode - using theme:', actual_theme);
 
-            // Apply theme classes to body for additional styling if needed
-            document.body.className = document.body.className.replace(/theme-\\w+/g, '') + ' theme-' + actual_theme;
+                // Set up listener for system theme changes (only once)
+                if (!window.themeChangeListenerSet) {
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                        // Only react if we're in auto mode
+                        const currentStored = JSON.parse(localStorage.getItem('theme-store') || '{}');
+                        if ((currentStored.theme || 'auto') === 'auto') {
+                            const newTheme = e.matches ? 'dark' : 'light';
+                            console.log('System theme changed to:', newTheme);
+                            applyTheme(newTheme);
+                        }
+                    });
+                    window.themeChangeListenerSet = true;
+                }
+            }
+
+            console.log('  final actual_theme:', actual_theme);
+            applyTheme(actual_theme);
 
             return actual_theme;
         }
         """,
         Output("theme-output", "children"),  # Use hidden div as dummy output
-        [
-            Input("theme-toggle", "value"),
-            Input("system-theme-store", "data"),
-            Input("theme-store", "data"),
-        ],
+        [Input("theme-toggle", "value")],
         prevent_initial_call=False,
     )
 
-    @app.callback(
-        Output("theme-store", "data"), Input("theme-toggle", "value"), prevent_initial_call=True
+    # Keep theme-store up to date with a concrete 'resolved' value
+    # so server-side charts can style correctly even when preference is 'auto'.
+    app.clientside_callback(
+        """
+        function(actual_theme, theme_toggle_value, current) {
+            if (!actual_theme) { return window.dash_clientside.no_update; }
+            var next = Object.assign({}, current || {});
+            var pref = theme_toggle_value || 'auto';
+            var changed = false;
+            if (next.resolved !== actual_theme) { next.resolved = actual_theme; changed = true; }
+            if (next.theme !== pref) { next.theme = pref; changed = true; }
+            if (!changed) { return window.dash_clientside.no_update; }
+            return next;
+        }
+        """,
+        Output("theme-store", "data"),
+        [Input("theme-output", "children"), Input("theme-toggle", "value")],
+        State("theme-store", "data"),
+        prevent_initial_call=True,
     )
-    def store_theme_preference(theme_value):
-        """Store theme preference in localStorage"""
-        return {"theme": theme_value}
+
+    # Removed store<->toggle cycle to avoid circular dependencies.
 
     @app.callback(
         Output("portfolio-section", "children"),
@@ -415,6 +467,7 @@ def register_callbacks(app):
             Output("nav-performance", "active"),
             Output("nav-trade-data", "active"),
             Output("nav-monte-carlo", "active"),
+            Output("nav-position-sizing", "active"),
             Output("nav-correlation", "active"),
             Output("nav-margin", "active"),
             Output("nav-optimizer", "active"),
@@ -424,6 +477,7 @@ def register_callbacks(app):
             Input("nav-performance", "n_clicks"),
             Input("nav-trade-data", "n_clicks"),
             Input("nav-monte-carlo", "n_clicks"),
+            Input("nav-position-sizing", "n_clicks"),
             Input("nav-correlation", "n_clicks"),
             Input("nav-margin", "n_clicks"),
             Input("nav-optimizer", "n_clicks"),
@@ -436,6 +490,7 @@ def register_callbacks(app):
         perf_clicks,
         trade_clicks,
         monte_clicks,
+        position_clicks,
         corr_clicks,
         margin_clicks,
         opt_clicks,
@@ -443,12 +498,12 @@ def register_callbacks(app):
     ):
         """Update main content and navigation highlighting"""
         if not portfolio_data:
-            return create_welcome_content(), True, False, False, False, False, False, False
+            return create_welcome_content(), True, False, False, False, False, False, False, False
 
         triggered = ctx.triggered_id
 
         # Reset all nav states
-        nav_states = [False] * 7
+        nav_states = [False] * 8
 
         if triggered == "nav-geekistics":
             nav_states[0] = True  # geekistics active
@@ -488,15 +543,18 @@ def register_callbacks(app):
             return create_trade_data_tab(), *nav_states
         elif triggered == "nav-monte-carlo":
             nav_states[3] = True  # monte-carlo active
-            return create_coming_soon_content(), *nav_states  # Coming soon page
+            return create_risk_simulator_tab(), *nav_states  # New risk simulator tab
+        elif triggered == "nav-position-sizing":
+            nav_states[4] = True  # position-sizing active
+            return create_position_sizing_tab(), *nav_states
         elif triggered == "nav-correlation":
-            nav_states[4] = True  # correlation active
+            nav_states[5] = True  # correlation active
             return create_correlation_matrix_tab(), *nav_states
         elif triggered == "nav-margin":
-            nav_states[5] = True  # margin active
+            nav_states[6] = True  # margin active
             return create_capital_blocks_coming_soon(), *nav_states  # Coming soon page
         elif triggered == "nav-optimizer":
-            nav_states[6] = True  # optimizer active
+            nav_states[7] = True  # optimizer active
             return create_walk_forward_coming_soon(), *nav_states  # Coming soon page
         else:
             nav_states[0] = True  # Default to geekistics
@@ -517,7 +575,6 @@ def register_callbacks(app):
     )
     def update_geekistics_tab(portfolio_data, daily_log_data, selected_strategies, risk_free_rate):
         """Update the Geekistics tab with comprehensive statistics"""
-        logger.info(f"Geekistics callback triggered with portfolio_data: {bool(portfolio_data)}")
 
         if not portfolio_data:
             logger.info("No portfolio data available")

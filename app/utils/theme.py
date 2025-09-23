@@ -16,7 +16,8 @@ def get_theme_colors(theme_data):
     # Determine current theme
     is_dark_mode = False
     if theme_data and isinstance(theme_data, dict):
-        current_theme = theme_data.get("theme", "light")
+        # Prefer a concrete, client-resolved value if present
+        current_theme = theme_data.get("resolved") or theme_data.get("theme", "light")
         is_dark_mode = current_theme == "dark"
 
     if is_dark_mode:
@@ -44,6 +45,20 @@ def apply_theme_layout(fig, theme_colors, **kwargs):
         theme_colors: Colors from get_theme_colors()
         **kwargs: Additional layout properties
     """
+    # Set hover label styling based on theme
+    if theme_colors.get("is_dark_mode"):
+        hoverlabel_style = {
+            "bgcolor": "#2a2a2a",
+            "font": {"color": "#e0e0e0", "size": 13},
+            "bordercolor": "#404040",
+        }
+    else:
+        hoverlabel_style = {
+            "bgcolor": "white",
+            "font": {"color": "#222", "size": 13},
+            "bordercolor": "#d0d0d0",
+        }
+
     base_layout = {
         "paper_bgcolor": "rgba(0,0,0,0)",  # Transparent, let container handle background
         "plot_bgcolor": "rgba(0,0,0,0)",  # Transparent, let container handle background
@@ -56,6 +71,7 @@ def apply_theme_layout(fig, theme_colors, **kwargs):
             "showgrid": True,
             "gridcolor": theme_colors["grid_color"],
         },
+        "hoverlabel": hoverlabel_style,
     }
 
     # Deep merge axis settings to preserve grid settings

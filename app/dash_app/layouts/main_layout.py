@@ -41,7 +41,7 @@ def create_main_layout():
                                     # Theme toggle
                                     dmc.SegmentedControl(
                                         id="theme-toggle",
-                                        value="light",
+                                        value="auto",
                                         data=[
                                             {
                                                 "value": "light",
@@ -69,6 +69,8 @@ def create_main_layout():
                                         ],
                                         size="sm",
                                         radius="md",
+                                        persistence=True,
+                                        persistence_type="local",
                                     ),
                                 ],
                                 gap="sm",
@@ -107,6 +109,11 @@ def create_main_layout():
                                         label="🎲 Risk Simulator",
                                         id="nav-monte-carlo",
                                         description="Risk Simulation",
+                                    ),
+                                    dmc.NavLink(
+                                        label="🎯 Position Sizing",
+                                        id="nav-position-sizing",
+                                        description="Optimal Position Sizing",
                                     ),
                                     dmc.NavLink(
                                         label="🔗 Correlation Matrix",
