@@ -20,6 +20,11 @@ from app.calculations.shared import (
 )
 from app.data.models import Portfolio, Trade, MonteCarloRequest
 from app.utils.theme import get_theme_colors, apply_theme_layout
+from app.dash_app.components.tabs.risk_simulator import (
+    create_placeholder_equity_curve,
+    create_placeholder_histogram,
+    create_placeholder_drawdown,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +141,7 @@ def register_monte_carlo_callbacks(app):
             State("mc-use-random-seed", "checked"),
             State("mc-seed-value", "value"),
             State("mc-simulation-cache", "data"),
+            State("theme-store", "data"),
         ],
         prevent_initial_call=True,
     )
@@ -154,6 +160,7 @@ def register_monte_carlo_callbacks(app):
         use_random_seed,
         seed_value,
         cached_data,
+        theme_data,
     ):
         """Run Monte Carlo simulation and update all charts and statistics"""
         # Check if we're just updating chart display options
@@ -184,7 +191,7 @@ def register_monte_carlo_callbacks(app):
             # Generate updated chart - show all paths when enabled
             log_scale = scale_selector == "log"
             equity_curve_fig = create_equity_curve_chart(
-                result, initial_capital, int(time_horizon), log_scale, show_paths
+                result, initial_capital, int(time_horizon), log_scale, show_paths, theme_data
             )
 
             # Return updated chart with cached statistics and same cache
@@ -213,9 +220,9 @@ def register_monte_carlo_callbacks(app):
         if triggered_id == "mc-reset":
             logger.info("Reset button clicked - clearing all data and charts")
             return (
-                create_placeholder_equity_curve(),
-                create_placeholder_histogram(),
-                create_placeholder_histogram(),
+                create_placeholder_equity_curve(theme_data),
+                create_placeholder_histogram(theme_data),
+                create_placeholder_drawdown(theme_data),
                 "--",
                 "Run simulation to see expected return",
                 "--",
@@ -238,9 +245,9 @@ def register_monte_carlo_callbacks(app):
             logger.info("No portfolio data available")
             # If we're not running simulation, return early
             return (
-                create_placeholder_equity_curve(),
-                create_placeholder_histogram(),
-                create_placeholder_histogram(),
+                create_placeholder_equity_curve(theme_data),
+                create_placeholder_histogram(theme_data),
+                create_placeholder_drawdown(theme_data),
                 "--",
                 "Waiting for simulation",
                 "--",
@@ -305,10 +312,10 @@ def register_monte_carlo_callbacks(app):
             # Generate charts
             log_scale = scale_selector == "log"
             equity_curve_fig = create_equity_curve_chart(
-                result, initial_capital, int(time_horizon), log_scale, show_paths
+                result, initial_capital, int(time_horizon), log_scale, show_paths, theme_data
             )
-            distribution_fig = create_return_distribution_chart(result)
-            drawdown_fig = create_drawdown_analysis_chart(result, portfolio)
+            distribution_fig = create_return_distribution_chart(result, theme_data)
+            drawdown_fig = create_drawdown_analysis_chart(result, portfolio, theme_data)
 
             # Calculate statistics properly
 
@@ -441,9 +448,9 @@ def register_monte_carlo_callbacks(app):
             logger.error(f"Error running Monte Carlo simulation: {str(e)}")
             logger.exception("Full traceback:")  # This will log the full stack trace
             return (
-                create_placeholder_equity_curve(),
-                create_placeholder_histogram(),
-                create_placeholder_histogram(),
+                create_placeholder_equity_curve(theme_data),
+                create_placeholder_histogram(theme_data),
+                create_placeholder_drawdown(theme_data),
                 "Error",
                 str(e),
                 "Error",
@@ -483,7 +490,7 @@ def register_monte_carlo_callbacks(app):
 
 
 def create_equity_curve_chart(
-    result, initial_capital, days_forward, log_scale=False, show_paths=False
+    result, initial_capital, days_forward, log_scale=False, show_paths=False, theme_data=None
 ):
     """Create equity curve chart with percentile bands"""
     try:
@@ -600,10 +607,12 @@ def create_equity_curve_chart(
             hovermode="x unified",
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            autosize=True,
+            margin=dict(l=60, r=30, t=30, b=60),
         )
 
         # Apply theme
-        theme_colors = get_theme_colors({"theme": "light"})
+        theme_colors = get_theme_colors(theme_data)
         apply_theme_layout(fig, theme_colors)
 
         return fig
@@ -613,7 +622,7 @@ def create_equity_curve_chart(
         return create_placeholder_equity_curve()
 
 
-def create_return_distribution_chart(result):
+def create_return_distribution_chart(result, theme_data=None):
     """Create return distribution histogram"""
     try:
         fig = go.Figure(
@@ -660,10 +669,12 @@ def create_return_distribution_chart(result):
             yaxis_title="Frequency",
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            autosize=True,
+            margin=dict(l=60, r=30, t=30, b=60),
         )
 
         # Apply theme
-        theme_colors = get_theme_colors({"theme": "light"})
+        theme_colors = get_theme_colors(theme_data)
         apply_theme_layout(fig, theme_colors)
 
         return fig
@@ -673,7 +684,7 @@ def create_return_distribution_chart(result):
         return create_placeholder_histogram()
 
 
-def create_drawdown_analysis_chart(result, portfolio=None):
+def create_drawdown_analysis_chart(result, portfolio=None, theme_data=None):
     """Create drawdown analysis chart"""
     try:
         # Calculate maximum drawdowns from simulation paths (one per simulation)
@@ -760,90 +771,16 @@ def create_drawdown_analysis_chart(result, portfolio=None):
             yaxis_title="Frequency",
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            autosize=True,
+            margin=dict(l=60, r=30, t=30, b=60),
         )
 
         # Apply theme
-        theme_colors = get_theme_colors({"theme": "light"})
+        theme_colors = get_theme_colors(theme_data)
         apply_theme_layout(fig, theme_colors)
 
         return fig
 
     except Exception as e:
         logger.error(f"Error creating drawdown analysis chart: {str(e)}")
-        return create_placeholder_histogram()
-
-
-def create_placeholder_equity_curve():
-    """Create a placeholder equity curve chart"""
-    days = np.arange(0, 252)
-    np.random.seed(42)
-    median_path = 100000 * (1 + 0.0003 * days + 0.001 * np.random.randn(len(days)).cumsum())
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=days,
-            y=median_path,
-            mode="lines",
-            name="Example Projection",
-            line=dict(color="gray", dash="dash"),
-        )
-    )
-
-    fig.update_layout(
-        xaxis_title="Days Forward",
-        yaxis_title="Portfolio Value ($)",
-        annotations=[
-            dict(
-                text="Click 'Run Simulation' to see projections",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                xanchor="center",
-                yanchor="middle",
-                font=dict(size=16, color="gray"),
-                showarrow=False,
-            )
-        ],
-    )
-
-    return fig
-
-
-def create_placeholder_histogram():
-    """Create a placeholder histogram"""
-    data = np.random.normal(0.05, 0.15, 100)
-
-    fig = go.Figure(
-        data=[
-            go.Histogram(
-                x=data,
-                nbinsx=20,
-                marker_color="rgba(128,128,128,0.5)",
-                marker_line_color="rgba(128,128,128,1)",
-                marker_line_width=1,
-            )
-        ]
-    )
-
-    fig.update_layout(
-        xaxis_title="Return",
-        yaxis_title="Frequency",
-        showlegend=False,
-        annotations=[
-            dict(
-                text="Click 'Run Simulation' to analyze your data",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                xanchor="center",
-                yanchor="middle",
-                font=dict(size=14, color="gray"),
-                showarrow=False,
-            )
-        ],
-    )
-
-    return fig
+        return create_placeholder_drawdown()

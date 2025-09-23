@@ -14,84 +14,99 @@ from ..common import create_info_tooltip
 
 
 # Import placeholder chart functions
-def create_placeholder_equity_curve():
-    """Create a placeholder equity curve chart"""
-    import numpy as np
+def create_placeholder_equity_curve(theme_data=None):
+    """Create an empty state placeholder for equity curve"""
     import plotly.graph_objects as go
 
-    days = np.arange(0, 252)
-    np.random.seed(42)
-    median_path = 100000 * (1 + 0.0003 * days + 0.001 * np.random.randn(len(days)).cumsum())
-
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=days,
-            y=median_path,
-            mode="lines",
-            name="Example Projection",
-            line=dict(color="gray", dash="dash"),
-        )
+
+    # Create an empty chart with just the message
+    fig.add_annotation(
+        text="🎲<br><br><b>Portfolio Growth Projections</b><br><br>Run a simulation to see your potential portfolio paths<br><br>📊 Percentile Bands · 📈 Growth Trajectories · 🎰 Monte Carlo Paths",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font=dict(size=16, color="gray"),
+        xanchor="center",
+        yanchor="middle",
     )
 
     fig.update_layout(
-        xaxis_title="Days Forward",
-        yaxis_title="Portfolio Value ($)",
-        annotations=[
-            dict(
-                text="Upload portfolio data and click 'Run Simulation' to see projections",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                xanchor="center",
-                yanchor="middle",
-                font=dict(size=14, color="gray"),
-                showarrow=False,
-            )
-        ],
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
         showlegend=False,
+        autosize=True,
+        margin=dict(l=20, r=20, t=20, b=20),
     )
+
     return fig
 
 
-def create_placeholder_histogram():
-    """Create a placeholder histogram"""
-    import numpy as np
+def create_placeholder_histogram(theme_data=None):
+    """Create an empty state placeholder for distribution charts"""
     import plotly.graph_objects as go
 
-    data = np.random.normal(0.05, 0.15, 100)
+    fig = go.Figure()
 
-    fig = go.Figure(
-        data=[
-            go.Histogram(
-                x=data,
-                nbinsx=20,
-                marker_color="rgba(128,128,128,0.5)",
-                marker_line_color="rgba(128,128,128,1)",
-                marker_line_width=1,
-            )
-        ]
+    # Create an empty chart with just the message
+    fig.add_annotation(
+        text="📊<br><br><b>Return Distribution</b><br><br>Simulation results will appear here<br><br>🎲 Probability distributions<br>💯 Percentile analysis<br>📈 Return patterns",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font=dict(size=14, color="gray"),
+        xanchor="center",
+        yanchor="middle",
     )
 
     fig.update_layout(
-        xaxis_title="Return",
-        yaxis_title="Frequency",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
         showlegend=False,
-        annotations=[
-            dict(
-                text="Click 'Run Simulation' to analyze your data",
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.8,
-                xanchor="center",
-                yanchor="middle",
-                font=dict(size=14, color="gray"),
-                showarrow=False,
-            )
-        ],
+        autosize=True,
+        margin=dict(l=20, r=20, t=20, b=20),
     )
+
+    return fig
+
+
+def create_placeholder_drawdown(theme_data=None):
+    """Create an empty state placeholder for drawdown charts"""
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+
+    # Create an empty chart with just the message
+    fig.add_annotation(
+        text="📉<br><br><b>Drawdown Analysis</b><br><br>Risk scenarios will appear here<br><br>🏔️ Maximum drawdowns<br>⚠️ Worst-case scenarios<br>🔄 Recovery periods",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font=dict(size=14, color="gray"),
+        xanchor="center",
+        yanchor="middle",
+    )
+
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        showlegend=False,
+        autosize=True,
+        margin=dict(l=20, r=20, t=20, b=20),
+    )
+
     return fig
 
 
@@ -686,9 +701,17 @@ def create_analysis_section():
                     ),
                     dcc.Graph(
                         id="mc-return-distribution",
-                        config={"displayModeBar": False, "responsive": True},
-                        style={"height": "60vh", "minHeight": "400px"},
+                        config={
+                            "displayModeBar": False,
+                            "responsive": True,
+                            "autosizable": True,
+                        },
+                        style={
+                            "height": "400px",
+                            "width": "100%",
+                        },
                         figure=create_placeholder_histogram(),
+                        responsive=True,
                     ),
                 ],
                 p="md",
@@ -713,9 +736,17 @@ def create_analysis_section():
                     ),
                     dcc.Graph(
                         id="mc-drawdown-analysis",
-                        config={"displayModeBar": False, "responsive": True},
-                        style={"height": "60vh", "minHeight": "400px"},
-                        figure=create_placeholder_histogram(),
+                        config={
+                            "displayModeBar": False,
+                            "responsive": True,
+                            "autosizable": True,
+                        },
+                        style={
+                            "height": "400px",
+                            "width": "100%",
+                        },
+                        figure=create_placeholder_drawdown(),
+                        responsive=True,
                     ),
                 ],
                 p="md",
