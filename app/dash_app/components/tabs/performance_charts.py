@@ -194,7 +194,7 @@ def create_equity_curve_chart(
             gridcolor=theme_colors["grid_color"],
             tickformat="$,.0f",
         ),
-        hovermode="x unified",
+        hovermode="closest",
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(t=60, b=40, l=80, r=60),
@@ -282,7 +282,7 @@ def create_drawdown_chart(equity_data: Dict[str, Any], theme_data=None) -> go.Fi
             tickformat=".1f",
             range=[min(drawdowns + [0]) * 1.1, 5],  # Show a bit above zero
         ),
-        hovermode="x unified",
+        hovermode="closest",
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         margin=dict(t=80, b=60, l=80, r=60),

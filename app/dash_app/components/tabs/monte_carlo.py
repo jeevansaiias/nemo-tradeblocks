@@ -3,6 +3,7 @@ from dash import html, dcc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
 import numpy as np
+from app.utils.theme import get_theme_colors, apply_theme_layout
 
 
 def create_monte_carlo_tab():
@@ -100,10 +101,13 @@ def create_monte_carlo_tab():
     )
 
 
-def create_mc_paths_chart(mc_result):
-    """Create Monte Carlo simulation paths chart"""
+def create_mc_paths_chart(mc_result, theme_data=None):
+    """Create Monte Carlo simulation paths chart with theme support"""
     if not mc_result or "simulations" not in mc_result:
         return go.Figure()
+
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
 
     simulations = mc_result["simulations"]
 
@@ -117,9 +121,9 @@ def create_mc_paths_chart(mc_result):
             go.Scatter(
                 y=simulations[i],
                 mode="lines",
-                line=dict(width=1, color="rgba(0,100,255,0.1)"),
+                line=dict(width=1, color="rgba(37,99,235,0.1)"),  # blue-600 with transparency
                 showlegend=False,
-                hovertemplate="Day %{x}<br>Return: %{y:.2f}<extra></extra>",
+                hovertemplate="<b>Day:</b> %{x}<br><b>Return:</b> %{y:.2f}%<extra></extra>",
             )
         )
 
@@ -128,44 +132,76 @@ def create_mc_paths_chart(mc_result):
         median_path = np.median(simulations, axis=0)
         fig.add_trace(
             go.Scatter(
-                y=median_path, mode="lines", line=dict(width=3, color="red"), name="Median Path"
+                y=median_path,
+                mode="lines",
+                line=dict(width=3, color="#dc2626"),  # red-600
+                name="Median Path",
+                hovertemplate="<b>Median Path</b><br><b>Day:</b> %{x}<br><b>Return:</b> %{y:.2f}%<extra></extra>",
             )
         )
 
-    fig.update_layout(
+    # Apply theme-aware layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title="Monte Carlo Simulation Paths",
-        xaxis_title="Days",
-        yaxis_title="Cumulative Return",
+        xaxis=dict(title="Days"),
+        yaxis=dict(title="Cumulative Return"),
         height=400,
-        margin=dict(l=0, r=0, t=40, b=0),
+        margin=dict(l=60, r=30, t=60, b=60),
+        hovermode="closest",
+        showlegend=True,
     )
 
     return fig
 
 
-def create_mc_distribution_chart(mc_result):
-    """Create final value distribution chart"""
+def create_mc_distribution_chart(mc_result, theme_data=None):
+    """Create final value distribution chart with theme support"""
     if not mc_result or "final_values" not in mc_result:
         return go.Figure()
+
+    # Get theme colors
+    theme_colors = get_theme_colors(theme_data)
 
     final_values = mc_result["final_values"]
 
     fig = go.Figure()
 
-    fig.add_trace(go.Histogram(x=final_values, nbinsx=50, name="Final Values", opacity=0.7))
+    fig.add_trace(
+        go.Histogram(
+            x=final_values,
+            nbinsx=50,
+            name="Final Values",
+            opacity=0.7,
+            marker_color="#3b82f6",  # blue-500
+            hovertemplate="<b>Return Range:</b> %{x}<br><b>Count:</b> %{y}<extra></extra>",
+        )
+    )
 
     # Add percentile lines
     if "percentiles" in mc_result:
         percentiles = mc_result["percentiles"]
+        colors = {"p5": "#ef4444", "p50": "#3b82f6", "p95": "#10b981"}  # red, blue, green
         for key, value in percentiles.items():
-            fig.add_vline(x=value, line_dash="dash", annotation_text=f"{key}: {value:.2f}")
+            color = colors.get(key, "#6b7280")  # gray-500 as fallback
+            fig.add_vline(
+                x=value,
+                line_dash="dash",
+                line_color=color,
+                annotation_text=f"{key}: {value:.2f}",
+            )
 
-    fig.update_layout(
+    # Apply theme-aware layout
+    apply_theme_layout(
+        fig,
+        theme_colors,
         title="Distribution of Final Values",
-        xaxis_title="Final Return",
-        yaxis_title="Frequency",
+        xaxis=dict(title="Final Return"),
+        yaxis=dict(title="Frequency"),
         height=400,
-        margin=dict(l=0, r=0, t=40, b=0),
+        margin=dict(l=60, r=30, t=60, b=60),
+        hovermode="closest",
     )
 
     return fig

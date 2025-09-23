@@ -572,6 +572,7 @@ def create_equity_curve_chart(
                     mode="lines",
                     name="Median (50th)",
                     line=dict(color="blue", width=2),
+                    hovertemplate="<b>Median (50th)</b><br><b>Trade:</b> %{x}<br><b>Value:</b> $%{y:,.0f}<extra></extra>",
                 )
             )
 
@@ -597,14 +598,18 @@ def create_equity_curve_chart(
 
         # Add initial capital line
         fig.add_hline(
-            y=initial_capital, line_dash="dash", line_color="red", annotation_text="Initial Capital"
+            y=initial_capital,
+            line_dash="dash",
+            line_color="red",
+            annotation_text="Initial Capital",
+            annotation_position="right",
         )
 
         fig.update_layout(
             xaxis_title="Number of Trades",
             yaxis_title="Portfolio Value ($)",
             yaxis_type="log" if log_scale else "linear",
-            hovermode="x unified",
+            hovermode="closest",
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             autosize=True,
@@ -634,6 +639,7 @@ def create_return_distribution_chart(result, theme_data=None):
                     marker_line_color="rgba(0,128,255,1)",
                     marker_line_width=1,
                     showlegend=False,
+                    hovertemplate="<b>Return:</b> %{x:.1%}<br><b>Count:</b> %{y}<extra></extra>",
                 )
             ]
         )
@@ -716,6 +722,7 @@ def create_drawdown_analysis_chart(result, portfolio=None, theme_data=None):
                     marker_line_color="rgba(255,128,0,1)",
                     marker_line_width=1,
                     showlegend=False,
+                    hovertemplate="<b>Drawdown:</b> %{x:.1f}%<br><b>Count:</b> %{y}<extra></extra>",
                 )
             ]
         )
