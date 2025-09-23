@@ -125,7 +125,7 @@ def create_risk_simulator_tab():
                     # Statistics Grid
                     *create_statistics_grid(),  # Unpack the list of grids
                     # Additional Analysis Tabs
-                    create_analysis_tabs(),
+                    create_analysis_section(),
                 ],
                 gap="lg",
             ),
@@ -661,78 +661,67 @@ def create_stat_card(
     )
 
 
-def create_analysis_tabs():
-    """Create additional analysis tabs"""
-    return dmc.Paper(
+def create_analysis_section():
+    """Create side-by-side distribution analysis section"""
+    return dmc.SimpleGrid(
+        cols={"base": 1, "lg": 2},
+        spacing="md",
         children=[
-            dmc.Tabs(
-                value="distribution",
+            # Return Distribution
+            dmc.Paper(
                 children=[
-                    dmc.TabsList(
+                    dmc.Group(
                         [
-                            dmc.TabsTab(
-                                dmc.Group(
-                                    [
-                                        DashIconify(icon="tabler:chart-histogram", width=16),
-                                        "Return Distribution",
-                                        create_info_tooltip(
-                                            title="📊 Return Distribution Analysis",
-                                            content="Shows the spread of potential returns from your Monte Carlo simulation. The histogram reveals how likely different outcomes are.",
-                                            detailed_content="P5/P50/P95 lines show pessimistic, median, and optimistic scenarios. A wider spread means higher uncertainty. TradeBlocks builds insights, not investment advice.",
-                                            tooltip_id="return-distribution",
-                                        ),
-                                    ],
-                                    gap="xs",
-                                ),
-                                value="distribution",
+                            DashIconify(icon="tabler:chart-histogram", width=16),
+                            dmc.Text("Return Distribution", size="md", fw=600),
+                            create_info_tooltip(
+                                title="📊 Return Distribution Analysis",
+                                content="Shows the spread of potential returns from your Monte Carlo simulation. The histogram reveals how likely different outcomes are.",
+                                detailed_content="P5/P50/P95 lines show pessimistic, median, and optimistic scenarios. A wider spread means higher uncertainty. TradeBlocks builds insights, not investment advice.",
+                                tooltip_id="return-distribution",
                             ),
-                            dmc.TabsTab(
-                                dmc.Group(
-                                    [
-                                        DashIconify(icon="tabler:trending-down", width=16),
-                                        "Drawdown Analysis",
-                                        create_info_tooltip(
-                                            title="📉 Drawdown Analysis",
-                                            content="Shows the distribution of maximum drawdowns from your simulations. Helps you understand worst-case scenarios and prepare for losing streaks.",
-                                            detailed_content="Each simulation's worst drawdown is captured. P5 shows the worst 5% of outcomes. Use this to size your account and manage risk. TradeBlocks builds insights, not investment advice.",
-                                            tooltip_id="drawdown-analysis",
-                                        ),
-                                    ],
-                                    gap="xs",
-                                ),
-                                value="drawdown",
-                            ),
-                        ]
-                    ),
-                    # Distribution Tab
-                    dmc.TabsPanel(
-                        children=[
-                            dcc.Graph(
-                                id="mc-return-distribution",
-                                config={"displayModeBar": False, "responsive": True},
-                                style={"height": "60vh", "minHeight": "400px"},
-                                figure=create_placeholder_histogram(),
-                            )
                         ],
-                        value="distribution",
+                        gap="xs",
+                        mb="md",
                     ),
-                    # Drawdown Tab
-                    dmc.TabsPanel(
-                        children=[
-                            dcc.Graph(
-                                id="mc-drawdown-analysis",
-                                config={"displayModeBar": False, "responsive": True},
-                                style={"height": "60vh", "minHeight": "400px"},
-                                figure=create_placeholder_histogram(),
-                            )
-                        ],
-                        value="drawdown",
+                    dcc.Graph(
+                        id="mc-return-distribution",
+                        config={"displayModeBar": False, "responsive": True},
+                        style={"height": "60vh", "minHeight": "400px"},
+                        figure=create_placeholder_histogram(),
                     ),
                 ],
-            )
+                p="md",
+                withBorder=True,
+            ),
+            # Drawdown Analysis
+            dmc.Paper(
+                children=[
+                    dmc.Group(
+                        [
+                            DashIconify(icon="tabler:trending-down", width=16),
+                            dmc.Text("Drawdown Analysis", size="md", fw=600),
+                            create_info_tooltip(
+                                title="📉 Drawdown Analysis",
+                                content="Shows the distribution of maximum drawdowns from your simulations. Helps you understand worst-case scenarios and prepare for losing streaks.",
+                                detailed_content="Each simulation's worst drawdown is captured. P5 shows the worst 5% of outcomes. Use this to size your account and manage risk. TradeBlocks builds insights, not investment advice.",
+                                tooltip_id="drawdown-analysis",
+                            ),
+                        ],
+                        gap="xs",
+                        mb="md",
+                    ),
+                    dcc.Graph(
+                        id="mc-drawdown-analysis",
+                        config={"displayModeBar": False, "responsive": True},
+                        style={"height": "60vh", "minHeight": "400px"},
+                        figure=create_placeholder_histogram(),
+                    ),
+                ],
+                p="md",
+                withBorder=True,
+            ),
         ],
-        p="lg",
-        withBorder=True,
     )
 
 
