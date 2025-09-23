@@ -600,7 +600,8 @@ def create_correlation_heatmap_from_matrix(correlation_matrix, strategies, is_da
                 tickfont=dict(size=12, color=colorbar_color),
                 titlefont=dict(color=colorbar_color),
             ),
-            hovertemplate="<b>%{customdata}</b><br>Correlation: %{z}<extra></extra>",
+            # Use fixed decimal precision in hover text so tooltip matches on-cell value
+            hovertemplate="<b>%{customdata}</b><br>Correlation: %{z:.2f}<extra></extra>",
             customdata=[
                 [f"{strategies[i]} vs {strategies[j]}" for j in range(len(strategies))]
                 for i in range(len(strategies))
