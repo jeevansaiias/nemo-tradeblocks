@@ -11,116 +11,35 @@ from dash_iconify import DashIconify
 import plotly.graph_objects as go
 
 from ..common import create_info_tooltip
-from app.utils.theme import get_theme_colors
+from app.utils.placeholders import create_placeholder_figure
 
 
 # Import placeholder chart functions
 def create_placeholder_equity_curve(theme_data=None):
     """Create an empty state placeholder for equity curve"""
-    import plotly.graph_objects as go
-
-    theme_colors = get_theme_colors(theme_data)
-    text_color = theme_colors.get("text_color", "gray")
-
-    fig = go.Figure()
-
-    # Create an empty chart with just the message
-    fig.add_annotation(
-        text="🎲<br><br><b>Portfolio Growth Projections</b><br><br>Run a simulation to see your potential portfolio paths<br><br>📊 Percentile Bands · 📈 Growth Trajectories · 🎰 Monte Carlo Paths",
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=0.5,
-        showarrow=False,
-        font=dict(size=16, color=text_color),
-        xanchor="center",
-        yanchor="middle",
+    return create_placeholder_figure(
+        "🎲<br><br><b>Portfolio Growth Projections</b><br><br>Run a simulation to see your potential portfolio paths<br><br>📊 Percentile Bands · 📈 Growth Trajectories · 🎰 Monte Carlo Paths",
+        theme_data=theme_data,
+        font_size=16,
     )
-
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=text_color),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        showlegend=False,
-        autosize=True,
-        margin=dict(l=20, r=20, t=20, b=20),
-    )
-
-    return fig
 
 
 def create_placeholder_histogram(theme_data=None):
     """Create an empty state placeholder for distribution charts"""
-    import plotly.graph_objects as go
-
-    theme_colors = get_theme_colors(theme_data)
-    text_color = theme_colors.get("text_color", "gray")
-
-    fig = go.Figure()
-
-    # Create an empty chart with just the message
-    fig.add_annotation(
-        text="📊<br><br><b>Return Distribution</b><br><br>Simulation results will appear here<br><br>🎲 Probability distributions<br>💯 Percentile analysis<br>📈 Return patterns",
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=0.5,
-        showarrow=False,
-        font=dict(size=14, color=text_color),
-        xanchor="center",
-        yanchor="middle",
+    return create_placeholder_figure(
+        "📊<br><br><b>Return Distribution</b><br><br>Simulation results will appear here<br><br>🎲 Probability distributions<br>💯 Percentile analysis<br>📈 Return patterns",
+        theme_data=theme_data,
+        font_size=14,
     )
-
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=text_color),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        showlegend=False,
-        autosize=True,
-        margin=dict(l=20, r=20, t=20, b=20),
-    )
-
-    return fig
 
 
 def create_placeholder_drawdown(theme_data=None):
     """Create an empty state placeholder for drawdown charts"""
-    import plotly.graph_objects as go
-
-    theme_colors = get_theme_colors(theme_data)
-    text_color = theme_colors.get("text_color", "gray")
-
-    fig = go.Figure()
-
-    # Create an empty chart with just the message
-    fig.add_annotation(
-        text="📉<br><br><b>Drawdown Analysis</b><br><br>Risk scenarios will appear here<br><br>🏔️ Maximum drawdowns<br>⚠️ Worst-case scenarios<br>🔄 Recovery periods",
-        xref="paper",
-        yref="paper",
-        x=0.5,
-        y=0.5,
-        showarrow=False,
-        font=dict(size=14, color=text_color),
-        xanchor="center",
-        yanchor="middle",
+    return create_placeholder_figure(
+        "📉<br><br><b>Drawdown Analysis</b><br><br>Risk scenarios will appear here<br><br>🏔️ Maximum drawdowns<br>⚠️ Worst-case scenarios<br>🔄 Recovery periods",
+        theme_data=theme_data,
+        font_size=14,
     )
-
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=text_color),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        showlegend=False,
-        autosize=True,
-        margin=dict(l=20, r=20, t=20, b=20),
-    )
-
-    return fig
 
 
 def create_risk_simulator_tab():
