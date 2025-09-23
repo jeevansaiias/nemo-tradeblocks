@@ -5,6 +5,8 @@ Advanced risk simulation using historical trade data to project future outcomes.
 Features bootstrap resampling to preserve real distribution characteristics.
 """
 
+from typing import Dict
+
 import dash_mantine_components as dmc
 from dash import dcc
 from dash_iconify import DashIconify
@@ -40,6 +42,55 @@ def create_placeholder_drawdown(theme_data=None):
         theme_data=theme_data,
         font_size=14,
     )
+
+
+MONTE_CARLO_METRIC_PLACEHOLDERS: Dict[str, Dict[str, str]] = {
+    "expected_return": {
+        "value": "--",
+        "description": "Run simulation to see expected return",
+    },
+    "var_95": {
+        "value": "--",
+        "description": "Run simulation to see VaR analysis",
+    },
+    "prob_profit": {
+        "value": "--",
+        "description": "Run simulation to see probability metrics",
+    },
+    "max_drawdown": {
+        "value": "--",
+        "description": "Run simulation to see drawdown analysis",
+    },
+    "best_case": {
+        "value": "--",
+        "description": "Run simulation to see scenario analysis",
+    },
+    "median_case": {
+        "value": "--",
+        "description": "Run simulation to see scenario analysis",
+    },
+    "worst_case": {
+        "value": "--",
+        "description": "Run simulation to see scenario analysis",
+    },
+}
+
+
+def get_monte_carlo_placeholder_state(theme_data=None) -> Dict[str, Dict[str, object]]:
+    """Return consistent placeholder figures and metric text for Monte Carlo views."""
+
+    figures = {
+        "equity": create_placeholder_equity_curve(theme_data),
+        "distribution": create_placeholder_histogram(theme_data),
+        "drawdown": create_placeholder_drawdown(theme_data),
+    }
+
+    metrics = {key: value.copy() for key, value in MONTE_CARLO_METRIC_PLACEHOLDERS.items()}
+
+    return {
+        "figures": figures,
+        "metrics": metrics,
+    }
 
 
 def create_risk_simulator_tab():
@@ -428,6 +479,9 @@ def create_simulation_controls():
 
 def create_equity_curve_section():
     """Create the main equity curve visualization"""
+    placeholder_state = get_monte_carlo_placeholder_state()
+    equity_placeholder = placeholder_state["figures"]["equity"]
+
     return dmc.Paper(
         children=[
             dmc.Stack(
@@ -469,7 +523,7 @@ def create_equity_curve_section():
                                 id="mc-equity-curve",
                                 config={"displayModeBar": True, "displaylogo": False},
                                 style={"height": "500px"},
-                                figure=create_placeholder_equity_curve(),
+                                figure=equity_placeholder,
                             )
                         ],
                     ),
@@ -484,6 +538,9 @@ def create_equity_curve_section():
 
 def create_statistics_grid():
     """Create grid of key statistics"""
+    placeholder_state = get_monte_carlo_placeholder_state()
+    metrics = placeholder_state["metrics"]
+
     return [
         # First row - main metrics
         dmc.SimpleGrid(
@@ -496,6 +553,8 @@ def create_statistics_grid():
                     subtitle_id="mc-expected-return-desc",
                     icon="tabler:trending-up",
                     color="green",
+                    default_value=metrics["expected_return"]["value"],
+                    default_subtitle=metrics["expected_return"]["description"],
                     tooltip_title="🧱 Expected Return",
                     tooltip_content="The average outcome across all simulations. Your 'center of gravity' if you keep trading with these blocks.",
                     tooltip_detail="Not a guarantee - it's the mathematical average. Half of outcomes will be better, half worse. That's the nature of probability.",
@@ -506,6 +565,8 @@ def create_statistics_grid():
                     subtitle_id="mc-var-95-desc",
                     icon="tabler:alert-triangle",
                     color="red",
+                    default_value=metrics["var_95"]["value"],
+                    default_subtitle=metrics["var_95"]["description"],
                     tooltip_title="🧱 Value at Risk (VaR)",
                     tooltip_content="Your risk floor - the return level that 95% of simulations stayed above. Only 5% of outcomes were worse than this number.",
                     tooltip_detail="Positive VaR (e.g., +19.7%) = Even your worst 5% scenarios are profitable! Negative VaR (e.g., -8.5%) = 5% chance of losing more than 8.5%.",
@@ -516,6 +577,8 @@ def create_statistics_grid():
                     subtitle_id="mc-prob-profit-desc",
                     icon="tabler:percentage",
                     color="blue",
+                    default_value=metrics["prob_profit"]["value"],
+                    default_subtitle=metrics["prob_profit"]["description"],
                     tooltip_title="🧱 Win Probability",
                     tooltip_content="What percentage of simulated futures end in profit? Your odds of success if the future resembles the past.",
                     tooltip_detail="Based on reshuffling your actual trades. High probability doesn't mean guaranteed profit - it means consistent positive edge.",
@@ -526,6 +589,8 @@ def create_statistics_grid():
                     subtitle_id="mc-max-drawdown-desc",
                     icon="tabler:chart-line",
                     color="orange",
+                    default_value=metrics["max_drawdown"]["value"],
+                    default_subtitle=metrics["max_drawdown"]["description"],
                     tooltip_title="🧱 Maximum Drawdown",
                     tooltip_content="The deepest valley in 95% of simulations. How far your blocks might tumble before recovering.",
                     tooltip_detail="95th percentile worst drawdown - only 5% of simulations had deeper drops. Essential for position sizing and psychology.",
@@ -543,6 +608,8 @@ def create_statistics_grid():
                     subtitle_id="mc-best-case-desc",
                     icon="tabler:star",
                     color="green",
+                    default_value=metrics["best_case"]["value"],
+                    default_subtitle=metrics["best_case"]["description"],
                     tooltip_title="🧱 Best Case Scenario",
                     tooltip_content="The 95th percentile outcome. Only 5% of simulations exceeded this return.",
                     tooltip_detail="Your upside potential if things go really well. Not a prediction, but a boundary of possibility based on your trading blocks.",
@@ -553,6 +620,8 @@ def create_statistics_grid():
                     subtitle_id="mc-median-case-desc",
                     icon="tabler:target",
                     color="blue",
+                    default_value=metrics["median_case"]["value"],
+                    default_subtitle=metrics["median_case"]["description"],
                     tooltip_title="🧱 Most Likely Outcome",
                     tooltip_content="The median result. Half of simulations were above this, half below.",
                     tooltip_detail="This is your 'center line' - if your future trades perform like your past trades, you'll land near here.",
@@ -563,6 +632,8 @@ def create_statistics_grid():
                     subtitle_id="mc-worst-case-desc",
                     icon="tabler:alert-triangle",
                     color="orange",
+                    default_value=metrics["worst_case"]["value"],
+                    default_subtitle=metrics["worst_case"]["description"],
                     tooltip_title="🧱 Worst Case Scenario",
                     tooltip_content="The 5th percentile outcome. 95% of simulations stayed above this level.",
                     tooltip_detail="Your downside risk if things go poorly. Plan your position sizing and risk management around surviving this scenario.",
@@ -581,6 +652,8 @@ def create_stat_card(
     tooltip_title=None,
     tooltip_content=None,
     tooltip_detail=None,
+    default_value="--",
+    default_subtitle="Run simulation to see details",
 ):
     """Create a statistic card with optional tooltip"""
     return dmc.Paper(
@@ -603,8 +676,13 @@ def create_stat_card(
                         ],
                         gap="xs",
                     ),
-                    dmc.Text("--", id=value_id, size="xl", fw=700),
-                    dmc.Text("Waiting for simulation", id=subtitle_id, size="xs", c="dimmed"),
+                    dmc.Text(default_value, id=value_id, size="xl", fw=700),
+                    dmc.Text(
+                        default_subtitle,
+                        id=subtitle_id,
+                        size="xs",
+                        c="dimmed",
+                    ),
                 ],
                 gap="xs",
             )
@@ -616,6 +694,10 @@ def create_stat_card(
 
 def create_analysis_section():
     """Create side-by-side distribution analysis section"""
+    placeholder_state = get_monte_carlo_placeholder_state()
+    distribution_placeholder = placeholder_state["figures"]["distribution"]
+    drawdown_placeholder = placeholder_state["figures"]["drawdown"]
+
     return dmc.SimpleGrid(
         cols={"base": 1, "lg": 2},
         spacing="md",
@@ -652,7 +734,7 @@ def create_analysis_section():
                                     "height": "400px",
                                     "width": "100%",
                                 },
-                                figure=create_placeholder_histogram(),
+                                figure=distribution_placeholder,
                                 responsive=True,
                             )
                         ],
@@ -693,7 +775,7 @@ def create_analysis_section():
                                     "height": "400px",
                                     "width": "100%",
                                 },
-                                figure=create_placeholder_drawdown(),
+                                figure=drawdown_placeholder,
                                 responsive=True,
                             )
                         ],

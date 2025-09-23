@@ -16,8 +16,18 @@ _LIGHT_MODE_TEXT_COLOR = "#2f3d51"
 _DARK_MODE_TEXT_COLOR = "#dce2f2"
 
 
-def _resolve_text_color(theme_data: Optional[Dict[str, Any]]) -> str:
+def _resolve_text_color(
+    theme_data: Optional[Dict[str, Any]],
+    theme_colors: Optional[Dict[str, Any]] = None,
+) -> str:
     """Return a readable text color given theme data (or lack thereof)."""
+
+    # If we have concrete theme colors, trust those first so placeholders match real charts.
+    if theme_colors and isinstance(theme_colors, dict):
+        text_color = theme_colors.get("text_color")
+        if isinstance(text_color, str) and text_color:
+            return text_color
+
     resolved: Optional[str] = None
     preference: Optional[str] = None
 
@@ -66,7 +76,7 @@ def create_placeholder_figure(
         Extra keyword arguments forwarded to `Figure.update_layout`.
     """
     theme_colors = get_theme_colors(theme_data)
-    text_color = _resolve_text_color(theme_data)
+    text_color = _resolve_text_color(theme_data, theme_colors)
 
     annotation_options: Dict[str, Any] = {
         "text": text,
