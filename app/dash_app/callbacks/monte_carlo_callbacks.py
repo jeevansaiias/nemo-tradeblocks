@@ -53,7 +53,7 @@ def register_monte_carlo_callbacks(app):
 
         try:
             # Parse portfolio data
-            portfolio = Portfolio.parse_obj(portfolio_data)
+            portfolio = Portfolio.model_validate(portfolio_data)
             strategies = portfolio.strategies
 
             # Calculate initial capital from the data
@@ -123,6 +123,7 @@ def register_monte_carlo_callbacks(app):
             Input("mc-run-simulation", "n_clicks"),
             Input("mc-scale-selector", "value"),
             Input("mc-show-paths", "checked"),
+            Input("mc-reset", "n_clicks"),
         ],
         [
             State("current-portfolio-data", "data"),
@@ -142,6 +143,7 @@ def register_monte_carlo_callbacks(app):
         n_clicks,
         scale_selector,
         show_paths,
+        reset_clicks,
         portfolio_data,
         num_simulations,
         time_horizon,
@@ -157,8 +159,19 @@ def register_monte_carlo_callbacks(app):
         # Check if we're just updating chart display options
         triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
 
+        logger.info(
+            f"Monte Carlo callback triggered by: {triggered_id}, n_clicks: {n_clicks}, reset_clicks: {reset_clicks}"
+        )
+
+        # Debug: Log current state
+        if triggered_id:
+            logger.info(f"Full trigger context: {ctx.triggered}")
+        else:
+            logger.warning("No triggered context found")
+
         if triggered_id in ["mc-scale-selector", "mc-show-paths"] and cached_data:
             # Just updating chart display with cached data
+            logger.info("Using cached data for chart update")
             result_data = cached_data["result"]
             initial_capital = cached_data["initial_capital"]
             time_horizon = cached_data["time_horizon"]
@@ -196,7 +209,34 @@ def register_monte_carlo_callbacks(app):
                 cached_data,  # Keep same cache
             )
 
-        if not n_clicks or not portfolio_data:
+        # Handle reset button clicks - clear everything
+        if triggered_id == "mc-reset":
+            logger.info("Reset button clicked - clearing all data and charts")
+            return (
+                create_placeholder_equity_curve(),
+                create_placeholder_histogram(),
+                create_placeholder_histogram(),
+                "--",
+                "Run simulation to see expected return",
+                "--",
+                "Run simulation to see VaR analysis",
+                "--",
+                "Run simulation to see probability metrics",
+                "--",
+                "Run simulation to see drawdown analysis",
+                "--",
+                "Run simulation to see scenario analysis",
+                "--",
+                "Run simulation to see scenario analysis",
+                "--",
+                "Run simulation to see scenario analysis",
+                None,  # Clear cache
+            )
+
+        # Handle non-simulation triggers (return early if no data)
+        if not portfolio_data:
+            logger.info("No portfolio data available")
+            # If we're not running simulation, return early
             return (
                 create_placeholder_equity_curve(),
                 create_placeholder_histogram(),
@@ -218,9 +258,20 @@ def register_monte_carlo_callbacks(app):
                 None,  # No cache
             )
 
+        # Check if this is actually a button click for simulation
+        if triggered_id != "mc-run-simulation":
+            logger.info(f"Callback triggered by non-simulation control: {triggered_id}")
+            from dash import no_update
+
+            return no_update
+
         try:
+            logger.info(
+                f"Starting Monte Carlo simulation with {num_simulations} simulations, {time_horizon} days"
+            )
+
             # Parse portfolio data
-            portfolio = Portfolio.parse_obj(portfolio_data)
+            portfolio = Portfolio.model_validate(portfolio_data)
 
             # Determine strategy filter
             strategy_filter = None
@@ -388,6 +439,7 @@ def register_monte_carlo_callbacks(app):
 
         except Exception as e:
             logger.error(f"Error running Monte Carlo simulation: {str(e)}")
+            logger.exception("Full traceback:")  # This will log the full stack trace
             return (
                 create_placeholder_equity_curve(),
                 create_placeholder_histogram(),
@@ -418,9 +470,10 @@ def register_monte_carlo_callbacks(app):
         [Input("mc-reset", "n_clicks")],
         prevent_initial_call=True,
     )
-    def reset_simulation_parameters(n_clicks):
-        """Reset all simulation parameters to defaults"""
+    def reset_simulation_controls(n_clicks):
+        """Reset only the input controls to defaults"""
         if n_clicks:
+            logger.info("Resetting Monte Carlo controls to defaults")
             return (
                 1000,  # num_simulations
                 "252",  # time_horizon (1 year)
@@ -738,12 +791,11 @@ def create_placeholder_equity_curve():
     )
 
     fig.update_layout(
-        title="Portfolio Value Projections (Load data and run simulation)",
         xaxis_title="Days Forward",
         yaxis_title="Portfolio Value ($)",
         annotations=[
             dict(
-                text="Upload portfolio data and click 'Run Simulation' to see projections",
+                text="Click 'Run Simulation' to see projections",
                 xref="paper",
                 yref="paper",
                 x=0.5,
@@ -776,7 +828,6 @@ def create_placeholder_histogram():
     )
 
     fig.update_layout(
-        title="Run simulation to see results",
         xaxis_title="Return",
         yaxis_title="Frequency",
         showlegend=False,

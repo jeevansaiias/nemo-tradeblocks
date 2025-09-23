@@ -13,6 +13,88 @@ import plotly.graph_objects as go
 from ..common import create_info_tooltip
 
 
+# Import placeholder chart functions
+def create_placeholder_equity_curve():
+    """Create a placeholder equity curve chart"""
+    import numpy as np
+    import plotly.graph_objects as go
+
+    days = np.arange(0, 252)
+    np.random.seed(42)
+    median_path = 100000 * (1 + 0.0003 * days + 0.001 * np.random.randn(len(days)).cumsum())
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=days,
+            y=median_path,
+            mode="lines",
+            name="Example Projection",
+            line=dict(color="gray", dash="dash"),
+        )
+    )
+
+    fig.update_layout(
+        xaxis_title="Days Forward",
+        yaxis_title="Portfolio Value ($)",
+        annotations=[
+            dict(
+                text="Upload portfolio data and click 'Run Simulation' to see projections",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=14, color="gray"),
+                showarrow=False,
+            )
+        ],
+        showlegend=False,
+    )
+    return fig
+
+
+def create_placeholder_histogram():
+    """Create a placeholder histogram"""
+    import numpy as np
+    import plotly.graph_objects as go
+
+    data = np.random.normal(0.05, 0.15, 100)
+
+    fig = go.Figure(
+        data=[
+            go.Histogram(
+                x=data,
+                nbinsx=20,
+                marker_color="rgba(128,128,128,0.5)",
+                marker_line_color="rgba(128,128,128,1)",
+                marker_line_width=1,
+            )
+        ]
+    )
+
+    fig.update_layout(
+        xaxis_title="Return",
+        yaxis_title="Frequency",
+        showlegend=False,
+        annotations=[
+            dict(
+                text="Click 'Run Simulation' to analyze your data",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.8,
+                xanchor="center",
+                yanchor="middle",
+                font=dict(size=14, color="gray"),
+                showarrow=False,
+            )
+        ],
+    )
+    return fig
+
+
 def create_risk_simulator_tab():
     """Create the Risk Simulator tab with Monte Carlo controls"""
     return dmc.Stack(
@@ -436,10 +518,7 @@ def create_equity_curve_section():
                         id="mc-equity-curve",
                         config={"displayModeBar": True, "displaylogo": False},
                         style={"height": "500px"},
-                        figure=create_empty_chart(
-                            "Run Simulation to see projections",
-                            "",
-                        ),
+                        figure=create_placeholder_equity_curve(),
                     ),
                 ],
                 gap="md",
@@ -632,10 +711,7 @@ def create_analysis_tabs():
                                 id="mc-return-distribution",
                                 config={"displayModeBar": False, "responsive": True},
                                 style={"height": "60vh", "minHeight": "400px"},
-                                figure=create_empty_chart(
-                                    "Run simulation to see return distribution",
-                                    "",
-                                ),
+                                figure=create_placeholder_histogram(),
                             )
                         ],
                         value="distribution",
@@ -647,9 +723,7 @@ def create_analysis_tabs():
                                 id="mc-drawdown-analysis",
                                 config={"displayModeBar": False, "responsive": True},
                                 style={"height": "60vh", "minHeight": "400px"},
-                                figure=create_empty_chart(
-                                    "Run simulation to see drawdown analysis", ""
-                                ),
+                                figure=create_placeholder_histogram(),
                             )
                         ],
                         value="drawdown",
