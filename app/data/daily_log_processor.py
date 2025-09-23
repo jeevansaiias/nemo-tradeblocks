@@ -45,7 +45,6 @@ class DailyLogProcessor:
             # Create DailyLog
             daily_log = DailyLog.from_entries(entries, filename)
 
-            logger.info(f"Successfully processed {len(entries)} daily entries from {filename}")
             return daily_log
 
         except Exception as e:

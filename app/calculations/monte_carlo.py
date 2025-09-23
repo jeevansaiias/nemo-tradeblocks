@@ -33,11 +33,6 @@ class MonteCarloSimulator:
             mean_return = np.mean(daily_returns)
             std_return = np.std(daily_returns)
 
-            logger.info(
-                f"Running Monte Carlo with {request.num_simulations} simulations, "
-                f"mean return: {mean_return:.4f}, std: {std_return:.4f}"
-            )
-
             # Run simulations
             simulations = []
             final_values = []
@@ -65,11 +60,6 @@ class MonteCarloSimulator:
             # Calculate expected metrics
             expected_return = np.mean(final_values)
             std_deviation = np.std(final_values)
-
-            logger.info(
-                f"Monte Carlo completed. Expected return: {expected_return:.2f}, "
-                f"VaR 95%: {var_95:.2f}"
-            )
 
             return MonteCarloResult(
                 simulations=simulations,
@@ -164,8 +154,6 @@ class MonteCarloSimulator:
                     f"Insufficient trades for bootstrap simulation. Found {len(trades)} trades, need at least 10."
                 )
 
-            logger.info(f"Running bootstrap simulation with {len(trades)} historical trades")
-
             if use_daily_returns:
                 # Bootstrap from daily returns
                 return self._bootstrap_daily_returns(trades, request)
@@ -222,11 +210,6 @@ class MonteCarloSimulator:
             expected_return = np.mean(final_values)
             std_deviation = np.std(final_values)
 
-            logger.info(
-                f"Bootstrap completed. Expected return: {expected_return:.4f}, "
-                f"VaR 95%: {var_95:.4f}, Std: {std_deviation:.4f}"
-            )
-
             return MonteCarloResult(
                 simulations=simulations,
                 percentiles=percentiles,
@@ -277,11 +260,6 @@ class MonteCarloSimulator:
             var_95 = np.percentile(final_values, 5)
             expected_return = np.mean(final_values)
             std_deviation = np.std(final_values)
-
-            logger.info(
-                f"Bootstrap (daily) completed. Expected return: {expected_return:.4f}, "
-                f"VaR 95%: {var_95:.4f}, Std: {std_deviation:.4f}"
-            )
 
             return MonteCarloResult(
                 simulations=simulations,

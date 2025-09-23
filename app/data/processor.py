@@ -64,7 +64,6 @@ class PortfolioProcessor:
             # Create Portfolio
             portfolio = Portfolio.from_trades(trades, filename)
 
-            logger.info(f"Successfully processed {len(trades)} trades from {filename}")
             return portfolio
 
         except Exception as e:

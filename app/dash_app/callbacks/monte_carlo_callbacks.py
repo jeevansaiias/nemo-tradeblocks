@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
 import logging
+from types import SimpleNamespace
 
 from app.calculations.monte_carlo import MonteCarloSimulator
 from app.calculations.shared import (
@@ -129,6 +130,7 @@ def register_monte_carlo_callbacks(app):
             Input("mc-scale-selector", "value"),
             Input("mc-show-paths", "checked"),
             Input("mc-reset", "n_clicks"),
+            Input("theme-store", "data"),
         ],
         [
             State("current-portfolio-data", "data"),
@@ -141,7 +143,6 @@ def register_monte_carlo_callbacks(app):
             State("mc-use-random-seed", "checked"),
             State("mc-seed-value", "value"),
             State("mc-simulation-cache", "data"),
-            State("theme-store", "data"),
         ],
         prevent_initial_call=True,
     )
@@ -150,6 +151,7 @@ def register_monte_carlo_callbacks(app):
         scale_selector,
         show_paths,
         reset_clicks,
+        theme_data,
         portfolio_data,
         num_simulations,
         time_horizon,
@@ -160,65 +162,130 @@ def register_monte_carlo_callbacks(app):
         use_random_seed,
         seed_value,
         cached_data,
-        theme_data,
     ):
         """Run Monte Carlo simulation and update all charts and statistics"""
         # Check if we're just updating chart display options
         triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
 
-        logger.info(
-            f"Monte Carlo callback triggered by: {triggered_id}, n_clicks: {n_clicks}, reset_clicks: {reset_clicks}"
-        )
+        log_scale = (scale_selector or "linear") == "log"
 
-        # Debug: Log current state
-        if triggered_id:
-            logger.info(f"Full trigger context: {ctx.triggered}")
-        else:
-            logger.warning("No triggered context found")
+        def rebuild_figures_from_cache(cache):
+            if not cache or "result" not in cache:
+                return None
 
-        if triggered_id in ["mc-scale-selector", "mc-show-paths"] and cached_data:
-            # Just updating chart display with cached data
-            logger.info("Using cached data for chart update")
-            result_data = cached_data["result"]
-            initial_capital = cached_data["initial_capital"]
-            time_horizon = cached_data["time_horizon"]
+            logger.info("Rebuilding Monte Carlo figures from cached simulation data")
 
-            # Recreate the result object (simplified)
-            from types import SimpleNamespace
+            cached_initial_capital = cache.get("initial_capital", initial_capital)
+            cached_time_horizon = cache.get("time_horizon", time_horizon)
 
-            result = SimpleNamespace(**result_data)
+            try:
+                cached_time_horizon_int = int(cached_time_horizon)
+            except (TypeError, ValueError):
+                try:
+                    cached_time_horizon_int = int(time_horizon) if time_horizon else 0
+                except (TypeError, ValueError):
+                    cached_time_horizon_int = 0
 
-            # Generate updated chart - show all paths when enabled
-            log_scale = scale_selector == "log"
+            result = SimpleNamespace(**cache["result"])
+
             equity_curve_fig = create_equity_curve_chart(
-                result, initial_capital, int(time_horizon), log_scale, show_paths, theme_data
+                result,
+                cached_initial_capital,
+                cached_time_horizon_int,
+                log_scale,
+                show_paths,
+                theme_data,
+            )
+            distribution_fig = create_return_distribution_chart(result, theme_data)
+            drawdown_fig = create_drawdown_analysis_chart(result, None, theme_data)
+
+            updated_cache = {**cache}
+            updated_cache.pop("distribution_fig", None)
+            updated_cache.pop("drawdown_fig", None)
+            updated_cache.pop("equity_curve_fig", None)
+            updated_cache["initial_capital"] = cached_initial_capital
+            updated_cache["time_horizon"] = cached_time_horizon
+
+            return equity_curve_fig, distribution_fig, drawdown_fig, updated_cache
+
+        if triggered_id == "theme-store":
+            rebuild = rebuild_figures_from_cache(cached_data)
+            if rebuild:
+                equity_curve_fig, distribution_fig, drawdown_fig, updated_cache = rebuild
+                return (
+                    equity_curve_fig,
+                    distribution_fig,
+                    drawdown_fig,
+                    updated_cache["expected_return_text"],
+                    updated_cache["expected_return_desc"],
+                    updated_cache["var_text"],
+                    updated_cache["var_desc"],
+                    updated_cache["prob_profit_text"],
+                    updated_cache["prob_profit_desc"],
+                    updated_cache["max_dd_text"],
+                    updated_cache["max_dd_desc"],
+                    updated_cache.get("best_case_text", "--"),
+                    updated_cache.get("best_case_desc", ""),
+                    updated_cache.get("median_case_text", "--"),
+                    updated_cache.get("median_case_desc", ""),
+                    updated_cache.get("worst_case_text", "--"),
+                    updated_cache.get("worst_case_desc", ""),
+                    updated_cache,
+                )
+
+            logger.info(
+                "Theme changed but no cached simulation available; returning themed placeholders"
+            )
+            return (
+                create_placeholder_equity_curve(theme_data),
+                create_placeholder_histogram(theme_data),
+                create_placeholder_drawdown(theme_data),
+                "--",
+                "Run simulation to see expected return",
+                "--",
+                "Run simulation to see VaR analysis",
+                "--",
+                "Run simulation to see probability metrics",
+                "--",
+                "Run simulation to see drawdown analysis",
+                "--",
+                "Run simulation to see scenario analysis",
+                "--",
+                "Run simulation to see scenario analysis",
+                "--",
+                "Run simulation to see scenario analysis",
+                None,
             )
 
-            # Return updated chart with cached statistics and same cache
-            return (
-                equity_curve_fig,
-                cached_data["distribution_fig"],
-                cached_data["drawdown_fig"],
-                cached_data["expected_return_text"],
-                cached_data["expected_return_desc"],
-                cached_data["var_text"],
-                cached_data["var_desc"],
-                cached_data["prob_profit_text"],
-                cached_data["prob_profit_desc"],
-                cached_data["max_dd_text"],
-                cached_data["max_dd_desc"],
-                cached_data.get("best_case_text", "--"),
-                cached_data.get("best_case_desc", ""),
-                cached_data.get("median_case_text", "--"),
-                cached_data.get("median_case_desc", ""),
-                cached_data.get("worst_case_text", "--"),
-                cached_data.get("worst_case_desc", ""),
-                cached_data,  # Keep same cache
-            )
+        if triggered_id in ["mc-scale-selector", "mc-show-paths"]:
+            rebuild = rebuild_figures_from_cache(cached_data)
+            if rebuild:
+                equity_curve_fig, distribution_fig, drawdown_fig, updated_cache = rebuild
+                return (
+                    equity_curve_fig,
+                    distribution_fig,
+                    drawdown_fig,
+                    updated_cache["expected_return_text"],
+                    updated_cache["expected_return_desc"],
+                    updated_cache["var_text"],
+                    updated_cache["var_desc"],
+                    updated_cache["prob_profit_text"],
+                    updated_cache["prob_profit_desc"],
+                    updated_cache["max_dd_text"],
+                    updated_cache["max_dd_desc"],
+                    updated_cache.get("best_case_text", "--"),
+                    updated_cache.get("best_case_desc", ""),
+                    updated_cache.get("median_case_text", "--"),
+                    updated_cache.get("median_case_desc", ""),
+                    updated_cache.get("worst_case_text", "--"),
+                    updated_cache.get("worst_case_desc", ""),
+                    updated_cache,
+                )
+
+            return no_update
 
         # Handle reset button clicks - clear everything
         if triggered_id == "mc-reset":
-            logger.info("Reset button clicked - clearing all data and charts")
             return (
                 create_placeholder_equity_curve(theme_data),
                 create_placeholder_histogram(theme_data),
@@ -242,7 +309,6 @@ def register_monte_carlo_callbacks(app):
 
         # Handle non-simulation triggers (return early if no data)
         if not portfolio_data:
-            logger.info("No portfolio data available")
             # If we're not running simulation, return early
             return (
                 create_placeholder_equity_curve(theme_data),
@@ -267,16 +333,9 @@ def register_monte_carlo_callbacks(app):
 
         # Check if this is actually a button click for simulation
         if triggered_id != "mc-run-simulation":
-            logger.info(f"Callback triggered by non-simulation control: {triggered_id}")
-            from dash import no_update
-
             return no_update
 
         try:
-            logger.info(
-                f"Starting Monte Carlo simulation with {num_simulations} simulations, {time_horizon} days"
-            )
-
             # Parse portfolio data
             portfolio = Portfolio.model_validate(portfolio_data)
 
@@ -343,15 +402,6 @@ def register_monte_carlo_callbacks(app):
             prob_profit_text = f"{prob_profit:.1%}"
             prob_profit_desc = f"Out of {num_simulations} simulations"
 
-            # Debug: Log statistics for validation
-            logger.info(
-                f"Simulation stats - Expected: {result.expected_return:.2%}, Annual: {expected_return_annual:.2%}"
-            )
-            logger.info(f"VaR 95%: {result.var_95:.2%}, Prob of profit: {prob_profit:.1%}")
-            logger.info(
-                f"Return range: [{min(result.final_values):.2%}, {max(result.final_values):.2%}]"
-            )
-
             # 4. Max Drawdown (95th percentile of worst drawdowns)
             # Calculate drawdowns from each simulation path
             max_drawdowns = []
@@ -405,8 +455,6 @@ def register_monte_carlo_callbacks(app):
                 },
                 "initial_capital": initial_capital,
                 "time_horizon": time_horizon,
-                "distribution_fig": distribution_fig,
-                "drawdown_fig": drawdown_fig,
                 "expected_return_text": expected_return_text,
                 "expected_return_desc": expected_return_desc,
                 "var_text": var_text,
@@ -480,7 +528,6 @@ def register_monte_carlo_callbacks(app):
     def reset_simulation_controls(n_clicks):
         """Reset only the input controls to defaults"""
         if n_clicks:
-            logger.info("Resetting Monte Carlo controls to defaults")
             return (
                 1000,  # num_simulations
                 "252",  # time_horizon (1 year)
@@ -730,13 +777,6 @@ def create_drawdown_analysis_chart(result, portfolio=None, theme_data=None):
         # Add percentile lines as interactive scatter traces
         percentiles = np.percentile(drawdowns, [5, 50, 95])
 
-        # Debug: Log the actual percentile values and drawdown range
-        logger.info(f"Max drawdowns range: {min(drawdowns):.4f} to {max(drawdowns):.4f}")
-        logger.info(
-            f"Max DD Percentiles: P5={percentiles[0]:.4f}, P50={percentiles[1]:.4f}, P95={percentiles[2]:.4f}"
-        )
-        logger.info(f"Number of simulations: {len(drawdowns)}")
-
         percentile_info = [
             {"value": percentiles[0] * 100, "color": "red", "name": f"P5: {percentiles[0]:.1%}"},
             {
@@ -752,13 +792,7 @@ def create_drawdown_analysis_chart(result, portfolio=None, theme_data=None):
         hist_counts, hist_bins = np.histogram(drawdowns_pct, bins=30)
         y_max = max(hist_counts) if len(hist_counts) > 0 else 1
 
-        # Debug: Log histogram range and drawdown range
-        logger.info(f"Histogram x-range: {min(drawdowns_pct):.2f}% to {max(drawdowns_pct):.2f}%")
-        logger.info(f"Histogram bins range: {hist_bins[0]:.2f}% to {hist_bins[-1]:.2f}%")
-
         for info in percentile_info:
-            # Debug: Log trace creation details
-            logger.info(f"Adding trace: {info['name']} at x={info['value']:.2f}, y_max={y_max:.0f}")
 
             # Add vertical line as scatter trace (interactive)
             fig.add_trace(
