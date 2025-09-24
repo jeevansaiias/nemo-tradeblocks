@@ -2,12 +2,7 @@ from dash import Input, Output, State, callback, html, ctx, no_update
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import base64
-import io
-import json
-import requests
 import logging
-import os
-
 from app.data.models import Trade
 from app.dash_app.layouts.main_layout import (
     create_welcome_content,
@@ -56,11 +51,16 @@ from app.dash_app.components.tabs.position_sizing import (
     create_position_sizing_tab,
 )
 
+from app.services.portfolio_service import (
+    calculate_advanced_stats_dict,
+    calculate_portfolio_stats_dict,
+    calculate_strategy_stats_dict,
+    calculate_trades_dict,
+    process_daily_log_upload,
+    process_portfolio_upload,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# API base URL - environment-based for production compatibility
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
 
 
 def register_callbacks(app):
@@ -373,26 +373,16 @@ def register_callbacks(app):
             decoded = base64.b64decode(content_string)
             file_content = decoded.decode("utf-8")
 
-            # Upload to API using proper multipart form data
-            files = {"file": (filename, io.StringIO(file_content), "text/csv")}
-            response = requests.post(f"{API_BASE_URL}/portfolio/upload", files=files)
+            result = process_portfolio_upload(file_content, filename)
+            portfolio_data = result["portfolio_data"]
 
-            if response.status_code == 200:
-                result = response.json()
-                portfolio_data = result["portfolio_data"]
+            success_msg = create_upload_success_message(
+                filename, result["total_trades"], result["total_pl"]
+            )
 
-                success_msg = create_upload_success_message(
-                    filename, result["total_trades"], result["total_pl"]
-                )
+            filename_data = {"filename": filename, "total_trades": result["total_trades"]}
 
-                # Store both portfolio data and filename info
-                filename_data = {"filename": filename, "total_trades": result["total_trades"]}
-
-                return portfolio_data, filename_data, success_msg
-
-            else:
-                error_msg = f"Upload failed: {response.text}"
-                return no_update, no_update, create_upload_error_message(error_msg)
+            return portfolio_data, filename_data, success_msg
 
         except Exception as e:
             logger.error(f"Error uploading trade log file: {str(e)}")
@@ -420,11 +410,7 @@ def register_callbacks(app):
             decoded = base64.b64decode(content_string)
             file_content = decoded.decode("utf-8")
 
-            # Process daily log using DailyLogProcessor
-            from app.data.daily_log_processor import DailyLogProcessor
-
-            processor = DailyLogProcessor()
-            daily_log = processor.parse_csv(file_content, filename)
+            result = process_daily_log_upload(file_content, filename)
 
             success_msg = dmc.Alert(
                 children=[
@@ -435,7 +421,7 @@ def register_callbacks(app):
                                 children=[
                                     dmc.Text(f"Successfully uploaded: {filename}", fw=500),
                                     dmc.Text(
-                                        f"Loaded {daily_log.total_entries} daily entries", size="sm"
+                                        f"Loaded {result['total_entries']} daily entries", size="sm"
                                     ),
                                 ],
                                 gap="xs",
@@ -448,11 +434,8 @@ def register_callbacks(app):
                 variant="light",
             )
 
-            # Convert daily log to dict for storage
-            daily_log_data = daily_log.model_dump()
-
-            # Store both daily log data and filename info
-            filename_data = {"filename": filename, "total_entries": daily_log.total_entries}
+            daily_log_data = result["daily_log_data"]
+            filename_data = {"filename": filename, "total_entries": result["total_entries"]}
 
             return daily_log_data, filename_data, success_msg, no_update
 
@@ -586,30 +569,16 @@ def register_callbacks(app):
             )
 
         try:
-            # Get all trades first to build strategy filter options
-            trades_response = requests.post(f"{API_BASE_URL}/calculate/trades", json=portfolio_data)
+            trades_response = calculate_trades_dict(portfolio_data)
+            all_trades_data = trades_response.get("trades", [])
 
-            if trades_response.status_code != 200:
-                return (
-                    dmc.Center(
-                        dmc.Text("Error loading trades data", c="red", size="lg"),
-                        style={"height": "400px"},
-                    ),
-                    [],
-                )
-
-            all_trades_data = trades_response.json().get("trades", [])
-
-            # Build strategy filter options
             all_strategies = list(set(trade.get("strategy", "") for trade in all_trades_data))
             strategy_options = [
                 {"value": strategy, "label": strategy} for strategy in sorted(all_strategies)
             ]
 
-            # Determine if we're filtering by strategy
             is_filtered = bool(selected_strategies)
 
-            # Filter trades if strategies are selected
             filtered_trades = all_trades_data
             if selected_strategies:
                 filtered_trades = [
@@ -618,54 +587,24 @@ def register_callbacks(app):
                     if trade.get("strategy") in selected_strategies
                 ]
 
-            # Create filtered portfolio data for calculations
             filtered_portfolio_data = portfolio_data.copy()
             filtered_portfolio_data["trades"] = filtered_trades
 
-            # Prepare request with daily log data for portfolio stats
-            portfolio_stats_request = {
-                "portfolio_data": filtered_portfolio_data,
-                "daily_log_data": daily_log_data,
-                "is_filtered": is_filtered,
-            }
-
-            # Calculate stats on filtered data
-            stats_response = requests.post(
-                f"{API_BASE_URL}/calculate/portfolio-stats", json=portfolio_stats_request
+            portfolio_stats = calculate_portfolio_stats_dict(
+                filtered_portfolio_data,
+                daily_log_payload=daily_log_data,
+                is_filtered=is_filtered,
             )
-            strategy_stats_response = requests.post(
-                f"{API_BASE_URL}/calculate/strategy-stats", json=filtered_portfolio_data
-            )
+            strategy_stats = calculate_strategy_stats_dict(filtered_portfolio_data)
 
-            # Prepare request with config and daily log data for advanced stats
             advanced_stats_request = {
                 "portfolio_data": filtered_portfolio_data,
                 "daily_log_data": daily_log_data,
                 "config": {"risk_free_rate": risk_free_rate or 2.0, "annualization_factor": 252},
                 "is_filtered": is_filtered,
             }
-            advanced_stats_response = requests.post(
-                f"{API_BASE_URL}/calculate/advanced-stats", json=advanced_stats_request
-            )
+            advanced_stats = calculate_advanced_stats_dict(advanced_stats_request)
 
-            if stats_response.status_code != 200:
-                return (
-                    dmc.Center(
-                        dmc.Text("Error calculating portfolio stats", c="red", size="lg"),
-                        style={"height": "400px"},
-                    ),
-                    strategy_options,
-                )
-
-            portfolio_stats = stats_response.json()
-            strategy_stats = (
-                strategy_stats_response.json() if strategy_stats_response.status_code == 200 else {}
-            )
-            advanced_stats = (
-                advanced_stats_response.json() if advanced_stats_response.status_code == 200 else {}
-            )
-
-            # Import the function here to avoid circular imports
             from app.dash_app.components.tabs.geekistics import create_comprehensive_stats
 
             content = create_comprehensive_stats(
@@ -924,32 +863,23 @@ def register_callbacks(app):
             return "", [], []
 
         try:
-            # Prepare request data
             request_data = portfolio_data.copy()
+            trades_response = calculate_trades_dict(request_data)
+            all_trades = trades_response.get("trades", [])
 
-            # Send portfolio data to stateless API endpoint
-            response = requests.post(f"{API_BASE_URL}/calculate/trades", json=request_data)
-
-            if response.status_code != 200:
-                return "Error loading trades", [], []
-
-            trades_data = response.json().get("trades", [])
-
-            # Filter by strategy if specified (client-side filtering for now)
             if strategy_filter:
                 trades_data = [
-                    trade for trade in trades_data if trade.get("strategy") == strategy_filter
+                    trade for trade in all_trades if trade.get("strategy") == strategy_filter
                 ]
+            else:
+                trades_data = all_trades
 
-            # Get strategy options for filter
-            all_strategies = list(
-                set(trade.get("strategy", "") for trade in response.json().get("trades", []))
-            )
             strategy_options = [
-                {"value": strategy, "label": strategy} for strategy in all_strategies
+                {"value": strategy, "label": strategy}
+                for strategy in sorted({trade.get("strategy", "") for trade in all_trades})
+                if strategy
             ]
 
-            # Create table and summary
             trades_table = create_trades_table(trades_data)
             summary_stats = create_trade_summary_stats(trades_data)
 

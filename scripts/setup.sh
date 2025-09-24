@@ -31,24 +31,33 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Ensure Poetry is installed
-print_status "Checking for Poetry..."
-if ! command -v poetry &> /dev/null; then
-    print_error "Poetry is not installed. See https://python-poetry.org/docs/#installation"
+# Ensure uv is installed
+print_status "Checking for uv..."
+if ! command -v uv &> /dev/null; then
+    print_error "uv is not installed. See https://docs.astral.sh/uv/getting-started/#installation"
     exit 1
 fi
-print_success "Poetry detected"
+print_success "uv detected"
 
-# Install project dependencies using Poetry (create .venv in project)
-print_status "Installing project dependencies via Poetry..."
-POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --with dev
+# Ensure requested Python is available via uv
+if [ -f .python-version ]; then
+    PYTHON_VERSION=$(cat .python-version)
+    print_status "Ensuring Python ${PYTHON_VERSION} is installed..."
+    uv python install "${PYTHON_VERSION}" >/dev/null 2>&1 || true
+    print_success "Python ${PYTHON_VERSION} available"
+else
+    print_warning ".python-version not found; uv will choose a compatible interpreter"
+fi
+
+# Install project dependencies using uv (including dev group)
+print_status "Syncing project dependencies via uv..."
+uv sync --group dev
 print_success "Dependencies installed"
 
 # Setup pre-commit hooks if .pre-commit-config.yaml exists
-# Install pre-commit hooks within Poetry environment
 if [ -f ".pre-commit-config.yaml" ]; then
     print_status "Installing pre-commit hooks..."
-    POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run pre-commit install
+    uv run --group dev pre-commit install
     print_success "Pre-commit hooks installed"
 else
     print_warning "No pre-commit configuration found, skipping pre-commit setup"
@@ -81,15 +90,14 @@ fi
 print_success "🎉 Setup complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Activate virtual environment: source venv/bin/activate"
+echo "  1. Sync optional analytics stack (if needed): uv sync --group dev --extra analytics"
 echo "  2. Start development server: ./scripts/start-dev.sh"
 echo "  3. Open browser: http://localhost:8000"
 echo ""
 echo "Available scripts:"
 echo "  ./scripts/start-dev.sh  - Start development server"
-echo "  ./scripts/seed-data.sh  - Load sample data"
-echo "  pytest                  - Run tests"
-echo "  black app tests         - Format code"
-echo "  ruff check app tests    - Check code quality"
+echo "  ./scripts/check-code.sh - Run quick quality checks"
+echo "  ./scripts/fix-code.sh   - Apply formatting fixes"
+echo "  uv run --group dev pytest - Run tests"
 echo ""
 echo "Happy coding! 🚀"

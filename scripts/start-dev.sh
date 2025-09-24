@@ -25,7 +25,7 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Ensure Poetry-managed virtualenv exists in project
+# Ensure uv-managed virtual environment is ready
 if [ ! -d ".venv" ]; then
     print_warning ".venv not found. Run './scripts/setup.sh' first."
     exit 1
@@ -39,7 +39,7 @@ export LOG_LEVEL=DEBUG
 # Check if .env file exists and source it
 if [ -f ".env" ]; then
     print_info "Loading environment variables from .env"
-    export $(cat .env | grep -v '^#' | xargs)
+    export $(grep -v '^#' .env | xargs)
 fi
 
 # Get port from environment or use default
@@ -54,4 +54,4 @@ print_info "Press Ctrl+C to stop the server"
 print_info ""
 
 # Start the development server with hot-reload
-POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run python app/main.py
+uv run --group dev python app/main.py

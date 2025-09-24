@@ -27,9 +27,9 @@ echo "🧱 TradeBlocks - Quick Code Fix"
 echo "==============================="
 
 # 1. Format code with Black (if available)
-if POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run black --version &> /dev/null; then
+if uv run --group dev black --version &> /dev/null; then
     echo "🎨 Formatting code..."
-    if POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run black app/ -q; then
+    if uv run --group dev black app/ -q; then
         print_success "Code formatted"
     else
         print_warning "Formatting had issues"
@@ -39,9 +39,9 @@ else
 fi
 
 # 2. Sort imports (if available)
-if POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run isort --version &> /dev/null; then
+if uv run --group dev isort --version &> /dev/null; then
     echo "📚 Sorting imports..."
-    if POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run isort app/ -q; then
+    if uv run --group dev isort app/ -q; then
         print_success "Imports sorted"
     else
         print_warning "Import sorting had issues"

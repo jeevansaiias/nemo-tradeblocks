@@ -41,8 +41,8 @@ cd tradeblocks
 # One-command setup
 ./scripts/setup.sh
 
-# Or manual setup with Poetry:
-# poetry install --with dev
+# Or manual sync with uv:
+uv sync --group dev
 ```
 
 ### 2. Configuration
@@ -58,15 +58,12 @@ cp .env.example .env
 
 ```bash
 # Install development dependencies (includes pre-commit, linting, etc.)
-poetry install --with dev
-poetry install --with analytics  # optional: SciPy + scikit-learn
-poetry export --without-hashes -f requirements.txt -o requirements.txt  # for deployment bundles
-
+uv sync --group dev
 # Need the heavier analytics stack locally?
-poetry install --with analytics
+uv sync --group dev --extra analytics
 
 # Install pre-commit hooks for automatic code quality checks
-poetry run pre-commit install
+uv run --group dev pre-commit install
 
 # Run code quality checks locally
 ./scripts/check-code.sh
@@ -82,10 +79,10 @@ poetry run pre-commit install
 ./scripts/start-dev.sh
 
 # Or manually:
-poetry run python app/main.py
+uv run --group dev python app/main.py
 
 # Or using uvicorn directly
-poetry run uvicorn app.main:app --reload --port 8000
+uv run --group dev uvicorn app.main:app --reload --port 8000
 ```
 
 Navigate to `http://localhost:8000` to access the application.
@@ -241,7 +238,7 @@ For other platforms:
 
 ```bash
 # Build and run with gunicorn (production)
-poetry run gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+uv run --group dev gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 ```
 
 ## API Documentation
