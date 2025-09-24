@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
 
@@ -532,25 +533,75 @@ def calculate_strategy_correlations(trades_data, method="pearson"):
     return correlation_matrix, strategies
 
 
+def _generate_short_strategy_labels(strategies, max_length=10):
+    """Create compact, unique labels for strategies while keeping axes readable."""
+    short_names = []
+    used_labels = set()
+
+    for idx, strategy in enumerate(strategies):
+        # Replace punctuation with spaces so parts split cleanly, fallback to original if blank
+        cleaned = re.sub(r"[^A-Za-z0-9\s]", " ", strategy or "")
+        parts = [part for part in cleaned.split() if part]
+        if not parts:
+            parts = [strategy or f"Strategy{idx + 1}"]
+
+        # Start with first two parts, up to max_length characters in total
+        candidate = "".join(part[:3] for part in parts[:2])
+        candidate = candidate[:max_length]
+        if not candidate:
+            candidate = ("".join(parts))[:max_length]
+        if not candidate:
+            candidate = f"Strategy{idx + 1}"
+
+        part_count = 2
+        base_candidate = candidate
+
+        while candidate in used_labels:
+            if part_count < len(parts):
+                # Gradually add more parts until the label becomes unique
+                part_count += 1
+                candidate = "".join(part[:3] for part in parts[:part_count])
+                candidate = candidate[:max_length]
+                if not candidate:
+                    candidate = ("".join(parts))[:max_length]
+                if not candidate:
+                    candidate = f"Strategy{idx + 1}"
+                base_candidate = candidate
+            else:
+                # Append numeric suffix while respecting max_length
+                suffix = 2
+                # Ensure base_candidate always has something to trim from
+                base_full = (
+                    "".join(part[:3] for part in parts) or ("".join(parts)) or f"Strategy{idx + 1}"
+                )
+                base_full = base_full[:max_length] or f"Strategy{idx + 1}"
+
+                while True:
+                    available = max_length - len(str(suffix)) - 1  # account for hyphen
+                    if available <= 0:
+                        trimmed = ""
+                    else:
+                        trimmed = base_full[:available].rstrip("-")
+
+                    candidate = f"{trimmed}-{suffix}" if trimmed else str(suffix)
+
+                    if candidate not in used_labels:
+                        break
+                    suffix += 1
+                break
+
+        used_labels.add(candidate)
+        short_names.append(candidate)
+
+    return short_names
+
+
 def create_correlation_heatmap_from_matrix(correlation_matrix, strategies, is_dark_mode=False):
     """Create large, readable correlation heatmap focused on clarity"""
     import plotly.graph_objects as go
 
     # Create very short strategy names for axis labels to prevent spillover
-    short_strategies = []
-    for s in strategies:
-        # Very aggressive shortening to fit in matrix
-        if len(s) > 10:
-            parts = s.split(" ")
-            if len(parts) > 1:
-                # Multi-word: use first few chars of first two words
-                short_name = "".join([part[:3] for part in parts[:2]])
-                short_strategies.append(short_name[:8])
-            else:
-                # Single word: just truncate to 8 chars
-                short_strategies.append(s[:8])
-        else:
-            short_strategies.append(s)
+    short_strategies = _generate_short_strategy_labels(strategies)
 
     # Theme-based heatmap colors
     if is_dark_mode:
