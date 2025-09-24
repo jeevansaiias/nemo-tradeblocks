@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 import dash_mantine_components as dmc
 from dash import Input, Output, State, callback, ctx, no_update
+import plotly.graph_objects as go
 
 from app.calculations.shared import (
     calculate_initial_capital_from_trades,
@@ -457,16 +458,31 @@ def register_position_sizing_callbacks(app):
 
     @app.callback(
         Output("position-sizing-kelly-analysis", "children"),
+        Output("position-sizing-fraction-tiles", "children"),
+        Output("position-sizing-margin-chart", "figure"),
+        Output("position-sizing-margin-warning", "children"),
         Input("current-portfolio-data", "data"),
         Input("position-sizing-store", "data"),
     )
     def update_kelly_analysis(portfolio_data, store_data):
-        """Update Kelly Criterion based on historical portfolio performance."""
+        """Update Kelly metrics, fraction tiles, and margin utilization visuals."""
+
+        def _empty_outputs(message: str):
+            placeholder_fig = go.Figure()
+            placeholder_fig.update_layout(
+                template="plotly_white",
+                margin=dict(l=40, r=20, t=40, b=40),
+                height=320,
+            )
+            return (
+                dmc.Text(message, c="dimmed"),
+                dmc.Alert(message, color="gray", variant="light"),
+                placeholder_fig,
+                "",
+            )
 
         if not portfolio_data:
-            return dmc.Text(
-                "Load portfolio data to see position sizing recommendations", c="dimmed"
-            )
+            return _empty_outputs("Upload a portfolio to see position sizing insights.")
 
         store = _ensure_store(store_data)
         fingerprint = _portfolio_fingerprint(portfolio_data)
@@ -477,15 +493,13 @@ def register_position_sizing_callbacks(app):
             if portfolio_entry:
                 portfolio_settings = portfolio_entry.get("portfolio", {})
 
+        starting_capital = portfolio_settings.get("starting_capital", DEFAULT_STARTING_CAPITAL)
+        if starting_capital in (None, 0):
+            starting_capital = DEFAULT_STARTING_CAPITAL
+
         selected_choice = portfolio_settings.get("kelly_fraction_choice", "full")
         target_drawdown = portfolio_settings.get("target_drawdown_pct", DEFAULT_TARGET_DRAWDOWN)
         fraction_multiplier = KELLY_FRACTION_LOOKUP.get(selected_choice, 1.0)
-
-        choice_label = {
-            "full": "Full Kelly",
-            "half": "Half Kelly",
-            "quarter": "Quarter Kelly",
-        }.get(selected_choice, "Custom")
 
         try:
             portfolio = Portfolio(**portfolio_data)
@@ -493,13 +507,9 @@ def register_position_sizing_callbacks(app):
             kelly_metrics = calculate_kelly_metrics(trades)
 
             if not (kelly_metrics.avg_win > 0 and kelly_metrics.avg_loss > 0):
-                return [
-                    dmc.Alert(
-                        children="Insufficient trade data for Kelly Criterion calculation. Need both winning and losing trades.",
-                        color="orange",
-                        variant="light",
-                    )
-                ]
+                return _empty_outputs(
+                    "Need both winning and losing trades to calculate Kelly metrics."
+                )
 
             kelly_pct = kelly_metrics.percent
             b = kelly_metrics.payoff_ratio
@@ -508,16 +518,22 @@ def register_position_sizing_callbacks(app):
             avg_loss = kelly_metrics.avg_loss
             applied_pct = kelly_pct * fraction_multiplier
 
-            recommendation_text = f"{choice_label} at {fraction_multiplier:.0%} of Kelly risk suggests allocating {applied_pct:.1f}% of capital per trade."
+            choice_label = {
+                "full": "Full Kelly",
+                "half": "Half Kelly",
+                "quarter": "Quarter Kelly",
+            }.get(selected_choice, "Custom")
+
+            recommendation_text = f"{choice_label} at {fraction_multiplier:.0%} of Kelly suggests allocating {applied_pct:.1f}% of capital per trade."
 
             if kelly_pct <= 0:
-                recommendation_details = "Kelly math is signaling negative expectancy. Consider pausing new risk or reviewing strategy inputs."
+                recommendation_details = "Kelly math is signaling negative expectancy. Consider pausing new risk or revisiting strategy assumptions."
                 alert_color = "red"
             else:
-                recommendation_details = f"With a target max drawdown of {target_drawdown:.0f}%, start by testing smaller fractions (Quarter/Half Kelly) before scaling."
+                recommendation_details = f"With a target max drawdown of {target_drawdown:.0f}%, many traders start with Quarter/Half Kelly before scaling."
                 alert_color = "blue"
 
-            return [
+            kelly_summary = [
                 dmc.Grid(
                     [
                         dmc.GridCol(
@@ -548,7 +564,7 @@ def register_position_sizing_callbacks(app):
                                                     c="blue" if kelly_pct > 0 else "red",
                                                 ),
                                                 dmc.Text(
-                                                    "Optimal position size based on your win rate and payoff ratio",
+                                                    "Optimal position size based on win rate and payoff ratio",
                                                     size="sm",
                                                     c="dimmed",
                                                 ),
@@ -563,10 +579,7 @@ def register_position_sizing_callbacks(app):
                                                                     size="xs",
                                                                     c="dimmed",
                                                                 ),
-                                                                dmc.Text(
-                                                                    f"{win_rate:.1%}",
-                                                                    fw=600,
-                                                                ),
+                                                                dmc.Text(f"{win_rate:.1%}", fw=600),
                                                             ],
                                                             gap="xs",
                                                         ),
@@ -577,10 +590,7 @@ def register_position_sizing_callbacks(app):
                                                                     size="xs",
                                                                     c="dimmed",
                                                                 ),
-                                                                dmc.Text(
-                                                                    f"{b:.2f}x",
-                                                                    fw=600,
-                                                                ),
+                                                                dmc.Text(f"{b:.2f}x", fw=600),
                                                             ],
                                                             gap="xs",
                                                         ),
@@ -619,14 +629,9 @@ def register_position_sizing_callbacks(app):
                                                 dmc.Alert(
                                                     children=[
                                                         dmc.Text(
-                                                            "🎯 Recommendation",
-                                                            fw=600,
-                                                            size="sm",
+                                                            "🎯 Recommendation", fw=600, size="sm"
                                                         ),
-                                                        dmc.Text(
-                                                            recommendation_text,
-                                                            size="sm",
-                                                        ),
+                                                        dmc.Text(recommendation_text, size="sm"),
                                                         dmc.Text(
                                                             recommendation_details,
                                                             size="sm",
@@ -650,10 +655,192 @@ def register_position_sizing_callbacks(app):
                 )
             ]
 
+            fraction_configs = [
+                ("Full Kelly", "full", 1.0),
+                ("Half Kelly", "half", 0.5),
+                ("Quarter Kelly", "quarter", 0.25),
+            ]
+
+            margin_rows = []
+            for trade in trades:
+                margin_req = getattr(trade, "margin_req", None)
+                if margin_req is None:
+                    continue
+
+                date_opened = getattr(trade, "date_opened", None)
+                if hasattr(date_opened, "isoformat"):
+                    date_val = date_opened.isoformat()
+                else:
+                    date_val = date_opened
+
+                margin_pct_capital = (
+                    (margin_req / starting_capital) * 100 if starting_capital else None
+                )
+
+                funds_close = getattr(trade, "funds_at_close", None) or 0
+                margin_rows.append(
+                    {
+                        "date": date_val,
+                        "margin_pct_capital": margin_pct_capital,
+                        "margin_req": margin_req,
+                        "utilization_pct": (
+                            (margin_req / funds_close) * 100 if funds_close else None
+                        ),
+                    }
+                )
+
+            margin_fig = go.Figure()
+            margin_fig.update_layout(
+                template="plotly_white",
+                margin=dict(l=40, r=20, t=60, b=40),
+                height=320,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                yaxis=dict(title="% of Starting Capital", ticksuffix="%"),
+            )
+
+            dates = []
+            margin_pct_values = []
+            if margin_rows:
+                margin_rows.sort(key=lambda row: row["date"] or "")
+                for row in margin_rows:
+                    dates.append(row["date"])
+                    margin_pct_values.append(row["margin_pct_capital"] or 0)
+
+                margin_fig.add_trace(
+                    go.Scatter(
+                        x=dates,
+                        y=margin_pct_values,
+                        mode="lines+markers",
+                        name="Historical Margin %",
+                        line=dict(color="#1f77b4", width=2),
+                        marker=dict(size=6),
+                    )
+                )
+            else:
+                margin_fig.add_annotation(
+                    text="Margin data unavailable",
+                    xref="paper",
+                    yref="paper",
+                    x=0.5,
+                    y=0.5,
+                    showarrow=False,
+                    font=dict(color="#6c6c6c"),
+                )
+
+            max_margin_pct = max([v for v in margin_pct_values if v is not None], default=0)
+
+            fraction_tiles_children = []
+            if kelly_pct > 0 and starting_capital > 0:
+                for label, key, multiplier in fraction_configs:
+                    fraction_pct = max(kelly_pct * multiplier, 0)
+                    fraction_amount = starting_capital * fraction_pct / 100
+                    coverage_ratio = (fraction_pct / max_margin_pct) if max_margin_pct else None
+                    covers = coverage_ratio is None or coverage_ratio >= 1
+                    status_color = "teal" if covers else "orange"
+                    status_text = "Covers Margin" if covers else "Shortfall"
+                    highlight = key == selected_choice
+
+                    fraction_tiles_children.append(
+                        dmc.Paper(
+                            children=[
+                                dmc.Stack(
+                                    [
+                                        dmc.Group(
+                                            [
+                                                dmc.Text(label, fw=600),
+                                                dmc.Badge(
+                                                    status_text, color=status_color, variant="light"
+                                                ),
+                                            ],
+                                            justify="space-between",
+                                        ),
+                                        dmc.Text(
+                                            f"{fraction_pct:.1f}% of capital",
+                                            size="sm",
+                                            c="dimmed",
+                                        ),
+                                        dmc.Text(
+                                            f"${fraction_amount:,.0f}",
+                                            fw=700,
+                                            size="lg",
+                                        ),
+                                        dmc.Text(
+                                            "Margin coverage: "
+                                            + (
+                                                f"{coverage_ratio:.2f}x"
+                                                if coverage_ratio is not None
+                                                else "--"
+                                            ),
+                                            size="xs",
+                                            c="dimmed",
+                                        ),
+                                    ],
+                                    gap="xs",
+                                )
+                            ],
+                            withBorder=True,
+                            radius="md",
+                            shadow="sm" if highlight else "xs",
+                            style={
+                                "border": (
+                                    "2px solid var(--mantine-color-teal-5)"
+                                    if highlight
+                                    else "1px solid var(--mantine-color-gray-3)"
+                                ),
+                            },
+                        )
+                    )
+
+                fraction_tiles_component = dmc.SimpleGrid(
+                    cols=3,
+                    spacing="md",
+                    children=fraction_tiles_children,
+                )
+            else:
+                fraction_tiles_component = dmc.Alert(
+                    "Positive Kelly result required to show fraction sizing tiles.",
+                    color="orange",
+                    variant="light",
+                )
+
+            if margin_pct_values:
+                for label, key, multiplier in fraction_configs:
+                    level = max(kelly_pct * multiplier, 0)
+                    line_color = "#2f9e44" if key == selected_choice else "#adb5bd"
+                    dash_style = "solid" if key == selected_choice else "dot"
+                    margin_fig.add_hline(
+                        y=level,
+                        line_dash=dash_style,
+                        line_color=line_color,
+                        annotation=dict(
+                            text=f"{label} ({level:.1f}%)",
+                            showarrow=False,
+                            font=dict(color=line_color),
+                            yanchor="bottom",
+                        ),
+                    )
+
+            margin_warning = ""
+            if max_margin_pct and applied_pct < max_margin_pct:
+                margin_warning = dmc.Alert(
+                    children=[
+                        dmc.Text("⚠️ Margin Shortfall", fw=600, size="sm"),
+                        dmc.Text(
+                            f"Historical max margin used {max_margin_pct:.1f}% of starting capital, exceeding your {choice_label} allocation ({applied_pct:.1f}%).",
+                            size="sm",
+                        ),
+                    ],
+                    color="orange",
+                    variant="light",
+                )
+
+            return (
+                kelly_summary,
+                fraction_tiles_component,
+                margin_fig,
+                margin_warning,
+            )
+
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Error calculating Kelly Criterion: %s", exc)
-            return dmc.Alert(
-                children=f"Error calculating Kelly Criterion: {exc}",
-                color="red",
-                variant="light",
-            )
+            return _empty_outputs(f"Error calculating Kelly Criterion: {exc}")

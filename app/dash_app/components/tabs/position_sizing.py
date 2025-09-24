@@ -209,6 +209,43 @@ def create_position_sizing_tab():
                                                         justify="space-between",
                                                     ),
                                                     html.Div(id="position-sizing-kelly-analysis"),
+                                                    html.Div(id="position-sizing-fraction-tiles"),
+                                                ],
+                                            )
+                                        ],
+                                        p="lg",
+                                        withBorder=True,
+                                    ),
+                                    dmc.Paper(
+                                        children=[
+                                            dmc.Stack(
+                                                gap="md",
+                                                children=[
+                                                    dmc.Group(
+                                                        [
+                                                            dmc.Title(
+                                                                "Margin Utilization",
+                                                                order=4,
+                                                            ),
+                                                            create_info_tooltip(
+                                                                title="Margin Utilization",
+                                                                content="Track how much of your starting capital historical trades consumed in margin.",
+                                                                detailed_content="We compare historical margin requirements against your selected Kelly allocation to highlight potential capital shortfalls.",
+                                                                tooltip_id="ps-margin-utilization",
+                                                            ),
+                                                        ],
+                                                        justify="space-between",
+                                                        align="center",
+                                                    ),
+                                                    dcc.Loading(
+                                                        dcc.Graph(
+                                                            id="position-sizing-margin-chart",
+                                                            config={"displayModeBar": False},
+                                                            style={"height": "320px"},
+                                                        ),
+                                                        type="default",
+                                                    ),
+                                                    html.Div(id="position-sizing-margin-warning"),
                                                 ],
                                             )
                                         ],
