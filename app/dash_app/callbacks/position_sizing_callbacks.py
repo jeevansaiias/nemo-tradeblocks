@@ -6,12 +6,12 @@ Risk of Ruin, and other position sizing methodologies.
 """
 
 import logging
-import numpy as np
+
 import dash_mantine_components as dmc
 from dash import callback, Input, Output
-from dash.exceptions import PreventUpdate
 
 from app.data.models import Portfolio
+from app.utils.kelly import calculate_kelly_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -33,26 +33,16 @@ def register_position_sizing_callbacks(app):
         try:
             portfolio = Portfolio(**portfolio_data)
             trades = portfolio.trades
-
-            # Calculate Kelly Criterion from historical trades
-            wins = [trade.pl for trade in trades if trade.pl > 0]
-            losses = [abs(trade.pl) for trade in trades if trade.pl < 0]
+            kelly_metrics = calculate_kelly_metrics(trades)
 
             kelly_content = []
 
-            if wins and losses:
-                win_rate = len(wins) / len(trades)
-                avg_win = np.mean(wins)
-                avg_loss = np.mean(losses)
-
-                # Kelly formula: f = (bp - q) / b
-                # where b = avg_win/avg_loss, p = win_probability, q = 1-p
-                b = avg_win / avg_loss
-                p = win_rate
-                q = 1 - p
-
-                kelly_fraction = (b * p - q) / b
-                kelly_pct = kelly_fraction * 100
+            if kelly_metrics.avg_win > 0 and kelly_metrics.avg_loss > 0:
+                kelly_pct = kelly_metrics.percent
+                b = kelly_metrics.payoff_ratio
+                win_rate = kelly_metrics.win_rate
+                avg_win = kelly_metrics.avg_win
+                avg_loss = kelly_metrics.avg_loss
 
                 kelly_content = [
                     dmc.Grid(
