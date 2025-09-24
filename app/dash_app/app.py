@@ -157,6 +157,12 @@ def create_dash_app():
             dcc.Store(id="current-daily-log-data", storage_type="local"),
             dcc.Store(id="daily-log-filename", storage_type="local"),
             dcc.Store(id="theme-store", storage_type="local", data={"theme": "auto"}),
+            dcc.Store(
+                id="position-sizing-store",
+                storage_type="local",
+                data={"version": 1, "portfolios": {}},
+            ),
+            dcc.Store(id="position-sizing-active-fingerprint", storage_type="memory"),
             # Hidden div for theme callback output
             html.Div(id="theme-output", style={"display": "none"}),
             # Main layout

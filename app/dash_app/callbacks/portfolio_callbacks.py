@@ -529,7 +529,16 @@ def register_callbacks(app):
             return create_risk_simulator_tab(), *nav_states  # New risk simulator tab
         elif triggered == "nav-position-sizing":
             nav_states[4] = True  # position-sizing active
-            return create_position_sizing_tab(), *nav_states
+            try:
+                return create_position_sizing_tab(), *nav_states
+            except Exception as exc:  # pragma: no cover - defensive UI guard
+                logger.exception("Failed to render Position Sizing tab: %s", exc)
+                fallback = dmc.Alert(
+                    "Position Sizing tab failed to render. Check logs for details.",
+                    color="red",
+                    variant="light",
+                )
+                return fallback, *nav_states
         elif triggered == "nav-correlation":
             nav_states[5] = True  # correlation active
             return create_correlation_matrix_tab(), *nav_states
