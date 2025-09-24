@@ -50,6 +50,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+
       - name: Ensure Render assets
         run: |
           test -f uv.lock || (echo "❌ uv.lock missing" && exit 1)
