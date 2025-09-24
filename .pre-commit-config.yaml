@@ -18,12 +18,3 @@ repos:
   - id: black
     name: "\U0001F3A8 Format Python code"
     language_version: python3
-- repo: local
-  hooks:
-  - id: poetry-export
-    name: Export requirements.txt
-    entry: poetry export --without-hashes -f requirements.txt -o requirements.txt
-    language: system
-    pass_filenames: false
-fail_fast: true
-minimum_pre_commit_version: 3.0.0
