@@ -25,16 +25,10 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Check if virtual environment is activated
-if [[ "$VIRTUAL_ENV" == "" ]]; then
-    print_warning "Virtual environment not activated. Activating..."
-    if [ -d "venv" ]; then
-        source venv/bin/activate
-        print_success "Virtual environment activated"
-    else
-        print_warning "Virtual environment not found. Run './scripts/setup.sh' first."
-        exit 1
-    fi
+# Ensure Poetry-managed virtualenv exists in project
+if [ ! -d ".venv" ]; then
+    print_warning ".venv not found. Run './scripts/setup.sh' first."
+    exit 1
 fi
 
 # Set development environment variables
@@ -60,4 +54,4 @@ print_info "Press Ctrl+C to stop the server"
 print_info ""
 
 # Start the development server with hot-reload
-python app/main.py
+POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run python app/main.py

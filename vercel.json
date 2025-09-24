@@ -6,6 +6,8 @@
       "use": "@vercel/python"
     }
   ],
+  "buildCommand": "bash buildfiles.sh",
+  "installCommand": "pip install -r requirements.txt",
   "routes": [
     {
       "src": "/api/(.*)",

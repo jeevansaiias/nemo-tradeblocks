@@ -31,58 +31,24 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if Python 3.11+ is installed
-print_status "Checking Python version..."
-if command -v python3 &> /dev/null; then
-    PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-    print_status "Found Python $PYTHON_VERSION"
-
-    # Check if version is 3.11 or higher
-    if python3 -c 'import sys; exit(0 if sys.version_info >= (3, 11) else 1)'; then
-        print_success "Python version is compatible"
-    else
-        print_error "Python 3.11+ is required. Please upgrade Python."
-        exit 1
-    fi
-else
-    print_error "Python 3 is not installed. Please install Python 3.11+."
+# Ensure Poetry is installed
+print_status "Checking for Poetry..."
+if ! command -v poetry &> /dev/null; then
+    print_error "Poetry is not installed. See https://python-poetry.org/docs/#installation"
     exit 1
 fi
+print_success "Poetry detected"
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    print_status "Creating virtual environment..."
-    python3 -m venv venv
-    print_success "Virtual environment created"
-else
-    print_status "Virtual environment already exists"
-fi
-
-# Activate virtual environment
-print_status "Activating virtual environment..."
-source venv/bin/activate
-
-# Upgrade pip
-print_status "Upgrading pip..."
-pip install --upgrade pip
-
-# Install production dependencies
-print_status "Installing production dependencies..."
-pip install -r requirements.txt
-
-# Install development dependencies if they exist
-if [ -f "dev-requirements.txt" ]; then
-    print_status "Installing development dependencies..."
-    pip install -r dev-requirements.txt
-else
-    print_status "Installing basic development tools..."
-    pip install pytest pytest-cov black ruff mypy pre-commit ipython rich watchdog httpx
-fi
+# Install project dependencies using Poetry (create .venv in project)
+print_status "Installing project dependencies via Poetry..."
+POETRY_VIRTUALENVS_IN_PROJECT=1 poetry install --with dev
+print_success "Dependencies installed"
 
 # Setup pre-commit hooks if .pre-commit-config.yaml exists
+# Install pre-commit hooks within Poetry environment
 if [ -f ".pre-commit-config.yaml" ]; then
     print_status "Installing pre-commit hooks..."
-    pre-commit install
+    POETRY_VIRTUALENVS_IN_PROJECT=1 poetry run pre-commit install
     print_success "Pre-commit hooks installed"
 else
     print_warning "No pre-commit configuration found, skipping pre-commit setup"
