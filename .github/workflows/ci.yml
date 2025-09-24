@@ -50,18 +50,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ensure Render build assets are present
+      - name: Ensure Render assets
         run: |
           test -f uv.lock || (echo "❌ uv.lock missing" && exit 1)
-          test -f buildfiles.sh || (echo "❌ buildfiles.sh missing" && exit 1)
-          test -f vercel.json && echo "ℹ️ vercel.json found (optional)"
-
-      - name: Verify build script
-        run: |
-          chmod +x buildfiles.sh
-          ./buildfiles.sh
-
-      - name: Confirm start script exists
-        run: |
           test -f scripts/start-dev.sh || (echo "❌ scripts/start-dev.sh missing" && exit 1)
+
+      - name: Validate lockfile
+        run: uv lock --frozen
+
+      - name: Check start script
+        run: |
+          grep -q "uv run" scripts/start-dev.sh || (echo "❌ start script must invoke uv" && exit 1)
           echo "✅ Render start assets verified"
