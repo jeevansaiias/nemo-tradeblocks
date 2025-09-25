@@ -14,8 +14,6 @@ def create_position_sizing_tab():
         gap="xl",
         p="lg",
         children=[
-            # Presence marker so callbacks only fire when tab is mounted
-            dcc.Store(id="position-sizing-present", data=True),
             dmc.Stack(
                 gap="xs",
                 children=[
@@ -118,8 +116,56 @@ def create_position_sizing_tab():
                         p="lg",
                         withBorder=True,
                         children=[
-                            html.Div(id="position-sizing-kelly-analysis"),
-                            html.Div(id="position-sizing-fraction-tiles"),
+                            dmc.Stack(
+                                gap="lg",
+                                children=[
+                                    dmc.Group(
+                                        [
+                                            dmc.Title("Kelly Allocation", order=4),
+                                            create_info_tooltip(
+                                                title="Kelly Allocation",
+                                                content="Set Kelly fractions per strategy to build an aggregate allocation plan.",
+                                                detailed_content="Adjust the Kelly %, run the analysis, and review expectancy stats alongside capital requirements.",
+                                                tooltip_id="ps-kelly-allocation",
+                                            ),
+                                        ],
+                                        justify="space-between",
+                                        align="center",
+                                    ),
+                                    dmc.Text(
+                                        "Review each strategy, choose the Kelly multiplier to apply, then run the allocation to see portfolio and strategy metrics.",
+                                        size="sm",
+                                        c="dimmed",
+                                    ),
+                                    html.Div(
+                                        id="ps-strategy-input-grid",
+                                        children=dmc.Alert(
+                                            "Upload a portfolio to configure strategy sizing.",
+                                            color="gray",
+                                            variant="light",
+                                        ),
+                                    ),
+                                    dmc.Group(
+                                        [
+                                            dmc.Button(
+                                                "Run Allocation",
+                                                id="ps-run-strategy-analysis",
+                                                leftSection=DashIconify(
+                                                    icon="tabler:calculator", width=16
+                                                ),
+                                                variant="filled",
+                                                color="blue",
+                                                size="md",
+                                            ),
+                                            html.Div(id="ps-strategy-action-feedback"),
+                                        ],
+                                        justify="space-between",
+                                        align="center",
+                                    ),
+                                    html.Div(id="ps-portfolio-kelly-summary"),
+                                    html.Div(id="ps-strategy-results"),
+                                ],
+                            )
                         ],
                     ),
                     dmc.Paper(
@@ -131,52 +177,28 @@ def create_position_sizing_tab():
                                 children=[
                                     dmc.Group(
                                         [
-                                            dmc.Title("Strategy Overrides", order=4),
+                                            dmc.Title("Margin Utilization", order=4),
                                             create_info_tooltip(
-                                                title="Strategy Overrides",
-                                                content="Future home for per-strategy sizing adjustments.",
-                                                detailed_content="We plan to let you cap contracts or adjust Kelly multipliers for individual strategies while keeping global defaults.",
-                                                tooltip_id="ps-strategy-overrides",
+                                                title="Margin Utilization",
+                                                content="Visualize margin needs for the portfolio and each strategy.",
+                                                detailed_content="We chart margin as a percent of starting capital for the combined portfolio and overlay each strategy's historical usage.",
+                                                tooltip_id="ps-margin-utilization",
                                             ),
                                         ],
                                         justify="space-between",
                                         align="center",
                                     ),
-                                    dmc.Alert(
-                                        "Strategy-specific sizing controls are coming soon.",
-                                        color="gray",
-                                        variant="light",
+                                    dcc.Loading(
+                                        dcc.Graph(
+                                            id="ps-strategy-margin-chart",
+                                            config={"displayModeBar": False},
+                                            style={"height": "320px"},
+                                        ),
+                                        type="default",
                                     ),
+                                    html.Div(id="ps-strategy-margin-warning"),
                                 ],
                             )
-                        ],
-                    ),
-                    dmc.Paper(
-                        p="lg",
-                        withBorder=True,
-                        children=[
-                            dmc.Group(
-                                [
-                                    dmc.Title("Margin Utilization", order=4),
-                                    create_info_tooltip(
-                                        title="Margin Utilization",
-                                        content="Compare historical margin requirements against your current Kelly fraction.",
-                                        detailed_content="We chart margin as a percent of starting capital and overlay Kelly guides for quick comparison.",
-                                        tooltip_id="ps-margin-utilization",
-                                    ),
-                                ],
-                                justify="space-between",
-                                align="center",
-                            ),
-                            dcc.Loading(
-                                dcc.Graph(
-                                    id="position-sizing-margin-chart",
-                                    config={"displayModeBar": False},
-                                    style={"height": "320px"},
-                                ),
-                                type="default",
-                            ),
-                            html.Div(id="position-sizing-margin-warning"),
                         ],
                     ),
                     dmc.Paper(

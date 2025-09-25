@@ -315,6 +315,35 @@ def create_main_layout():
                                 style={"position": "relative"},
                                 children=[
                                     html.Div(id="main-content", children=create_welcome_content()),
+                                    # Hidden placeholder components for Position Sizing callbacks
+                                    html.Div(
+                                        style={"display": "none"},
+                                        children=[
+                                            dmc.NumberInput(
+                                                id="ps-starting-capital-input", value=100000
+                                            ),
+                                            dmc.NumberInput(
+                                                id="ps-target-drawdown-input", value=10
+                                            ),
+                                            dmc.NumberInput(
+                                                id="ps-kelly-fraction-input", value=100
+                                            ),
+                                            html.Div(id="ps-saved-feedback"),
+                                            dmc.Button(id="ps-save-settings", n_clicks=0),
+                                            dmc.Button(id="ps-reset-settings", n_clicks=0),
+                                            html.Div(id="ps-portfolio-kelly-summary"),
+                                            html.Div(id="ps-strategy-results"),
+                                            dcc.Graph(
+                                                id="ps-strategy-margin-chart",
+                                                figure={"data": [], "layout": {}},
+                                                style={"display": "none"},
+                                            ),
+                                            html.Div(id="ps-strategy-margin-warning"),
+                                            html.Div(id="ps-strategy-action-feedback"),
+                                            dmc.Button(id="ps-run-strategy-analysis", n_clicks=0),
+                                            html.Div(id="ps-strategy-input-grid"),
+                                        ],
+                                    ),
                                     dmc.LoadingOverlay(id="loading-overlay", visible=False),
                                 ],
                             ),

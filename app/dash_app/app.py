@@ -6,6 +6,7 @@ from flask_cors import CORS
 
 from app.dash_app.callbacks.portfolio_callbacks import register_callbacks
 from app.dash_app.layouts.main_layout import create_main_layout
+from app.dash_app.components.tabs.position_sizing import create_position_sizing_tab
 
 
 def create_dash_app():
@@ -123,33 +124,33 @@ def create_dash_app():
     </html>
     """
 
-    # Configure DMC theme - TradeBlocks themed
-    app.layout = dmc.MantineProvider(
-        theme={
-            "primaryColor": "blue",
-            "fontFamily": "'Inter', sans-serif",
-            "colors": {
-                "blocks": [
-                    "#EBF4FF",
-                    "#C3DAFE",
-                    "#A3BFFA",
-                    "#7C9CF9",
-                    "#667EEA",
-                    "#5A67D8",
-                    "#4C51BF",
-                    "#434190",
-                    "#3C366B",
-                    "#322659",
-                ]
-            },
-            "components": {
-                "Paper": {"defaultProps": {"shadow": "sm", "radius": "md"}},
-                "Card": {"defaultProps": {"shadow": "sm", "radius": "md", "withBorder": True}},
-                "Button": {"defaultProps": {"radius": "md"}},
-                "ActionIcon": {"defaultProps": {"radius": "md"}},
-            },
+    theme_config = {
+        "primaryColor": "blue",
+        "fontFamily": "'Inter', sans-serif",
+        "colors": {
+            "blocks": [
+                "#EBF4FF",
+                "#C3DAFE",
+                "#A3BFFA",
+                "#7C9CF9",
+                "#667EEA",
+                "#5A67D8",
+                "#4C51BF",
+                "#434190",
+                "#3C366B",
+                "#322659",
+            ],
         },
-        children=[
+        "components": {
+            "Paper": {"defaultProps": {"shadow": "sm", "radius": "md"}},
+            "Card": {"defaultProps": {"shadow": "sm", "radius": "md", "withBorder": True}},
+            "Button": {"defaultProps": {"radius": "md"}},
+            "ActionIcon": {"defaultProps": {"radius": "md"}},
+        },
+    }
+
+    def build_base_children():
+        return [
             # Global stores
             dcc.Store(id="portfolio-store", storage_type="session"),
             dcc.Store(id="current-portfolio-data", storage_type="local"),
@@ -162,12 +163,32 @@ def create_dash_app():
                 storage_type="local",
                 data={"version": 1, "portfolios": {}},
             ),
+            dcc.Store(id="position-sizing-present", storage_type="memory", data=False),
             dcc.Store(id="position-sizing-active-fingerprint", storage_type="memory"),
             # Hidden div for theme callback output
             html.Div(id="theme-output", style={"display": "none"}),
             # Main layout
             create_main_layout(),
+        ]
+
+    # Configure DMC theme - TradeBlocks themed
+    app.layout = dmc.MantineProvider(
+        theme=theme_config,
+        children=build_base_children(),
+    )
+
+    # Validation layout ensures dynamic tabs (e.g., position sizing) are registered with Dash
+    # Create a hidden container with all possible dynamic components
+    validation_components = html.Div(
+        style={"display": "none"},
+        children=[
+            create_position_sizing_tab(),
         ],
+    )
+
+    app.validation_layout = dmc.MantineProvider(
+        theme=theme_config,
+        children=build_base_children() + [validation_components],
     )
 
     # Register all callbacks
