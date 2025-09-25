@@ -283,12 +283,18 @@ def register_position_sizing_callbacks(app):
         Output("ps-target-drawdown-input", "value"),
         Output("ps-kelly-fraction-input", "value"),
         Output("position-sizing-active-fingerprint", "data"),
+        Input("position-sizing-present", "data"),  # presence marker
         Input("position-sizing-store", "data"),
         Input("current-portfolio-data", "data"),
         State("current-daily-log-data", "data"),
-        prevent_initial_call=False,
+        prevent_initial_call=True,
     )
-    def hydrate_inputs(store_data, portfolio_data, daily_log_data):
+    def hydrate_inputs(present, store_data, portfolio_data, daily_log_data):
+        # If the tab isn't mounted, avoid triggering missing component errors
+        if not present:
+            from dash import no_update
+
+            return no_update, no_update, no_update, no_update
         store = _ensure_store(store_data)
         fingerprint = _portfolio_fingerprint(portfolio_data)
 
@@ -469,26 +475,6 @@ def register_position_sizing_callbacks(app):
         updated_store["portfolios"][fingerprint] = portfolio_entry
 
         return updated_store, message
-
-    @app.callback(
-        Output("ps-kelly-fraction-input", "value", allow_duplicate=True),
-        Input("ps-fraction-preset-full", "n_clicks"),
-        Input("ps-fraction-preset-half", "n_clicks"),
-        Input("ps-fraction-preset-quarter", "n_clicks"),
-        prevent_initial_call=True,
-    )
-    def apply_fraction_preset(full_clicks, half_clicks, quarter_clicks):
-        preset_map = {
-            "ps-fraction-preset-full": 100.0,
-            "ps-fraction-preset-half": 50.0,
-            "ps-fraction-preset-quarter": 25.0,
-        }
-
-        triggered = ctx.triggered_id
-        if not triggered or preset_map.get(triggered) is None:
-            return no_update
-
-        return preset_map[triggered]
 
     @app.callback(
         Output("position-sizing-kelly-analysis", "children"),

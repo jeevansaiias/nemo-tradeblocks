@@ -465,7 +465,6 @@ def create_simulation_controls():
                                 size="md",
                             ),
                         ],
-                        justify="center",
                         gap="md",
                     ),
                 ],

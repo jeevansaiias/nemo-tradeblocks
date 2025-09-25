@@ -14,6 +14,8 @@ def create_position_sizing_tab():
         gap="xl",
         p="lg",
         children=[
+            # Presence marker so callbacks only fire when tab is mounted
+            dcc.Store(id="position-sizing-present", data=True),
             dmc.Stack(
                 gap="xs",
                 children=[
@@ -80,36 +82,6 @@ def create_position_sizing_tab():
                                         suffix="%",
                                     ),
                                 ],
-                            ),
-                            dmc.Group(
-                                [
-                                    dmc.Text("Quick presets", size="xs", c="dimmed"),
-                                    dmc.Group(
-                                        gap="xs",
-                                        children=[
-                                            dmc.Button(
-                                                "Full Kelly",
-                                                id="ps-fraction-preset-full",
-                                                variant="subtle",
-                                                size="xs",
-                                            ),
-                                            dmc.Button(
-                                                "Half Kelly",
-                                                id="ps-fraction-preset-half",
-                                                variant="subtle",
-                                                size="xs",
-                                            ),
-                                            dmc.Button(
-                                                "Quarter Kelly",
-                                                id="ps-fraction-preset-quarter",
-                                                variant="subtle",
-                                                size="xs",
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                                justify="space-between",
-                                align="center",
                             ),
                             dmc.Group(
                                 [
