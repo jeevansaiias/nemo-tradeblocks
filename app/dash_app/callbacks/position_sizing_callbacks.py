@@ -299,189 +299,23 @@ def register_position_sizing_callbacks(app):
     """Register all position sizing related callbacks."""
 
     @app.callback(
-        Output("position-sizing-store", "data"),
-        Input("current-portfolio-data", "data"),
-        State("position-sizing-store", "data"),
-        State("current-daily-log-data", "data"),
-        prevent_initial_call=False,
-    )
-    def bootstrap_position_sizing_store(portfolio_data, store_data, daily_log_data):
-        store = _ensure_store(store_data)
-
-        if not portfolio_data:
-            return store
-
-        fingerprint = _portfolio_fingerprint(portfolio_data)
-        if not fingerprint:
-            return store
-
-        inferred_capital = _infer_starting_capital(portfolio_data, daily_log_data)
-        existing = store["portfolios"].get(fingerprint)
-        synced = _sync_settings(existing, portfolio_data, inferred_capital)
-
-        if existing == synced:
-            return store_data or store
-
-        logger.info("Initializing position sizing defaults for portfolio %s", fingerprint)
-        store["portfolios"][fingerprint] = synced
-        return store
-
-    @app.callback(
         Output("ps-starting-capital-input", "value"),
         Output("ps-kelly-fraction-input", "value"),
-        Output("position-sizing-active-fingerprint", "data"),
-        Input("main-content", "children"),
         Input("position-sizing-present", "data"),
-        Input("position-sizing-store", "data"),
         Input("current-portfolio-data", "data"),
         State("current-daily-log-data", "data"),
         prevent_initial_call=False,
     )
-    def hydrate_inputs(main_children, tab_present, store_data, portfolio_data, daily_log_data):
+    def hydrate_inputs(tab_present, portfolio_data, daily_log_data):
         # Only update if Position Sizing tab is actually active
         if not tab_present:
             raise PreventUpdate
-        store = _ensure_store(store_data)
-        fingerprint = _portfolio_fingerprint(portfolio_data)
 
-        portfolio_settings = None
-        if fingerprint:
-            portfolio_entry = store["portfolios"].get(fingerprint)
-            if portfolio_entry:
-                portfolio_settings = portfolio_entry.get("portfolio", {})
-        else:
-            if portfolio_data:
-                logger.warning(
-                    "Could not compute portfolio fingerprint; position sizing preferences will not persist."
-                )
-
+        # Try to infer starting capital from portfolio data
         inferred_capital = _infer_starting_capital(portfolio_data, daily_log_data)
+        starting_capital = inferred_capital if inferred_capital else DEFAULT_STARTING_CAPITAL
 
-        if portfolio_settings is None and portfolio_data:
-            portfolio_settings = _default_portfolio_settings(portfolio_data, inferred_capital)[
-                "portfolio"
-            ]
-
-        starting_capital = None
-        fraction_pct = DEFAULT_KELLY_PCT
-        source = "default"
-
-        if portfolio_settings:
-            starting_capital = portfolio_settings.get("starting_capital")
-            source = portfolio_settings.get("starting_capital_source", "default")
-            fraction_pct = portfolio_settings.get("kelly_fraction_pct", DEFAULT_KELLY_PCT)
-
-        if source != "manual":
-            if inferred_capital and (
-                starting_capital in (None, 0) or starting_capital == DEFAULT_STARTING_CAPITAL
-            ):
-                starting_capital = inferred_capital
-                source = "inferred"
-
-        if starting_capital in (None, 0):
-            starting_capital = DEFAULT_STARTING_CAPITAL
-            if source != "manual":
-                source = "default"
-
-        try:
-            starting_capital = int(round(float(starting_capital)))
-        except (TypeError, ValueError):
-            starting_capital = DEFAULT_STARTING_CAPITAL
-
-        try:
-            fraction_pct = max(0.0, float(fraction_pct))
-        except (TypeError, ValueError):
-            fraction_pct = DEFAULT_KELLY_PCT
-
-        logger.debug(
-            "Hydrating inputs capital=%s (source=%s) fraction=%s fingerprint=%s",
-            starting_capital,
-            source,
-            fraction_pct,
-            fingerprint,
-        )
-
-        return starting_capital, fraction_pct, fingerprint
-
-    @app.callback(
-        Output("position-sizing-store", "data", allow_duplicate=True),
-        Input("ps-starting-capital-input", "value"),
-        Input("ps-kelly-fraction-input", "value"),
-        State("position-sizing-store", "data"),
-        State("position-sizing-active-fingerprint", "data"),
-        State("current-portfolio-data", "data"),
-        State("current-daily-log-data", "data"),
-        State("position-sizing-present", "data"),
-        prevent_initial_call=True,
-    )
-    def persist_preferences(
-        starting_capital,
-        fraction_pct,
-        store_data,
-        fingerprint,
-        portfolio_data,
-        daily_log_data,
-        tab_present,
-    ):
-        triggered = ctx.triggered_id
-        if not triggered:
-            return no_update
-
-        # Only process if Position Sizing tab is active
-        if not tab_present:
-            raise PreventUpdate
-
-        if not fingerprint or not portfolio_data:
-            logger.warning(
-                "Position sizing save skipped: fingerprint=%s portfolio_present=%s",
-                fingerprint,
-                bool(portfolio_data),
-            )
-            return no_update
-
-        store = _ensure_store(store_data)
-        inferred_capital = _infer_starting_capital(portfolio_data, daily_log_data)
-        portfolio_entry = _sync_settings(
-            store["portfolios"].get(fingerprint),
-            portfolio_data,
-            inferred_capital,
-        )
-
-        portfolio_entry.setdefault("portfolio", {})
-
-        try:
-            parsed_capital = (
-                int(round(float(starting_capital))) if starting_capital not in (None, "") else None
-            )
-        except (TypeError, ValueError):
-            parsed_capital = None
-
-        if parsed_capital is None:
-            parsed_capital = DEFAULT_STARTING_CAPITAL
-
-        portfolio_entry["portfolio"]["starting_capital"] = parsed_capital
-
-        if triggered == "ps-starting-capital-input":
-            portfolio_entry["portfolio"]["starting_capital_source"] = "manual"
-
-        # Keep target_drawdown for backward compatibility but don't update it
-        if "target_drawdown_pct" not in portfolio_entry["portfolio"]:
-            portfolio_entry["portfolio"]["target_drawdown_pct"] = DEFAULT_TARGET_DRAWDOWN
-
-        try:
-            parsed_fraction = max(0.0, float(fraction_pct))
-        except (TypeError, ValueError):
-            parsed_fraction = DEFAULT_KELLY_PCT
-
-        portfolio_entry["portfolio"]["kelly_fraction_pct"] = parsed_fraction
-
-        if store["portfolios"].get(fingerprint) == portfolio_entry:
-            return no_update
-
-        updated_store = deepcopy(store)
-        updated_store["portfolios"][fingerprint] = portfolio_entry
-
-        return updated_store
+        return starting_capital, DEFAULT_KELLY_PCT
 
     @app.callback(
         Output("ps-strategy-input-grid", "children"),
@@ -598,72 +432,6 @@ def register_position_sizing_callbacks(app):
         )
 
     @app.callback(
-        Output("position-sizing-store", "data", allow_duplicate=True),
-        Input({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
-        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
-        State("position-sizing-store", "data"),
-        State("position-sizing-active-fingerprint", "data"),
-        prevent_initial_call=True,
-    )
-    def persist_strategy_kelly(values, input_ids, store_data, fingerprint):
-        if not fingerprint or not isinstance(ctx.triggered_id, dict):
-            return no_update
-
-        strategy_name = ctx.triggered_id.get("strategy")
-        if not strategy_name:
-            return no_update
-
-        if not values or not input_ids:
-            return no_update
-
-        # Build a mapping from strategy name to current input value
-        try:
-            id_value_map = {
-                component_id.get("strategy"): value
-                for component_id, value in zip(input_ids, values)
-                if isinstance(component_id, dict)
-            }
-        except Exception:  # pragma: no cover - defensive guard
-            return no_update
-
-        if strategy_name not in id_value_map:
-            return no_update
-
-        value = id_value_map[strategy_name]
-
-        store = _ensure_store(store_data)
-        portfolio_entry = store["portfolios"].get(fingerprint)
-        if not portfolio_entry:
-            return no_update
-
-        strategies = portfolio_entry.get("strategies", {})
-        try:
-            parsed_value = max(0.0, float(value)) if value not in (None, "") else DEFAULT_KELLY_PCT
-        except (TypeError, ValueError):
-            parsed_value = DEFAULT_KELLY_PCT
-
-        current_value = strategies.get(strategy_name, {}).get("kelly_pct", DEFAULT_KELLY_PCT)
-        try:
-            current_value = float(current_value)
-        except (TypeError, ValueError):
-            current_value = DEFAULT_KELLY_PCT
-
-        if abs(current_value - parsed_value) < 1e-6:
-            return no_update
-
-        updated_store = deepcopy(store)
-        updated_entry = updated_store["portfolios"].setdefault(
-            fingerprint,
-            {"version": SETTINGS_VERSION, "portfolio": {}, "strategies": {}},
-        )
-        strategies_entry = updated_entry.setdefault("strategies", {})
-        strategy_settings = dict(strategies_entry.get(strategy_name, {}))
-        strategy_settings["kelly_pct"] = parsed_value
-        strategies_entry[strategy_name] = strategy_settings
-
-        return updated_store
-
-    @app.callback(
         Output("ps-portfolio-kelly-summary", "children"),
         Output("ps-strategy-results", "children"),
         Output("ps-strategy-margin-chart", "figure"),
@@ -672,9 +440,20 @@ def register_position_sizing_callbacks(app):
         Input("ps-run-strategy-analysis", "n_clicks"),
         Input("current-portfolio-data", "data"),
         Input("theme-store", "data"),
-        State("position-sizing-store", "data"),
+        State("ps-starting-capital-input", "value"),
+        State("ps-kelly-fraction-input", "value"),
+        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
+        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
     )
-    def run_strategy_analysis(n_clicks, portfolio_data, theme_data, store_data):
+    def run_strategy_analysis(
+        n_clicks,
+        portfolio_data,
+        theme_data,
+        starting_capital_input,
+        kelly_fraction_input,
+        strategy_kelly_values,
+        strategy_kelly_ids,
+    ):
         placeholder_fig = _blank_margin_figure(theme_data)
 
         def _empty_outputs(message: str):
@@ -699,9 +478,6 @@ def register_position_sizing_callbacks(app):
                 "Adjust Kelly inputs and click Run Allocation to calculate metrics."
             )
 
-        store = _ensure_store(store_data)
-        fingerprint = _portfolio_fingerprint(portfolio_data)
-
         try:
             portfolio = Portfolio(**portfolio_data)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -712,29 +488,32 @@ def register_position_sizing_callbacks(app):
         if not trades:
             return _empty_outputs("No trades available to analyze.")
 
-        portfolio_entry = store["portfolios"].get(fingerprint, {}) if fingerprint else {}
-        portfolio_settings = portfolio_entry.get("portfolio", {})
-        strategies_settings = dict(portfolio_entry.get("strategies", {}))
-
-        collected_strategies = _collect_strategies(portfolio_data)
-        for name, defaults in collected_strategies.items():
-            settings = strategies_settings.setdefault(name, {})
-            try:
-                pct_value = float(
-                    settings.get("kelly_pct", defaults.get("kelly_pct", DEFAULT_KELLY_PCT))
-                )
-            except (TypeError, ValueError):
-                pct_value = defaults.get("kelly_pct", DEFAULT_KELLY_PCT)
-            settings["kelly_pct"] = max(0.0, pct_value)
-
+        # Get input values from UI
         try:
-            starting_capital = float(
-                portfolio_settings.get("starting_capital", DEFAULT_STARTING_CAPITAL)
+            starting_capital = (
+                float(starting_capital_input)
+                if starting_capital_input
+                else DEFAULT_STARTING_CAPITAL
             )
         except (TypeError, ValueError):
             starting_capital = DEFAULT_STARTING_CAPITAL
         if starting_capital <= 0:
             starting_capital = DEFAULT_STARTING_CAPITAL
+
+        # Build strategy kelly settings from UI inputs
+        strategies_settings = {}
+        if strategy_kelly_values and strategy_kelly_ids:
+            for value, comp_id in zip(strategy_kelly_values, strategy_kelly_ids):
+                if isinstance(comp_id, dict):
+                    strategy_name = comp_id.get("strategy")
+                    if strategy_name:
+                        try:
+                            kelly_pct = (
+                                float(value) if value not in (None, "") else DEFAULT_KELLY_PCT
+                            )
+                        except (TypeError, ValueError):
+                            kelly_pct = DEFAULT_KELLY_PCT
+                        strategies_settings[strategy_name] = {"kelly_pct": kelly_pct}
 
         portfolio_metrics = calculate_kelly_metrics(trades)
         if not (portfolio_metrics.avg_win > 0 and portfolio_metrics.avg_loss > 0):
