@@ -91,3 +91,14 @@ def test_column_mapping(portfolio_processor):
     except ValueError:
         # Expected due to missing required columns, but BOM should be removed
         pass
+
+
+def test_missing_closing_commissions_defaults_to_zero(portfolio_processor):
+    """Missing closing commissions should be coerced to zero for validation"""
+    csv_content = """Date Opened,Time Opened,Opening Price,Legs,Premium,Closing Price,Date Closed,Time Closed,Avg. Closing Cost,Reason For Close,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy,Opening Commissions + Fees,Closing Commissions + Fees,Opening Short/Long Ratio,Closing Short/Long Ratio,Gap,Movement,Max Profit,Max Loss\n"""
+    csv_content += "2025-09-23,09:32:00,6694.8,Sample Legs,55,6656.92,2025-09-23,16:00:00,0,Expired,4930.2,99,945113.8,93555,Test Strategy,514.8,,1.48,1,-1.31,2.36,100,-400\n"
+
+    portfolio = portfolio_processor.parse_csv(csv_content, "missing_closing_fees.csv")
+
+    assert len(portfolio.trades) == 1
+    assert portfolio.trades[0].closing_commissions_fees == 0
