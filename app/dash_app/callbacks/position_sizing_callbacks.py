@@ -389,6 +389,8 @@ def register_position_sizing_callbacks(app):
                 "avg_win": analysis.avg_win,
                 "avg_loss": analysis.avg_loss,
                 "max_margin_pct": analysis.max_margin_pct,
+                "allocation_pct": analysis.allocation_pct,
+                "allocation_dollars": analysis.allocation_dollars,
                 "has_data": analysis.has_data,
             }
             for analysis in strategy_analysis_objs
@@ -783,37 +785,127 @@ def register_position_sizing_callbacks(app):
                                     align="center",
                                     w="100%",
                                 ),
-                                dmc.Group(
-                                    [
-                                        dmc.Text(
-                                            f"Max margin used: {analysis['max_margin_pct']:.1f}% of capital",
-                                            size="xs",
-                                            c="dimmed",
+                                dmc.Divider(variant="dashed"),
+                                dmc.Stack(
+                                    gap="xs",
+                                    children=[
+                                        dmc.Group(
+                                            [
+                                                dmc.Group(
+                                                    [
+                                                        dmc.Text(
+                                                            "Max margin used",
+                                                            size="xs",
+                                                            c="dimmed",
+                                                        ),
+                                                        create_info_tooltip(
+                                                            title="📊 Max Margin Used",
+                                                            content="Peak margin requirement observed historically for this strategy.",
+                                                            detailed_content="This represents the highest percentage of capital that was tied up as margin when this strategy had open positions. Higher values indicate more capital-intensive strategies.",
+                                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-margin",
+                                                        ),
+                                                    ],
+                                                    gap=4,
+                                                    align="center",
+                                                ),
+                                                dmc.Text(
+                                                    f"{analysis['max_margin_pct']:.1f}%",
+                                                    size="sm",
+                                                    fw=600,
+                                                ),
+                                            ],
+                                            justify="space-between",
+                                            align="center",
+                                            w="100%",
                                         ),
-                                        create_info_tooltip(
-                                            title="📊 Max Margin Used",
-                                            content="Peak margin requirement observed historically for this strategy.",
-                                            detailed_content="This represents the highest percentage of capital that was tied up as margin when this strategy had open positions. Higher values indicate more capital-intensive strategies.",
-                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-margin",
+                                        dmc.Group(
+                                            [
+                                                dmc.Group(
+                                                    [
+                                                        dmc.Text(
+                                                            "Applied capital",
+                                                            size="xs",
+                                                            c="dimmed",
+                                                        ),
+                                                        create_info_tooltip(
+                                                            title="💵 Applied Capital",
+                                                            content="Starting capital × this strategy's applied % after Kelly.",
+                                                            detailed_content="Use this as the maximum capital you intend to commit to the strategy when configuring backtest sizing rules.",
+                                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-capital-detail",
+                                                        ),
+                                                    ],
+                                                    gap=4,
+                                                    align="center",
+                                                ),
+                                                dmc.Text(
+                                                    f"${applied_capital_strategy:,.0f}",
+                                                    size="sm",
+                                                    fw=600,
+                                                ),
+                                            ],
+                                            justify="space-between",
+                                            align="center",
+                                            w="100%",
+                                        ),
+                                        dmc.Group(
+                                            [
+                                                dmc.Group(
+                                                    [
+                                                        dmc.Text(
+                                                            "Reference allocation %",
+                                                            size="xs",
+                                                            c="dimmed",
+                                                        ),
+                                                        create_info_tooltip(
+                                                            title="📐 Reference Allocation %",
+                                                            content="Historical max margin × your Kelly %.",
+                                                            detailed_content="Use this percentage as the per-trade margin allocation guideline when setting up your backtest. It scales past requirements by the Kelly fraction you chose here.",
+                                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-allocation",
+                                                        ),
+                                                    ],
+                                                    gap=4,
+                                                    align="center",
+                                                ),
+                                                dmc.Text(
+                                                    f"{analysis['allocation_pct']:.1f}%",
+                                                    size="sm",
+                                                    fw=600,
+                                                ),
+                                            ],
+                                            justify="space-between",
+                                            align="center",
+                                            w="100%",
+                                        ),
+                                        dmc.Group(
+                                            [
+                                                dmc.Group(
+                                                    [
+                                                        dmc.Text(
+                                                            "Reference allocation $",
+                                                            size="xs",
+                                                            c="dimmed",
+                                                        ),
+                                                        create_info_tooltip(
+                                                            title="💡 Reference Allocation $",
+                                                            content="Starting capital × reference allocation %.",
+                                                            detailed_content="Map this dollar amount to your backtest's per-trade allocation limit so it mirrors the Kelly-based guidance above.",
+                                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-allocation-dollars",
+                                                        ),
+                                                    ],
+                                                    gap=4,
+                                                    align="center",
+                                                ),
+                                                dmc.Text(
+                                                    f"${analysis['allocation_dollars']:,.0f}",
+                                                    size="sm",
+                                                    fw=600,
+                                                ),
+                                            ],
+                                            justify="space-between",
+                                            align="center",
+                                            w="100%",
                                         ),
                                     ],
-                                    gap=4,
-                                ),
-                                dmc.Group(
-                                    [
-                                        dmc.Text(
-                                            f"Applied capital: ${applied_capital_strategy:,.0f}",
-                                            size="xs",
-                                            c="dimmed",
-                                        ),
-                                        create_info_tooltip(
-                                            title="💵 Applied Capital",
-                                            content="Starting capital × this strategy's applied % (post-Kelly).",
-                                            detailed_content="This is the portion of your starting capital the model would allocate to this strategy after applying its Kelly percentage and any overrides you set.",
-                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-capital",
-                                        ),
-                                    ],
-                                    gap=4,
                                 ),
                             ],
                         ),

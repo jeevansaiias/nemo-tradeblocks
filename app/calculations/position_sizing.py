@@ -186,6 +186,8 @@ class StrategyAnalysis:
     avg_loss: float
     max_margin_pct: float
     has_data: bool
+    allocation_pct: float
+    allocation_dollars: float
 
 
 @dataclass
@@ -391,6 +393,9 @@ def build_strategy_analysis(
         margin_series = list(strategy_margin_pct_series.get(name, []))
         max_margin_pct = max(margin_series) if margin_series else 0.0
 
+        allocation_pct = max_margin_pct * (input_pct / 100.0)
+        allocation_dollars = starting_capital * allocation_pct / 100.0
+
         strategy_analysis.append(
             StrategyAnalysis(
                 name=name,
@@ -404,6 +409,8 @@ def build_strategy_analysis(
                 avg_loss=metrics.avg_loss,
                 max_margin_pct=max_margin_pct,
                 has_data=metrics.avg_win > 0 and metrics.avg_loss > 0,
+                allocation_pct=allocation_pct,
+                allocation_dollars=allocation_dollars,
             )
         )
 
