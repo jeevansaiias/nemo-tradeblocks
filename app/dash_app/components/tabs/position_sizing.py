@@ -233,12 +233,25 @@ def create_position_sizing_tab():
                                         justify="flex-start",
                                         align="center",
                                     ),
+                                ],
+                            )
+                        ],
+                    ),
+                    dmc.Space(h="sm"),
+                    dmc.Paper(
+                        p="lg",
+                        withBorder=True,
+                        children=[
+                            dmc.Stack(
+                                gap="md",
+                                children=[
                                     html.Div(id="ps-portfolio-kelly-summary"),
                                     html.Div(id="ps-strategy-results"),
                                 ],
                             )
                         ],
                     ),
+                    dmc.Space(h="sm"),
                     dmc.Paper(
                         p="lg",
                         withBorder=True,
