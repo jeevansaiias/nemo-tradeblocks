@@ -191,9 +191,8 @@ def register_position_sizing_callbacks(app):
                     radius="md",
                     shadow="xs",
                     p="md",
-                    style={"position": "relative"},
+                    style={"position": "relative", "height": "100%"},
                     children=[
-                        # Badge positioned absolutely in top-right
                         dmc.Badge(
                             f"{trade_counts.get(strategy_name, 0)} trades",
                             color="gray",
@@ -202,22 +201,44 @@ def register_position_sizing_callbacks(app):
                         ),
                         dmc.Stack(
                             gap="sm",
+                            justify="space-between",
+                            style={"height": "100%"},
                             children=[
-                                # Strategy name with padding to avoid badge overlap
-                                dmc.Text(strategy_name, fw=600, style={"paddingRight": "100px"}),
-                                dmc.NumberInput(
-                                    id={
-                                        "type": "ps-strategy-kelly-input",
-                                        "strategy": strategy_name,
-                                    },
-                                    label="Kelly %",
-                                    description="Percent of each strategy's Kelly to apply",
-                                    value=kelly_pct_value,
-                                    min=0,
-                                    max=200,
-                                    step=5,
-                                    allowNegative=False,
-                                    suffix="%",
+                                dmc.Text(
+                                    strategy_name,
+                                    fw=600,
+                                    style={"paddingRight": "120px"},
+                                ),
+                                dmc.Stack(
+                                    gap=4,
+                                    style={"marginTop": "auto"},
+                                    children=[
+                                        dmc.Group(
+                                            [
+                                                dmc.Text("Kelly %", size="sm", fw=500),
+                                                dmc.NumberInput(
+                                                    id={
+                                                        "type": "ps-strategy-kelly-input",
+                                                        "strategy": strategy_name,
+                                                    },
+                                                    value=kelly_pct_value,
+                                                    min=0,
+                                                    max=200,
+                                                    step=5,
+                                                    allowNegative=False,
+                                                    suffix="%",
+                                                    style={"flex": 1},
+                                                ),
+                                            ],
+                                            gap="sm",
+                                            align="flex-end",
+                                        ),
+                                        dmc.Text(
+                                            "Percent of each strategy's Kelly to apply",
+                                            size="xs",
+                                            c="dimmed",
+                                        ),
+                                    ],
                                 ),
                             ],
                         ),
@@ -254,6 +275,8 @@ def register_position_sizing_callbacks(app):
         Output("ps-strategy-results", "children"),
         Output("ps-strategy-margin-chart", "figure"),
         Output("ps-strategy-margin-warning", "children"),
+        Output("ps-results-container", "style"),
+        Output("ps-margin-card-container", "style"),
         Output("ps-strategy-action-feedback", "children", allow_duplicate=True),
         Input("ps-run-strategy-analysis", "n_clicks"),
         Input("current-portfolio-data", "data"),
@@ -285,6 +308,8 @@ def register_position_sizing_callbacks(app):
                 dmc.Alert(message, color="gray", variant="light"),
                 placeholder_fig,
                 "",
+                {"display": "none"},
+                {"display": "none"},
                 dmc.Text(
                     "Run the allocation to calculate metrics.",
                     size="xs",
@@ -1074,5 +1099,7 @@ def register_position_sizing_callbacks(app):
             strategy_results_component,
             margin_fig,
             margin_warning,
+            {"display": "block"},
+            {"display": "block"},
             feedback,
         )
