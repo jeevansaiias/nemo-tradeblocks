@@ -771,25 +771,7 @@ def register_position_sizing_callbacks(app):
                             dmc.Group(
                                 [
                                     dmc.Tooltip(
-                                        label=dmc.Stack(
-                                            [
-                                                dmc.Text(
-                                                    "🎯 Full Kelly", c="blue", fw=600, size="sm"
-                                                ),
-                                                dmc.Text(
-                                                    "Optimal Kelly percentage calculated from portfolio statistics",
-                                                    size="xs",
-                                                ),
-                                                dmc.Text(
-                                                    "This represents the mathematically optimal allocation based on your historical win rate and payoff ratio.",
-                                                    size="xs",
-                                                    c="dimmed",
-                                                ),
-                                            ],
-                                            gap="xs",
-                                        ),
-                                        multiline=True,
-                                        w=350,
+                                        label="Mathematically optimal allocation based on win rate and payoff ratio",
                                         children=dmc.Badge(
                                             f"FULL KELLY {portfolio_metrics.percent:.1f}%",
                                             color=portfolio_color,
@@ -798,28 +780,7 @@ def register_position_sizing_callbacks(app):
                                         ),
                                     ),
                                     dmc.Tooltip(
-                                        label=dmc.Stack(
-                                            [
-                                                dmc.Text(
-                                                    "⚖️ Weighted Applied",
-                                                    c="blue",
-                                                    fw=600,
-                                                    size="sm",
-                                                ),
-                                                dmc.Text(
-                                                    "Actual allocation after applying your Kelly fraction settings",
-                                                    size="xs",
-                                                ),
-                                                dmc.Text(
-                                                    "This value reflects your risk preferences applied to the optimal Kelly allocation.",
-                                                    size="xs",
-                                                    c="dimmed",
-                                                ),
-                                            ],
-                                            gap="xs",
-                                        ),
-                                        multiline=True,
-                                        w=350,
+                                        label="Your Kelly fraction applied to the optimal allocation",
                                         children=dmc.Badge(
                                             f"WEIGHTED APPLIED {weighted_applied_pct:.1f}%",
                                             color="blue",
@@ -1111,15 +1072,37 @@ def register_position_sizing_callbacks(app):
                                     align="center",
                                     w="100%",
                                 ),
-                                dmc.Text(
-                                    f"Max margin used: {analysis['max_margin_pct']:.1f}% of capital",
-                                    size="xs",
-                                    c="dimmed",
+                                dmc.Group(
+                                    [
+                                        dmc.Text(
+                                            f"Max margin used: {analysis['max_margin_pct']:.1f}% of capital",
+                                            size="xs",
+                                            c="dimmed",
+                                        ),
+                                        create_info_tooltip(
+                                            title="📊 Max Margin Used",
+                                            content="Peak margin requirement observed historically for this strategy.",
+                                            detailed_content="This represents the highest percentage of capital that was tied up as margin when this strategy had open positions. Higher values indicate more capital-intensive strategies.",
+                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-margin",
+                                        ),
+                                    ],
+                                    gap=4,
                                 ),
-                                dmc.Text(
-                                    f"Applied capital: ${applied_capital_strategy:,.0f}",
-                                    size="xs",
-                                    c="dimmed",
+                                dmc.Group(
+                                    [
+                                        dmc.Text(
+                                            f"Applied capital: ${applied_capital_strategy:,.0f}",
+                                            size="xs",
+                                            c="dimmed",
+                                        ),
+                                        create_info_tooltip(
+                                            title="💵 Applied Capital",
+                                            content="Dollar amount allocated to this strategy based on Kelly settings.",
+                                            detailed_content="This is your starting capital multiplied by this strategy's applied percentage. It represents the actual dollars available for this strategy's position sizing.",
+                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-capital",
+                                        ),
+                                    ],
+                                    gap=4,
                                 ),
                             ],
                         ),
