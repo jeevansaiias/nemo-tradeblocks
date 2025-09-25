@@ -746,7 +746,9 @@ def register_position_sizing_callbacks(app):
                                         dmc.Stack(
                                             [
                                                 dmc.Text("Win Rate", size="xs", c="dimmed"),
-                                                dmc.Text(f"{analysis['win_rate']:.1%}", fw=600),
+                                                dmc.Text(
+                                                    f"{analysis['win_rate']:.1%}", fw=600, ta="left"
+                                                ),
                                             ],
                                             gap="xs",
                                         ),
@@ -770,7 +772,7 @@ def register_position_sizing_callbacks(app):
                                             [
                                                 dmc.Text("Average Win", size="xs", c="dimmed"),
                                                 dmc.Text(
-                                                    avg_win_display, fw=600, c="green", ta="right"
+                                                    avg_win_display, fw=600, c="green", ta="left"
                                                 ),
                                             ],
                                             gap="xs",
