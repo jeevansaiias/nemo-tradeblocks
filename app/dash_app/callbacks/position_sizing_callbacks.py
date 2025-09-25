@@ -719,7 +719,17 @@ def register_position_sizing_callbacks(app):
                         dmc.Stack(
                             gap="sm",
                             children=[
-                                dmc.Text(analysis["name"], fw=600, style={"paddingRight": "180px"}),
+                                dmc.Box(
+                                    dmc.Text(
+                                        analysis["name"], fw=600, style={"paddingRight": "180px"}
+                                    ),
+                                    style={
+                                        "minHeight": "72px",
+                                        "display": "flex",
+                                        "alignItems": "center",
+                                    },
+                                ),
+                                dmc.Divider(variant="dashed"),
                                 dmc.Group(
                                     [
                                         dmc.Text(
