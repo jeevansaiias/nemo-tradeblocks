@@ -755,7 +755,7 @@ def register_position_sizing_callbacks(app):
                                                 dmc.Text(
                                                     "Avg Win/Loss Ratio", size="xs", c="dimmed"
                                                 ),
-                                                dmc.Text(payoff_ratio_display, fw=600),
+                                                dmc.Text(payoff_ratio_display, fw=600, ta="right"),
                                             ],
                                             gap="xs",
                                         ),
@@ -769,14 +769,18 @@ def register_position_sizing_callbacks(app):
                                         dmc.Stack(
                                             [
                                                 dmc.Text("Average Win", size="xs", c="dimmed"),
-                                                dmc.Text(avg_win_display, fw=600, c="green"),
+                                                dmc.Text(
+                                                    avg_win_display, fw=600, c="green", ta="right"
+                                                ),
                                             ],
                                             gap="xs",
                                         ),
                                         dmc.Stack(
                                             [
                                                 dmc.Text("Average Loss", size="xs", c="dimmed"),
-                                                dmc.Text(avg_loss_display, fw=600, c="red"),
+                                                dmc.Text(
+                                                    avg_loss_display, fw=600, c="red", ta="right"
+                                                ),
                                             ],
                                             gap="xs",
                                         ),
@@ -812,6 +816,7 @@ def register_position_sizing_callbacks(app):
                                                     f"{analysis['max_margin_pct']:.1f}%",
                                                     size="sm",
                                                     fw=600,
+                                                    ta="right",
                                                 ),
                                             ],
                                             justify="space-between",
@@ -841,6 +846,7 @@ def register_position_sizing_callbacks(app):
                                                     f"${applied_capital_strategy:,.0f}",
                                                     size="sm",
                                                     fw=600,
+                                                    ta="right",
                                                 ),
                                             ],
                                             justify="space-between",
@@ -870,6 +876,7 @@ def register_position_sizing_callbacks(app):
                                                     f"{analysis['allocation_pct']:.1f}%",
                                                     size="sm",
                                                     fw=600,
+                                                    ta="right",
                                                 ),
                                             ],
                                             justify="space-between",
@@ -899,6 +906,7 @@ def register_position_sizing_callbacks(app):
                                                     f"${analysis['allocation_dollars']:,.0f}",
                                                     size="sm",
                                                     fw=600,
+                                                    ta="right",
                                                 ),
                                             ],
                                             justify="space-between",
