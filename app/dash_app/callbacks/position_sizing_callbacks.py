@@ -6,7 +6,7 @@ import logging
 import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import dash_mantine_components as dmc
 from dash import ALL, Input, Output, State
@@ -119,6 +119,48 @@ def _build_date_to_net_liq(
             date_to_net_liq[current_date.isoformat()] = starting_capital + cumulative_pnl
 
     return date_to_net_liq
+
+
+def _extract_strategy_name(trade: Any) -> str:
+    if isinstance(trade, dict):
+        name = trade.get("strategy")
+    else:
+        name = getattr(trade, "strategy", None)
+    return name or "Uncategorized"
+
+
+def _build_strategy_settings(
+    trades: Iterable[Any],
+    strategy_kelly_values: Optional[Iterable[Any]],
+    strategy_kelly_ids: Optional[Iterable[Any]],
+    global_kelly_pct: float,
+) -> Dict[str, Dict[str, float]]:
+    """Combine per-strategy overrides with the global Kelly percentage."""
+
+    strategies_settings: Dict[str, Dict[str, float]] = {}
+
+    if strategy_kelly_values and strategy_kelly_ids:
+        for value, comp_id in zip(strategy_kelly_values, strategy_kelly_ids):
+            strategy_name = None
+            if isinstance(comp_id, dict):
+                strategy_name = comp_id.get("strategy")
+            if not strategy_name:
+                continue
+
+            kelly_pct = global_kelly_pct
+            if value not in (None, ""):
+                try:
+                    kelly_pct = float(value)
+                except (TypeError, ValueError):
+                    kelly_pct = global_kelly_pct
+
+            strategies_settings[strategy_name] = {"kelly_pct": max(0.0, kelly_pct)}
+
+    for trade in trades:
+        strategy_name = _extract_strategy_name(trade)
+        strategies_settings.setdefault(strategy_name, {"kelly_pct": global_kelly_pct})
+
+    return strategies_settings
 
 
 def _infer_starting_capital(
@@ -466,6 +508,8 @@ def register_position_sizing_callbacks(app):
         State("ps-kelly-fraction-input", "value"),
         State("ps-margin-calc-mode", "value"),
         State("current-daily-log-data", "data"),
+        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
+        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
         prevent_initial_call=True,
     )
     def run_strategy_analysis(
@@ -476,6 +520,8 @@ def register_position_sizing_callbacks(app):
         kelly_fraction_input,
         margin_calc_mode,
         daily_log_data,
+        strategy_kelly_values,
+        strategy_kelly_ids,
     ):
         placeholder_fig = _blank_margin_figure(theme_data)
 
@@ -533,16 +579,12 @@ def register_position_sizing_callbacks(app):
         except (TypeError, ValueError):
             global_kelly_pct = DEFAULT_KELLY_PCT
 
-        # Get unique strategies from portfolio
-        unique_strategies = set()
-        for trade in trades:
-            if hasattr(trade, "strategy") and trade.strategy:
-                unique_strategies.add(trade.strategy)
-
-        # Apply the same Kelly percentage to all strategies
-        strategies_settings = {}
-        for strategy_name in unique_strategies:
-            strategies_settings[strategy_name] = {"kelly_pct": global_kelly_pct}
+        strategies_settings = _build_strategy_settings(
+            trades,
+            strategy_kelly_values,
+            strategy_kelly_ids,
+            global_kelly_pct,
+        )
 
         portfolio_metrics = calculate_kelly_metrics(trades)
         if not (portfolio_metrics.avg_win > 0 and portfolio_metrics.avg_loss > 0):
@@ -551,10 +593,10 @@ def register_position_sizing_callbacks(app):
         strategy_trade_map: Dict[str, list] = defaultdict(list)
         trade_counts: Dict[str, int] = defaultdict(int)
         for trade in trades:
-            strategy_name = getattr(trade, "strategy", None) or "Uncategorized"
+            strategy_name = _extract_strategy_name(trade)
             strategy_trade_map[strategy_name].append(trade)
             trade_counts[strategy_name] += 1
-            strategies_settings.setdefault(strategy_name, {"kelly_pct": DEFAULT_KELLY_PCT})
+            strategies_settings.setdefault(strategy_name, {"kelly_pct": global_kelly_pct})
 
         strategy_names = sorted(
             strategies_settings.keys(),
@@ -604,7 +646,7 @@ def register_position_sizing_callbacks(app):
             if end_date < start_date:
                 end_date = start_date
 
-            strategy_name = getattr(trade, "strategy", None) or "Uncategorized"
+            strategy_name = _extract_strategy_name(trade)
 
             current_date = start_date
             while current_date <= end_date:
