@@ -50,38 +50,61 @@ def create_position_sizing_tab():
                                         justify="space-between",
                                         align="center",
                                     ),
-                                    dmc.SimpleGrid(
-                                        cols=2,
-                                        spacing="lg",
+                                    dmc.Stack(
+                                        gap="md",
                                         mb="lg",
                                         children=[
-                                            dmc.NumberInput(
-                                                id="ps-starting-capital-input",
-                                                label="Starting Capital ($)",
-                                                description="Net liquidity or capital base",
-                                                min=0,
-                                                step=1000,
-                                                allowNegative=False,
-                                                prefix="$ ",
-                                                thousandSeparator=",",
+                                            dmc.Group(
+                                                gap="md",
+                                                grow=True,
+                                                children=[
+                                                    dmc.NumberInput(
+                                                        id="ps-starting-capital-input",
+                                                        label="Starting Capital ($)",
+                                                        description="Net liquidity or capital base",
+                                                        min=0,
+                                                        step=1000,
+                                                        allowNegative=False,
+                                                        prefix="$ ",
+                                                        thousandSeparator=",",
+                                                        style={"flex": 1},
+                                                    ),
+                                                    dmc.NumberInput(
+                                                        id="ps-kelly-fraction-input",
+                                                        label="Portfolio Kelly Fraction (%)",
+                                                        description="Percent of Kelly to apply globally",
+                                                        min=0,
+                                                        max=200,
+                                                        step=1,
+                                                        value=100,
+                                                        allowNegative=False,
+                                                        suffix="%",
+                                                        style={"flex": 1},
+                                                    ),
+                                                ],
                                             ),
-                                            dmc.NumberInput(
-                                                id="ps-kelly-fraction-input",
-                                                label="Portfolio Kelly Fraction (%)",
-                                                description="Percent of calculated Kelly to apply globally",
-                                                min=0,
-                                                max=200,
-                                                step=1,
-                                                value=100,
-                                                allowNegative=False,
-                                                suffix="%",
+                                            dmc.Button(
+                                                "Apply to All Strategies",
+                                                id="ps-apply-portfolio-kelly",
+                                                leftSection=DashIconify(
+                                                    icon="tabler:arrow-down", width=16
+                                                ),
+                                                variant="light",
+                                                color="teal",
+                                                fullWidth=True,
                                             ),
                                         ],
                                     ),
-                                    dmc.Text(
-                                        "Adjust the Kelly multiplier for each strategy individually:",
-                                        size="sm",
-                                        c="dimmed",
+                                    dmc.Stack(
+                                        gap="xs",
+                                        children=[
+                                            dmc.Text(
+                                                "Adjust the Kelly multiplier for each strategy individually:",
+                                                size="sm",
+                                                c="dimmed",
+                                            ),
+                                            html.Div(id="ps-strategy-action-feedback"),
+                                        ],
                                     ),
                                     html.Div(
                                         id="ps-strategy-input-grid",
@@ -103,9 +126,8 @@ def create_position_sizing_tab():
                                                 color="blue",
                                                 size="md",
                                             ),
-                                            html.Div(id="ps-strategy-action-feedback"),
                                         ],
-                                        justify="space-between",
+                                        justify="flex-start",
                                         align="center",
                                     ),
                                     html.Div(id="ps-portfolio-kelly-summary"),

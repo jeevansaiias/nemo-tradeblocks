@@ -8,7 +8,7 @@ import logging
 import math
 from collections import defaultdict
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import dash_mantine_components as dmc
@@ -432,11 +432,77 @@ def register_position_sizing_callbacks(app):
         )
 
     @app.callback(
+        Output("ps-strategy-action-feedback", "children"),
+        Output("position-sizing-store", "data"),
+        Input("ps-apply-portfolio-kelly", "n_clicks"),
+        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
+        State("ps-kelly-fraction-input", "value"),
+        State("position-sizing-store", "data"),
+        State("current-portfolio-data", "data"),
+        prevent_initial_call=True,
+    )
+    def apply_portfolio_kelly_to_strategies(
+        n_clicks, strategy_ids, portfolio_kelly_pct, store_data, portfolio_data
+    ):
+        if not n_clicks:
+            raise PreventUpdate
+
+        # Ensure store exists
+        store = _ensure_store(store_data)
+
+        try:
+            portfolio_value = (
+                float(portfolio_kelly_pct) if portfolio_kelly_pct is not None else DEFAULT_KELLY_PCT
+            )
+        except (TypeError, ValueError):
+            portfolio_value = DEFAULT_KELLY_PCT
+        portfolio_value = max(0.0, portfolio_value)
+
+        # If no strategies or portfolio data, return early
+        if not strategy_ids or not portfolio_data:
+            return (
+                dmc.Text("No strategies to update.", size="xs", c="dimmed"),
+                store,
+            )
+
+        # Get portfolio fingerprint to update the store
+        fingerprint = _portfolio_fingerprint(portfolio_data)
+        if fingerprint:
+            # Ensure portfolio entry exists
+            if fingerprint not in store["portfolios"]:
+                store["portfolios"][fingerprint] = {"strategies": {}}
+
+            # Update each strategy's kelly_pct in the store
+            for comp_id in strategy_ids:
+                if isinstance(comp_id, dict) and comp_id.get("strategy"):
+                    strategy_name = comp_id.get("strategy")
+                    if "strategies" not in store["portfolios"][fingerprint]:
+                        store["portfolios"][fingerprint]["strategies"] = {}
+                    if strategy_name not in store["portfolios"][fingerprint]["strategies"]:
+                        store["portfolios"][fingerprint]["strategies"][strategy_name] = {}
+                    store["portfolios"][fingerprint]["strategies"][strategy_name][
+                        "kelly_pct"
+                    ] = portfolio_value
+
+        # Count valid strategies for feedback
+        valid_strategies = sum(
+            1 for comp_id in strategy_ids if isinstance(comp_id, dict) and comp_id.get("strategy")
+        )
+
+        feedback = dmc.Text(
+            f"Applied {portfolio_value}% Kelly to {valid_strategies} strateg{'y' if valid_strategies == 1 else 'ies'}",
+            size="xs",
+            c="teal.6",
+        )
+
+        return feedback, store
+
+    @app.callback(
         Output("ps-portfolio-kelly-summary", "children"),
         Output("ps-strategy-results", "children"),
         Output("ps-strategy-margin-chart", "figure"),
         Output("ps-strategy-margin-warning", "children"),
-        Output("ps-strategy-action-feedback", "children"),
+        Output("ps-strategy-action-feedback", "children", allow_duplicate=True),
         Input("ps-run-strategy-analysis", "n_clicks"),
         Input("current-portfolio-data", "data"),
         Input("theme-store", "data"),
@@ -444,6 +510,7 @@ def register_position_sizing_callbacks(app):
         State("ps-kelly-fraction-input", "value"),
         State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
         State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
+        prevent_initial_call=True,
     )
     def run_strategy_analysis(
         n_clicks,
@@ -543,16 +610,41 @@ def register_position_sizing_callbacks(app):
                 continue
 
             date_opened = getattr(trade, "date_opened", None)
-            if hasattr(date_opened, "isoformat"):
-                date_key = date_opened.isoformat()
-            elif date_opened:
-                date_key = str(date_opened)
-            else:
+            date_closed = getattr(trade, "date_closed", None)
+            if not date_opened:
                 continue
 
+            # Ensure we have date objects to iterate across the holding period
+            if hasattr(date_opened, "isoformat"):
+                start_date = date_opened
+            else:
+                try:
+                    start_date = datetime.fromisoformat(str(date_opened)).date()
+                except ValueError:
+                    continue
+
+            if date_closed:
+                if hasattr(date_closed, "isoformat"):
+                    end_date = date_closed
+                else:
+                    try:
+                        end_date = datetime.fromisoformat(str(date_closed)).date()
+                    except ValueError:
+                        end_date = start_date
+            else:
+                end_date = start_date
+
+            if end_date < start_date:
+                end_date = start_date
+
             strategy_name = getattr(trade, "strategy", None) or "Uncategorized"
-            margin_totals[date_key][strategy_name] += margin_value
-            margin_totals[date_key]["__total__"] += margin_value
+
+            current_date = start_date
+            while current_date <= end_date:
+                date_key = current_date.isoformat()
+                margin_totals[date_key][strategy_name] += margin_value
+                margin_totals[date_key]["__total__"] += margin_value
+                current_date += timedelta(days=1)
 
         sorted_dates = sorted(margin_totals.keys())
         portfolio_margin_pct = []
