@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, Optional
 
 import dash_mantine_components as dmc
@@ -26,6 +26,99 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_STARTING_CAPITAL = 100000
 DEFAULT_KELLY_PCT = 100.0
+
+
+def _trade_identifier(trade: Any) -> Any:
+    """Return a stable identifier for a trade-like object."""
+    if isinstance(trade, dict):
+        return trade.get("trade_id") or trade.get("id") or id(trade)
+    for attr in ("trade_id", "id"):
+        value = getattr(trade, attr, None)
+        if value is not None:
+            return value
+    return id(trade)
+
+
+def _as_date(value: Any) -> Optional[date]:
+    """Normalize various date representations to a date object."""
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    try:
+        return datetime.fromisoformat(str(value)).date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_date_to_net_liq(
+    trades,
+    date_keys,
+    starting_capital: float,
+    daily_log_data=None,
+):
+    """Create a mapping of ISO date strings to net liquidity values."""
+    date_to_net_liq = {}
+    if not date_keys:
+        return date_to_net_liq
+
+    cumulative_pnl = 0.0
+    closed_trades_seen = set()
+
+    for date_key in date_keys:
+        current_date = _as_date(date_key)
+        if current_date is None:
+            try:
+                current_date = datetime.fromisoformat(str(date_key)).date()
+            except (TypeError, ValueError):
+                continue
+
+        for trade in trades:
+            trade_key = _trade_identifier(trade)
+            if trade_key in closed_trades_seen:
+                continue
+
+            date_closed = (
+                trade.get("date_closed")
+                if isinstance(trade, dict)
+                else getattr(trade, "date_closed", None)
+            )
+            close_date = _as_date(date_closed)
+            if close_date is None or close_date > current_date:
+                continue
+
+            trade_pnl = None
+            if isinstance(trade, dict):
+                trade_pnl = trade.get("pl")
+                if trade_pnl is None:
+                    trade_pnl = trade.get("pnl")
+            else:
+                trade_pnl = getattr(trade, "pl", None)
+                if trade_pnl is None:
+                    trade_pnl = getattr(trade, "pnl", None)
+
+            if trade_pnl is not None:
+                try:
+                    cumulative_pnl += float(trade_pnl)
+                except (TypeError, ValueError):
+                    logger.debug("Skipping trade with non-numeric P&L: %s", trade_pnl)
+
+            closed_trades_seen.add(trade_key)
+
+        net_liq_from_log = (
+            get_net_liq_from_daily_log(daily_log_data, current_date.isoformat())
+            if daily_log_data
+            else None
+        )
+
+        if net_liq_from_log is not None:
+            date_to_net_liq[current_date.isoformat()] = net_liq_from_log
+        else:
+            date_to_net_liq[current_date.isoformat()] = starting_capital + cumulative_pnl
+
+    return date_to_net_liq
 
 
 def _infer_starting_capital(
@@ -527,59 +620,34 @@ def register_position_sizing_callbacks(app):
         # If in compounding mode, calculate running P&L for each date
         date_to_net_liq = {}
         if margin_mode == "compounding":
-            # Build a map of date -> net liquidity
-            cumulative_pnl = 0
-            closed_dates_seen = set()
-
-            # Log initial state
             logger.info(f"Starting compounding calculation with {len(trades)} trades")
             trades_with_pl = sum(1 for t in trades if getattr(t, "pl", None) is not None)
             logger.info(f"Trades with P&L data: {trades_with_pl}/{len(trades)}")
 
-            for date_key in sorted_dates:
-                # First check if we have actual net liq from daily log
-                net_liq_from_log = (
-                    get_net_liq_from_daily_log(daily_log_data, date_key) if daily_log_data else None
+            date_to_net_liq = _build_date_to_net_liq(
+                trades,
+                sorted_dates,
+                starting_capital,
+                daily_log_data,
+            )
+
+            if date_to_net_liq and sorted_dates:
+                final_key = sorted_dates[-1]
+                final_net_liq = date_to_net_liq.get(final_key)
+                unique_values = sorted({v for v in date_to_net_liq.values()})
+                logger.info(
+                    "Compounding mode: Final net liq = $%s",
+                    f"{final_net_liq:,.0f}" if final_net_liq is not None else "N/A",
                 )
-
-                if net_liq_from_log is not None:
-                    date_to_net_liq[date_key] = net_liq_from_log
-                else:
-                    # Calculate based on closed trades
-                    for trade in trades:
-                        date_closed = getattr(trade, "date_closed", None)
-                        if date_closed:
-                            if hasattr(date_closed, "isoformat"):
-                                closed_str = date_closed.isoformat()
-                            else:
-                                try:
-                                    closed_str = (
-                                        datetime.fromisoformat(str(date_closed)).date().isoformat()
-                                    )
-                                except:
-                                    continue
-                            if closed_str <= date_key and closed_str not in closed_dates_seen:
-                                # Use 'pl' field (Trade model uses 'pl' not 'pnl')
-                                trade_pnl = getattr(trade, "pl", None)
-                                if trade_pnl is not None:
-                                    cumulative_pnl += trade_pnl
-                                    logger.debug(
-                                        f"Added P&L {trade_pnl} on {closed_str}, cumulative: {cumulative_pnl}"
-                                    )
-                                closed_dates_seen.add(closed_str)
-                    date_to_net_liq[date_key] = starting_capital + cumulative_pnl
-
-            # Log for debugging
-            logger.info(
-                f"Compounding mode: Cumulative P&L = ${cumulative_pnl:,.0f}, Final net liq = ${starting_capital + cumulative_pnl:,.0f}"
-            )
-            logger.info(
-                f"Date range: {sorted_dates[0] if sorted_dates else 'N/A'} to {sorted_dates[-1] if sorted_dates else 'N/A'}"
-            )
-            logger.info(
-                f"Net liq changes: {list(set(date_to_net_liq.values()))[:5]}"
-            )  # Show first 5 unique values
-            logger.info(f"Number of unique net liq values: {len(set(date_to_net_liq.values()))}")
+                logger.info(
+                    "Date range: %s to %s",
+                    sorted_dates[0],
+                    final_key,
+                )
+                logger.info(
+                    "Sample net liq values: %s",
+                    unique_values[:5],
+                )
 
         for date_key in sorted_dates:
             total_margin = margin_totals[date_key].get("__total__", 0.0)

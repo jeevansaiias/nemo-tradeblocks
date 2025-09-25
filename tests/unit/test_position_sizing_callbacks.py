@@ -1,7 +1,7 @@
 """Unit tests for position sizing callbacks, particularly margin warning logic."""
 
 import pytest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from unittest.mock import Mock, patch
 from dash import no_update
 import dash_mantine_components as dmc
@@ -321,6 +321,41 @@ class TestMarginCalculationModes:
         # Both trades should use starting capital since they overlap
         for trade_id in net_liq_timeline.values():
             assert trade_id == starting_capital
+
+    def test_compounding_counts_multiple_closes_same_day(self):
+        """Compounding mode should aggregate P&L from every trade closing on a date."""
+        from app.dash_app.callbacks.position_sizing_callbacks import _build_date_to_net_liq
+
+        starting_capital = 100000
+        trades = [
+            {
+                "margin_req": 10000,
+                "pl": 5000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 8000,
+                "pl": 2000,
+                "date_opened": date(2025, 1, 2),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 6000,
+                "pl": -1000,
+                "date_opened": date(2025, 1, 6),
+                "date_closed": date(2025, 1, 8),
+            },
+        ]
+
+        date_keys = [
+            (date(2025, 1, 1) + timedelta(days=offset)).isoformat() for offset in range(0, 8)
+        ]
+
+        net_liq_map = _build_date_to_net_liq(trades, date_keys, starting_capital)
+
+        assert net_liq_map["2025-01-05"] == 107000  # 100000 + 5000 + 2000
+        assert net_liq_map["2025-01-08"] == 106000  # 107000 - 1000
 
     def test_with_daily_log_data(self):
         """Test margin calculations when daily log is available."""
