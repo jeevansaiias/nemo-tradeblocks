@@ -323,7 +323,6 @@ def register_position_sizing_callbacks(app):
 
     @app.callback(
         Output("ps-starting-capital-input", "value"),
-        Output("ps-target-drawdown-input", "value"),
         Output("ps-kelly-fraction-input", "value"),
         Output("position-sizing-active-fingerprint", "data"),
         Input("main-content", "children"),
@@ -359,14 +358,12 @@ def register_position_sizing_callbacks(app):
             ]
 
         starting_capital = None
-        target_drawdown = DEFAULT_TARGET_DRAWDOWN
         fraction_pct = DEFAULT_KELLY_PCT
         source = "default"
 
         if portfolio_settings:
             starting_capital = portfolio_settings.get("starting_capital")
             source = portfolio_settings.get("starting_capital_source", "default")
-            target_drawdown = portfolio_settings.get("target_drawdown_pct", DEFAULT_TARGET_DRAWDOWN)
             fraction_pct = portfolio_settings.get("kelly_fraction_pct", DEFAULT_KELLY_PCT)
 
         if source != "manual":
@@ -387,34 +384,24 @@ def register_position_sizing_callbacks(app):
             starting_capital = DEFAULT_STARTING_CAPITAL
 
         try:
-            target_drawdown = float(target_drawdown)
-        except (TypeError, ValueError):
-            target_drawdown = DEFAULT_TARGET_DRAWDOWN
-
-        try:
             fraction_pct = max(0.0, float(fraction_pct))
         except (TypeError, ValueError):
             fraction_pct = DEFAULT_KELLY_PCT
 
         logger.debug(
-            "Hydrating inputs capital=%s (source=%s) drawdown=%s fraction=%s fingerprint=%s",
+            "Hydrating inputs capital=%s (source=%s) fraction=%s fingerprint=%s",
             starting_capital,
             source,
-            target_drawdown,
             fraction_pct,
             fingerprint,
         )
 
-        return starting_capital, target_drawdown, fraction_pct, fingerprint
+        return starting_capital, fraction_pct, fingerprint
 
     @app.callback(
         Output("position-sizing-store", "data", allow_duplicate=True),
-        Output("ps-saved-feedback", "children"),
         Input("ps-starting-capital-input", "value"),
-        Input("ps-target-drawdown-input", "value"),
         Input("ps-kelly-fraction-input", "value"),
-        Input("ps-save-settings", "n_clicks"),
-        Input("ps-reset-settings", "n_clicks"),
         State("position-sizing-store", "data"),
         State("position-sizing-active-fingerprint", "data"),
         State("current-portfolio-data", "data"),
@@ -424,10 +411,7 @@ def register_position_sizing_callbacks(app):
     )
     def persist_preferences(
         starting_capital,
-        target_drawdown,
         fraction_pct,
-        save_clicks,
-        reset_clicks,
         store_data,
         fingerprint,
         portfolio_data,
@@ -436,7 +420,7 @@ def register_position_sizing_callbacks(app):
     ):
         triggered = ctx.triggered_id
         if not triggered:
-            return no_update, no_update
+            return no_update
 
         # Only process if Position Sizing tab is active
         if not tab_present:
@@ -448,11 +432,7 @@ def register_position_sizing_callbacks(app):
                 fingerprint,
                 bool(portfolio_data),
             )
-            return no_update, dmc.Text(
-                "Upload a portfolio to enable position sizing controls.",
-                size="xs",
-                c="red.6",
-            )
+            return no_update
 
         store = _ensure_store(store_data)
         inferred_capital = _infer_starting_capital(portfolio_data, daily_log_data)
@@ -462,67 +442,41 @@ def register_position_sizing_callbacks(app):
             inferred_capital,
         )
 
-        message = no_update
+        portfolio_entry.setdefault("portfolio", {})
 
-        if triggered == "ps-reset-settings":
-            portfolio_entry = _default_portfolio_settings(portfolio_data, inferred_capital)
-            message = dmc.Text("Defaults restored", size="xs", c="orange.6")
-        else:
-            portfolio_entry.setdefault("portfolio", {})
+        try:
+            parsed_capital = (
+                int(round(float(starting_capital))) if starting_capital not in (None, "") else None
+            )
+        except (TypeError, ValueError):
+            parsed_capital = None
 
-            try:
-                parsed_capital = (
-                    int(round(float(starting_capital)))
-                    if starting_capital not in (None, "")
-                    else None
-                )
-            except (TypeError, ValueError):
-                parsed_capital = None
+        if parsed_capital is None:
+            parsed_capital = DEFAULT_STARTING_CAPITAL
 
-            if parsed_capital is None:
-                parsed_capital = DEFAULT_STARTING_CAPITAL
+        portfolio_entry["portfolio"]["starting_capital"] = parsed_capital
 
-            portfolio_entry["portfolio"]["starting_capital"] = parsed_capital
+        if triggered == "ps-starting-capital-input":
+            portfolio_entry["portfolio"]["starting_capital_source"] = "manual"
 
-            if triggered in {"ps-starting-capital-input", "ps-save-settings"}:
-                portfolio_entry["portfolio"]["starting_capital_source"] = "manual"
+        # Keep target_drawdown for backward compatibility but don't update it
+        if "target_drawdown_pct" not in portfolio_entry["portfolio"]:
+            portfolio_entry["portfolio"]["target_drawdown_pct"] = DEFAULT_TARGET_DRAWDOWN
 
-            try:
-                parsed_drawdown = (
-                    float(target_drawdown)
-                    if target_drawdown not in (None, "")
-                    else DEFAULT_TARGET_DRAWDOWN
-                )
-            except (TypeError, ValueError):
-                parsed_drawdown = DEFAULT_TARGET_DRAWDOWN
+        try:
+            parsed_fraction = max(0.0, float(fraction_pct))
+        except (TypeError, ValueError):
+            parsed_fraction = DEFAULT_KELLY_PCT
 
-            portfolio_entry["portfolio"]["target_drawdown_pct"] = parsed_drawdown
-
-            try:
-                parsed_fraction = max(0.0, float(fraction_pct))
-            except (TypeError, ValueError):
-                parsed_fraction = DEFAULT_KELLY_PCT
-
-            portfolio_entry["portfolio"]["kelly_fraction_pct"] = parsed_fraction
-
-            if triggered == "ps-save-settings":
-                message = dmc.Text("Settings saved", size="xs", c="teal.6")
-            elif triggered in {
-                "ps-starting-capital-input",
-                "ps-target-drawdown-input",
-                "ps-kelly-fraction-input",
-            }:
-                message = ""
+        portfolio_entry["portfolio"]["kelly_fraction_pct"] = parsed_fraction
 
         if store["portfolios"].get(fingerprint) == portfolio_entry:
-            if triggered == "ps-reset-settings":
-                return no_update, message
-            return no_update, message
+            return no_update
 
         updated_store = deepcopy(store)
         updated_store["portfolios"][fingerprint] = portfolio_entry
 
-        return updated_store, message
+        return updated_store
 
     @app.callback(
         Output("ps-strategy-input-grid", "children"),
@@ -590,22 +544,20 @@ def register_position_sizing_callbacks(app):
                     radius="md",
                     shadow="xs",
                     p="md",
+                    style={"position": "relative"},
                     children=[
+                        # Badge positioned absolutely in top-right
+                        dmc.Badge(
+                            f"{trade_counts.get(strategy_name, 0)} trades",
+                            color="gray",
+                            variant="light",
+                            style={"position": "absolute", "top": "12px", "right": "12px"},
+                        ),
                         dmc.Stack(
                             gap="sm",
                             children=[
-                                dmc.Group(
-                                    [
-                                        dmc.Text(strategy_name, fw=600),
-                                        dmc.Badge(
-                                            f"{trade_counts.get(strategy_name, 0)} trades",
-                                            color="gray",
-                                            variant="light",
-                                        ),
-                                    ],
-                                    justify="space-between",
-                                    align="center",
-                                ),
+                                # Strategy name with padding to avoid badge overlap
+                                dmc.Text(strategy_name, fw=600, style={"paddingRight": "100px"}),
                                 dmc.NumberInput(
                                     id={
                                         "type": "ps-strategy-kelly-input",
@@ -621,7 +573,7 @@ def register_position_sizing_callbacks(app):
                                     suffix="%",
                                 ),
                             ],
-                        )
+                        ),
                     ],
                 )
             )
@@ -1007,11 +959,13 @@ def register_position_sizing_callbacks(app):
                 else "red" if analysis["kelly_pct"] < 0 else "orange"
             )
 
-            badges = [dmc.Badge(f"{analysis['trade_count']} trades", color="gray", variant="light")]
+            # Prepare badge content
+            badge_content = f"{analysis['trade_count']} trades"
+            extra_badge = None
             if not analysis["has_data"]:
-                badges.append(dmc.Badge("Needs wins & losses", color="gray", variant="outline"))
+                extra_badge = dmc.Badge("Needs wins & losses", color="gray", variant="outline")
             elif analysis["kelly_pct"] <= 0:
-                badges.append(dmc.Badge("Negative Expectancy", color="red", variant="light"))
+                extra_badge = dmc.Badge("Negative Expectancy", color="red", variant="light")
 
             strategy_cards.append(
                 dmc.Paper(
@@ -1019,18 +973,26 @@ def register_position_sizing_callbacks(app):
                     radius="md",
                     shadow="sm" if analysis["kelly_pct"] > 0 else "xs",
                     p="md",
+                    style={"position": "relative"},
                     children=[
+                        # Badge positioned absolutely in top-right
+                        dmc.Group(
+                            (
+                                [
+                                    dmc.Badge(badge_content, color="gray", variant="light"),
+                                    extra_badge,
+                                ]
+                                if extra_badge
+                                else [dmc.Badge(badge_content, color="gray", variant="light")]
+                            ),
+                            gap="xs",
+                            style={"position": "absolute", "top": "12px", "right": "12px"},
+                        ),
                         dmc.Stack(
                             gap="sm",
                             children=[
-                                dmc.Group(
-                                    [
-                                        dmc.Text(analysis["name"], fw=600),
-                                        dmc.Group(badges, gap="xs"),
-                                    ],
-                                    justify="space-between",
-                                    align="center",
-                                ),
+                                # Strategy name with padding to avoid badge overlap
+                                dmc.Text(analysis["name"], fw=600, style={"paddingRight": "180px"}),
                                 dmc.Group(
                                     [
                                         dmc.Text(
@@ -1099,7 +1061,7 @@ def register_position_sizing_callbacks(app):
                                     c="dimmed",
                                 ),
                             ],
-                        )
+                        ),
                     ],
                 )
             )

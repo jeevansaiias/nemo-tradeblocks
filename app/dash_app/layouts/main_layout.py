@@ -323,9 +323,6 @@ def create_main_layout():
                                                 id="ps-starting-capital-input", value=100000
                                             ),
                                             dmc.NumberInput(
-                                                id="ps-target-drawdown-input", value=10
-                                            ),
-                                            dmc.NumberInput(
                                                 id="ps-kelly-fraction-input", value=100
                                             ),
                                             html.Div(id="ps-saved-feedback"),

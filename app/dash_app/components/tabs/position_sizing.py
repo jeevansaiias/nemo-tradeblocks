@@ -25,90 +25,6 @@ def create_position_sizing_tab():
                     ),
                 ],
             ),
-            dmc.Paper(
-                p="lg",
-                withBorder=True,
-                children=[
-                    dmc.Stack(
-                        gap="md",
-                        children=[
-                            dmc.Group(
-                                [
-                                    dmc.Title("Position Sizing Parameters", order=4),
-                                    create_info_tooltip(
-                                        title="Position Sizing Parameters",
-                                        content="Set starting capital, Kelly fraction, and drawdown guardrails. Changes update insights instantly; save to persist.",
-                                        detailed_content="Inputs persist per portfolio fingerprint in localStorage, so you can iterate without re-uploading.",
-                                        tooltip_id="ps-parameters",
-                                    ),
-                                ],
-                                justify="space-between",
-                                align="center",
-                            ),
-                            dmc.SimpleGrid(
-                                cols=3,
-                                spacing="lg",
-                                children=[
-                                    dmc.NumberInput(
-                                        id="ps-starting-capital-input",
-                                        label="Starting Capital ($)",
-                                        description="Net liquidity or capital base",
-                                        min=0,
-                                        step=1000,
-                                        allowNegative=False,
-                                        prefix="$ ",
-                                        thousandSeparator=",",
-                                    ),
-                                    dmc.NumberInput(
-                                        id="ps-target-drawdown-input",
-                                        label="Target Max Drawdown (%)",
-                                        description="Comfort zone for peak-to-trough loss",
-                                        min=1,
-                                        max=100,
-                                        step=1,
-                                        allowNegative=False,
-                                    ),
-                                    dmc.NumberInput(
-                                        id="ps-kelly-fraction-input",
-                                        label="Kelly Fraction (%)",
-                                        description="Percent of calculated Kelly you want to apply",
-                                        min=0,
-                                        max=200,
-                                        step=1,
-                                        value=100,
-                                        allowNegative=False,
-                                        suffix="%",
-                                    ),
-                                ],
-                            ),
-                            dmc.Group(
-                                [
-                                    dmc.Button(
-                                        "Save Settings",
-                                        id="ps-save-settings",
-                                        leftSection=DashIconify(
-                                            icon="tabler:device-floppy", width=16
-                                        ),
-                                        variant="filled",
-                                        color="green",
-                                        size="md",
-                                    ),
-                                    dmc.Button(
-                                        "Reset",
-                                        id="ps-reset-settings",
-                                        leftSection=DashIconify(icon="tabler:refresh", width=16),
-                                        variant="light",
-                                        size="md",
-                                    ),
-                                    html.Div(id="ps-saved-feedback", style={"marginLeft": "auto"}),
-                                ],
-                                justify="flex-end",
-                                align="center",
-                            ),
-                        ],
-                    )
-                ],
-            ),
             dmc.Stack(
                 gap="lg",
                 children=[
@@ -121,19 +37,49 @@ def create_position_sizing_tab():
                                 children=[
                                     dmc.Group(
                                         [
-                                            dmc.Title("Kelly Allocation", order=4),
+                                            dmc.Title(
+                                                "Position Sizing & Kelly Allocation", order=4
+                                            ),
                                             create_info_tooltip(
-                                                title="Kelly Allocation",
-                                                content="Set Kelly fractions per strategy to build an aggregate allocation plan.",
-                                                detailed_content="Adjust the Kelly %, run the analysis, and review expectancy stats alongside capital requirements.",
+                                                title="Position Sizing & Kelly Allocation",
+                                                content="Set your capital base and Kelly fractions to build an optimal allocation plan.",
+                                                detailed_content="Adjust starting capital and Kelly percentages, then run the allocation to see portfolio and strategy metrics.",
                                                 tooltip_id="ps-kelly-allocation",
                                             ),
                                         ],
                                         justify="space-between",
                                         align="center",
                                     ),
+                                    dmc.SimpleGrid(
+                                        cols=2,
+                                        spacing="lg",
+                                        mb="lg",
+                                        children=[
+                                            dmc.NumberInput(
+                                                id="ps-starting-capital-input",
+                                                label="Starting Capital ($)",
+                                                description="Net liquidity or capital base",
+                                                min=0,
+                                                step=1000,
+                                                allowNegative=False,
+                                                prefix="$ ",
+                                                thousandSeparator=",",
+                                            ),
+                                            dmc.NumberInput(
+                                                id="ps-kelly-fraction-input",
+                                                label="Portfolio Kelly Fraction (%)",
+                                                description="Percent of calculated Kelly to apply globally",
+                                                min=0,
+                                                max=200,
+                                                step=1,
+                                                value=100,
+                                                allowNegative=False,
+                                                suffix="%",
+                                            ),
+                                        ],
+                                    ),
                                     dmc.Text(
-                                        "Review each strategy, choose the Kelly multiplier to apply, then run the allocation to see portfolio and strategy metrics.",
+                                        "Adjust the Kelly multiplier for each strategy individually:",
                                         size="sm",
                                         c="dimmed",
                                     ),
@@ -197,39 +143,6 @@ def create_position_sizing_tab():
                                         type="default",
                                     ),
                                     html.Div(id="ps-strategy-margin-warning"),
-                                ],
-                            )
-                        ],
-                    ),
-                    dmc.Paper(
-                        p="lg",
-                        withBorder=True,
-                        children=[
-                            dmc.Stack(
-                                gap="md",
-                                children=[
-                                    dmc.Title("Roadmap", order=4),
-                                    dmc.Text(
-                                        "Margin-aware sizing curves, replay tools, and allocation optimizers are queued up next.",
-                                        size="sm",
-                                        c="dimmed",
-                                    ),
-                                    dmc.List(
-                                        spacing="xs",
-                                        size="sm",
-                                        c="dimmed",
-                                        children=[
-                                            dmc.ListItem(
-                                                "Compare sizing rules side-by-side (fixed fractional, Kelly variants, volatility-based)."
-                                            ),
-                                            dmc.ListItem(
-                                                "Interactive risk-of-ruin analysis with configurable guardrails."
-                                            ),
-                                            dmc.ListItem(
-                                                "Scenario replays that rebuild equity curves with alternative sizing inputs."
-                                            ),
-                                        ],
-                                    ),
                                 ],
                             )
                         ],
