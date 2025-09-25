@@ -23,6 +23,7 @@ from app.calculations.shared import (
 )
 from app.data.models import Portfolio
 from app.utils.kelly import calculate_kelly_metrics
+from app.dash_app.components.common import create_info_tooltip
 
 logger = logging.getLogger(__name__)
 
@@ -745,79 +746,250 @@ def register_position_sizing_callbacks(app):
             else "--"
         )
 
-        portfolio_summary = dmc.Stack(
-            gap="md",
-            children=[
-                dmc.Group(
-                    [
-                        dmc.Text("Portfolio Kelly", fw=600, size="lg"),
-                        dmc.Group(
-                            [
-                                dmc.Badge(
-                                    f"Full Kelly {portfolio_metrics.percent:.1f}%",
-                                    color=portfolio_color,
-                                    variant="filled",
-                                ),
-                                dmc.Badge(
-                                    f"Weighted Applied {weighted_applied_pct:.1f}%",
-                                    color="blue",
-                                    variant="light",
-                                ),
-                            ],
-                            gap="xs",
-                        ),
-                    ],
-                    justify="space-between",
-                    align="center",
-                ),
-                dmc.SimpleGrid(
-                    cols={"base": 1, "sm": 1, "md": 2},
-                    spacing="md",
-                    children=[
-                        dmc.Stack(
-                            [
-                                dmc.Text("Win Rate", size="xs", c="dimmed"),
-                                dmc.Text(f"{portfolio_metrics.win_rate:.1%}", fw=600),
-                            ],
-                            gap="xs",
-                        ),
-                        dmc.Stack(
-                            [
-                                dmc.Text("Avg Win/Loss Ratio", size="xs", c="dimmed"),
-                                dmc.Text(payoff_display, fw=600),
-                            ],
-                            gap="xs",
-                        ),
-                        dmc.Stack(
-                            [
-                                dmc.Text("Average Win", size="xs", c="dimmed"),
-                                dmc.Text(f"${portfolio_metrics.avg_win:,.0f}", fw=600, c="green"),
-                            ],
-                            gap="xs",
-                        ),
-                        dmc.Stack(
-                            [
-                                dmc.Text("Average Loss", size="xs", c="dimmed"),
-                                dmc.Text(f"-${portfolio_metrics.avg_loss:,.0f}", fw=600, c="red"),
-                            ],
-                            gap="xs",
-                        ),
-                    ],
-                ),
-                dmc.Group(
-                    [
-                        dmc.Text(
-                            f"Starting capital: ${starting_capital:,.0f}", size="sm", c="dimmed"
-                        ),
-                        dmc.Text(
-                            f"Weighted applied capital: ${applied_capital:,.0f}",
-                            size="sm",
-                            c="dimmed",
-                        ),
-                    ],
-                    justify="space-between",
-                ),
-            ],
+        portfolio_summary = dmc.Paper(
+            withBorder=True,
+            radius="md",
+            p="lg",
+            children=dmc.Stack(
+                gap="lg",
+                children=[
+                    # Header with title and badges
+                    dmc.Group(
+                        [
+                            dmc.Group(
+                                [
+                                    dmc.Text("Portfolio Kelly", fw=600, size="lg"),
+                                    create_info_tooltip(
+                                        title="📊 Portfolio Kelly",
+                                        content="Aggregated Kelly criterion across all strategies, weighted by trade count. Shows the mathematical optimal allocation percentage.",
+                                        detailed_content="The portfolio Kelly emerges from the weighted combination of individual strategy Kelly percentages. Strategies with more trades have greater influence on the overall portfolio allocation.",
+                                        tooltip_id="ps-portfolio-kelly-header",
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                            dmc.Group(
+                                [
+                                    dmc.Tooltip(
+                                        label=dmc.Stack(
+                                            [
+                                                dmc.Text(
+                                                    "🎯 Full Kelly", c="blue", fw=600, size="sm"
+                                                ),
+                                                dmc.Text(
+                                                    "Optimal Kelly percentage calculated from portfolio statistics",
+                                                    size="xs",
+                                                ),
+                                                dmc.Text(
+                                                    "This represents the mathematically optimal allocation based on your historical win rate and payoff ratio.",
+                                                    size="xs",
+                                                    c="dimmed",
+                                                ),
+                                            ],
+                                            gap="xs",
+                                        ),
+                                        multiline=True,
+                                        w=350,
+                                        children=dmc.Badge(
+                                            f"FULL KELLY {portfolio_metrics.percent:.1f}%",
+                                            color=portfolio_color,
+                                            variant="filled",
+                                            size="lg",
+                                        ),
+                                    ),
+                                    dmc.Tooltip(
+                                        label=dmc.Stack(
+                                            [
+                                                dmc.Text(
+                                                    "⚖️ Weighted Applied",
+                                                    c="blue",
+                                                    fw=600,
+                                                    size="sm",
+                                                ),
+                                                dmc.Text(
+                                                    "Actual allocation after applying your Kelly fraction settings",
+                                                    size="xs",
+                                                ),
+                                                dmc.Text(
+                                                    "This value reflects your risk preferences applied to the optimal Kelly allocation.",
+                                                    size="xs",
+                                                    c="dimmed",
+                                                ),
+                                            ],
+                                            gap="xs",
+                                        ),
+                                        multiline=True,
+                                        w=350,
+                                        children=dmc.Badge(
+                                            f"WEIGHTED APPLIED {weighted_applied_pct:.1f}%",
+                                            color="blue",
+                                            variant="light",
+                                            size="lg",
+                                        ),
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                        ],
+                        justify="space-between",
+                        align="center",
+                    ),
+                    dmc.Divider(variant="dashed"),
+                    # Metrics grid
+                    dmc.SimpleGrid(
+                        cols={"base": 2, "sm": 2, "md": 4},
+                        spacing="xl",
+                        children=[
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Win Rate", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="🎲 Win Rate",
+                                                content="Percentage of trades that were profitable across your entire portfolio.",
+                                                detailed_content="Win rate alone doesn't determine profitability—a 30% win rate with large wins can outperform a 70% win rate with small wins. The Kelly formula considers both win rate and payoff ratio together.",
+                                                tooltip_id="ps-portfolio-win-rate",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(
+                                        f"{portfolio_metrics.win_rate:.1%}", fw=600, size="lg"
+                                    ),
+                                ],
+                                gap=4,
+                            ),
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Avg Win/Loss Ratio", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="📈 Win/Loss Ratio",
+                                                content="Average winning trade divided by average losing trade, showing the asymmetry in your outcomes.",
+                                                detailed_content="A ratio above 1.0 means your average win exceeds your average loss. Higher ratios allow for profitable trading even with lower win rates—this is the mathematical edge that Kelly sizing helps capture.",
+                                                tooltip_id="ps-portfolio-payoff-ratio",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(payoff_display, fw=600, size="lg"),
+                                ],
+                                gap=4,
+                            ),
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Average Win", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="💚 Average Win",
+                                                content="Mean profit from winning trades across your portfolio.",
+                                                detailed_content="This value represents the typical gain when a trade goes your way. Larger average wins relative to losses create positive expectancy even with modest win rates.",
+                                                tooltip_id="ps-portfolio-avg-win",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(
+                                        f"${portfolio_metrics.avg_win:,.0f}",
+                                        fw=600,
+                                        size="lg",
+                                        c="teal.6",
+                                    ),
+                                ],
+                                gap=4,
+                            ),
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Average Loss", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="💔 Average Loss",
+                                                content="Mean loss from losing trades across your portfolio.",
+                                                detailed_content="This value shows the typical cost when a trade doesn't work out. Keeping losses small relative to wins is a key component of long-term trading success.",
+                                                tooltip_id="ps-portfolio-avg-loss",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(
+                                        f"-${portfolio_metrics.avg_loss:,.0f}",
+                                        fw=600,
+                                        size="lg",
+                                        c="red.6",
+                                    ),
+                                ],
+                                gap=4,
+                            ),
+                        ],
+                    ),
+                    dmc.Divider(variant="dashed"),
+                    # Capital summary
+                    dmc.SimpleGrid(
+                        cols={"base": 1, "sm": 2},
+                        spacing="md",
+                        children=[
+                            dmc.Group(
+                                [
+                                    dmc.Text(
+                                        [
+                                            dmc.Text(
+                                                "Starting capital: ",
+                                                span=True,
+                                                size="sm",
+                                                c="dimmed",
+                                            ),
+                                            dmc.Text(
+                                                f"${starting_capital:,.0f}",
+                                                span=True,
+                                                size="sm",
+                                                fw=500,
+                                            ),
+                                        ],
+                                    ),
+                                    create_info_tooltip(
+                                        title="🏦 Starting Capital",
+                                        content="The capital base used for all percentage calculations.",
+                                        detailed_content="This is your initial account value or available trading capital. All Kelly percentages are calculated relative to this amount.",
+                                        tooltip_id="ps-portfolio-starting-capital",
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                            dmc.Group(
+                                [
+                                    dmc.Text(
+                                        [
+                                            dmc.Text(
+                                                "Weighted applied capital: ",
+                                                span=True,
+                                                size="sm",
+                                                c="dimmed",
+                                            ),
+                                            dmc.Text(
+                                                f"${applied_capital:,.0f}",
+                                                span=True,
+                                                size="sm",
+                                                fw=500,
+                                            ),
+                                        ],
+                                    ),
+                                    create_info_tooltip(
+                                        title="💰 Applied Capital",
+                                        content="Total capital allocated after applying your Kelly fraction settings.",
+                                        detailed_content="This represents the actual dollar amount allocated across all strategies based on your chosen Kelly percentages. The difference between this and starting capital shows your unallocated reserve.",
+                                        tooltip_id="ps-portfolio-applied-capital",
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
         )
 
         strategy_cards = []
