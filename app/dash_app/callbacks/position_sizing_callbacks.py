@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import math
 from collections import defaultdict
-from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import dash_mantine_components as dmc
-from dash import ALL, Input, Output, State, callback, ctx, no_update
+from dash import ALL, Input, Output, State
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
@@ -27,162 +24,8 @@ from app.dash_app.components.common import create_info_tooltip
 
 logger = logging.getLogger(__name__)
 
-STORE_VERSION = 1
-SETTINGS_VERSION = 1
-DEFAULT_TARGET_DRAWDOWN = 10
 DEFAULT_STARTING_CAPITAL = 100000
 DEFAULT_KELLY_PCT = 100.0
-
-
-def _ensure_store(store_data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    if not isinstance(store_data, dict) or store_data.get("version") != STORE_VERSION:
-        return {"version": STORE_VERSION, "portfolios": {}}
-
-    return {
-        "version": STORE_VERSION,
-        "portfolios": dict(store_data.get("portfolios", {})),
-    }
-
-
-def _portfolio_fingerprint(portfolio_data: Optional[Dict[str, Any]]) -> Optional[str]:
-    if not portfolio_data:
-        return None
-
-    payload = {
-        "filename": portfolio_data.get("filename"),
-        "upload_timestamp": portfolio_data.get("upload_timestamp"),
-        "total_trades": portfolio_data.get("total_trades"),
-    }
-
-    if not any(payload.values()):
-        return None
-
-    try:
-        serialized = json.dumps(payload, sort_keys=True, default=str)
-    except (TypeError, ValueError):
-        return None
-
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
-
-
-def _collect_strategies(portfolio_data: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    strategies: Dict[str, Dict[str, Any]] = {}
-    trades = portfolio_data.get("trades", []) or []
-    for trade in trades:
-        strategy = trade.get("strategy")
-        if strategy:
-            strategies.setdefault(
-                strategy,
-                {"kelly_pct": DEFAULT_KELLY_PCT},
-            )
-    return strategies
-
-
-def _default_portfolio_settings(
-    portfolio_data: Dict[str, Any],
-    initial_capital: Optional[float] = None,
-) -> Dict[str, Any]:
-    starting_capital = None
-    source = "default"
-
-    if initial_capital is not None:
-        try:
-            if float(initial_capital) > 0:
-                starting_capital = int(round(float(initial_capital)))
-                source = "inferred"
-        except (TypeError, ValueError):
-            starting_capital = None
-
-    if starting_capital is None:
-        starting_capital = DEFAULT_STARTING_CAPITAL
-        source = "default"
-
-    return {
-        "version": SETTINGS_VERSION,
-        "portfolio": {
-            "starting_capital": starting_capital,
-            "starting_capital_source": source,
-            "target_drawdown_pct": DEFAULT_TARGET_DRAWDOWN,
-            "kelly_fraction_pct": DEFAULT_KELLY_PCT,
-        },
-        "strategies": _collect_strategies(portfolio_data),
-    }
-
-
-def _sync_settings(
-    existing: Dict[str, Any],
-    portfolio_data: Dict[str, Any],
-    initial_capital: Optional[float] = None,
-) -> Dict[str, Any]:
-    if not existing or existing.get("version") != SETTINGS_VERSION:
-        return _default_portfolio_settings(portfolio_data, initial_capital)
-
-    updated = deepcopy(existing)
-    portfolio_settings = updated.setdefault("portfolio", {})
-    updated.setdefault("strategies", {})
-
-    # Backwards compatibility for older stores
-    legacy_choice = portfolio_settings.pop("kelly_fraction_choice", None)
-    if "kelly_fraction_pct" not in portfolio_settings:
-        mapping = {"full": 100.0, "half": 50.0, "quarter": 25.0}
-        portfolio_settings["kelly_fraction_pct"] = mapping.get(legacy_choice, DEFAULT_KELLY_PCT)
-    else:
-        try:
-            portfolio_settings["kelly_fraction_pct"] = max(
-                0.0, float(portfolio_settings.get("kelly_fraction_pct", DEFAULT_KELLY_PCT))
-            )
-        except (TypeError, ValueError):
-            portfolio_settings["kelly_fraction_pct"] = DEFAULT_KELLY_PCT
-
-    collected = _collect_strategies(portfolio_data)
-    for strategy, defaults in collected.items():
-        strategy_entry = updated["strategies"].setdefault(strategy, {})
-        try:
-            current_pct = float(
-                strategy_entry.get("kelly_pct", defaults.get("kelly_pct", DEFAULT_KELLY_PCT))
-            )
-        except (TypeError, ValueError):
-            current_pct = DEFAULT_KELLY_PCT
-        strategy_entry["kelly_pct"] = max(0.0, current_pct)
-
-    if initial_capital is not None:
-        try:
-            parsed_capital = int(round(float(initial_capital)))
-        except (TypeError, ValueError):
-            parsed_capital = None
-
-        if parsed_capital and parsed_capital > 0:
-            current_capital = portfolio_settings.get("starting_capital")
-            current_source = portfolio_settings.get("starting_capital_source", "default")
-            manual_default = (
-                current_source == "manual"
-                and current_capital == DEFAULT_STARTING_CAPITAL
-                and parsed_capital != DEFAULT_STARTING_CAPITAL
-            )
-
-            if (
-                current_capital in (None, 0)
-                or (
-                    current_capital == DEFAULT_STARTING_CAPITAL
-                    and parsed_capital != DEFAULT_STARTING_CAPITAL
-                    and current_source != "manual"
-                )
-                or manual_default
-            ):
-                portfolio_settings["starting_capital"] = parsed_capital
-                portfolio_settings["starting_capital_source"] = "inferred"
-    else:
-        current_capital = portfolio_settings.get("starting_capital")
-        current_source = portfolio_settings.get("starting_capital_source")
-        if current_capital in (None, 0):
-            portfolio_settings["starting_capital"] = DEFAULT_STARTING_CAPITAL
-            portfolio_settings.setdefault("starting_capital_source", "default")
-        elif current_source is None:
-            portfolio_settings["starting_capital_source"] = (
-                "default" if current_capital == DEFAULT_STARTING_CAPITAL else "manual"
-            )
-
-    return updated
 
 
 def _infer_starting_capital(
@@ -259,25 +102,107 @@ def _infer_starting_capital(
     return None
 
 
-def _contains_component_id(node: Any, target_id: str) -> bool:
-    """Return True if a serialized Dash component tree contains target id."""
+def get_net_liq_from_daily_log(daily_log_data, date_str):
+    """Extract net liquidity for a specific date from daily log.
 
-    if node is None:
-        return False
+    Args:
+        daily_log_data: List or dict of daily log entries
+        date_str: ISO format date string (YYYY-MM-DD)
 
-    if isinstance(node, dict):
-        props = node.get("props", {})
-        if props.get("id") == target_id:
-            return True
-        children = props.get("children")
-        if isinstance(children, list):
-            return any(_contains_component_id(child, target_id) for child in children)
-        return _contains_component_id(children, target_id)
+    Returns:
+        Net liquidity for that date, or None if not found
+    """
+    if not daily_log_data:
+        return None
 
-    if isinstance(node, list):
-        return any(_contains_component_id(child, target_id) for child in node)
+    # Handle both list and dict formats
+    entries = daily_log_data
+    if isinstance(daily_log_data, dict):
+        entries = daily_log_data.get("entries", [])
 
-    return False
+    for entry in entries:
+        entry_date = entry.get("date")
+        if entry_date == date_str:
+            return entry.get("net_liq")
+
+    return None
+
+
+def calculate_running_net_liq(trades, starting_capital, daily_log_data=None):
+    """Calculate net liquidity at each point in time for compounding mode.
+
+    Returns a dict mapping trade IDs to the net liquidity when that trade was opened.
+    If daily_log_data is provided, uses actual net liquidity from the log.
+    """
+    # Sort trades by date_opened
+    sorted_trades = sorted(
+        trades,
+        key=lambda t: (
+            t.get("date_opened") or datetime.min.date(),
+            t.get("time_opened") or datetime.min.time(),
+        ),
+    )
+
+    net_liq_timeline = {}
+    cumulative_pnl = 0
+    closed_trades = []
+
+    for trade in sorted_trades:
+        trade_id = id(trade) if not isinstance(trade, dict) else hash(str(trade))
+        trade_open = trade.get("date_opened")
+
+        if not trade_open:
+            net_liq_timeline[trade_id] = starting_capital
+            continue
+
+        # Try to get actual net liq from daily log
+        date_str = trade_open.isoformat() if hasattr(trade_open, "isoformat") else str(trade_open)
+        net_liq_from_log = (
+            get_net_liq_from_daily_log(daily_log_data, date_str) if daily_log_data else None
+        )
+
+        if net_liq_from_log is not None:
+            # Use actual net liq from daily log
+            net_liq_at_open = net_liq_from_log
+        else:
+            # Calculate based on closed trades P&L
+            for closed_trade in sorted_trades:
+                closed_date = closed_trade.get("date_closed")
+                if closed_date and closed_date < trade_open and closed_trade not in closed_trades:
+                    # Try both 'pl' and 'pnl' field names
+                    trade_pnl = closed_trade.get("pl") or closed_trade.get("pnl")
+                    if trade_pnl is not None:
+                        cumulative_pnl += trade_pnl
+                    closed_trades.append(closed_trade)
+
+            net_liq_at_open = starting_capital + cumulative_pnl
+
+        net_liq_timeline[trade_id] = net_liq_at_open
+
+    return net_liq_timeline
+
+
+def calculate_margin_pct(trade, starting_capital, margin_mode="fixed", net_liq_timeline=None):
+    """Calculate margin % based on selected mode.
+
+    Args:
+        trade: Trade data
+        starting_capital: Initial capital
+        margin_mode: "fixed" or "compounding"
+        net_liq_timeline: Dict of trade IDs to net liquidity (for compounding mode)
+
+    Returns:
+        Margin percentage
+    """
+    margin_req = trade.get("margin_req", 0)
+
+    if margin_mode == "compounding" and net_liq_timeline:
+        trade_id = id(trade) if not isinstance(trade, dict) else hash(str(trade))
+        denominator = net_liq_timeline.get(trade_id, starting_capital)
+    else:
+        denominator = starting_capital
+
+    return (margin_req / denominator * 100) if denominator > 0 else 0
 
 
 def _blank_margin_figure(theme_data=None) -> go.Figure:
@@ -303,16 +228,11 @@ def register_position_sizing_callbacks(app):
     @app.callback(
         Output("ps-starting-capital-input", "value"),
         Output("ps-kelly-fraction-input", "value"),
-        Input("position-sizing-present", "data"),
         Input("current-portfolio-data", "data"),
         State("current-daily-log-data", "data"),
         prevent_initial_call=False,
     )
-    def hydrate_inputs(tab_present, portfolio_data, daily_log_data):
-        # Only update if Position Sizing tab is actually active
-        if not tab_present:
-            raise PreventUpdate
-
+    def hydrate_inputs(portfolio_data, daily_log_data):
         # Try to infer starting capital from portfolio data
         inferred_capital = _infer_starting_capital(portfolio_data, daily_log_data)
         starting_capital = inferred_capital if inferred_capital else DEFAULT_STARTING_CAPITAL
@@ -322,11 +242,10 @@ def register_position_sizing_callbacks(app):
     @app.callback(
         Output("ps-strategy-input-grid", "children"),
         Input("current-portfolio-data", "data"),
-        Input("position-sizing-store", "data"),
+        Input("ps-apply-trigger", "data"),
+        State("ps-kelly-fraction-input", "value"),
     )
-    def render_strategy_inputs(portfolio_data, store_data):
-        store = _ensure_store(store_data)
-
+    def render_strategy_inputs(portfolio_data, apply_trigger, kelly_fraction_value):
         if not portfolio_data:
             return dmc.Alert(
                 "Upload a portfolio to configure strategy sizing.",
@@ -334,21 +253,18 @@ def register_position_sizing_callbacks(app):
                 variant="light",
             )
 
-        fingerprint = _portfolio_fingerprint(portfolio_data)
-        strategies_data: Dict[str, Dict[str, Any]] = {}
+        # Collect unique strategies from the portfolio
+        strategies = set()
+        trades = portfolio_data.get("trades", []) or []
+        for trade in trades:
+            if isinstance(trade, dict):
+                strategy = trade.get("strategy")
+            else:
+                strategy = getattr(trade, "strategy", None)
+            if strategy:
+                strategies.add(strategy)
 
-        if fingerprint:
-            portfolio_entry = store["portfolios"].get(fingerprint, {})
-            strategies_data = dict(portfolio_entry.get("strategies", {}))
-        else:
-            logger.warning(
-                "Could not compute portfolio fingerprint; strategy inputs will not persist."
-            )
-
-        if not strategies_data:
-            strategies_data = _collect_strategies(portfolio_data)
-
-        if not strategies_data:
+        if not strategies:
             return dmc.Alert(
                 "No strategies detected in the uploaded portfolio.",
                 color="gray",
@@ -367,17 +283,16 @@ def register_position_sizing_callbacks(app):
 
         cards = []
         strategy_names = sorted(
-            strategies_data.keys(),
+            strategies,
             key=lambda name: (-trade_counts.get(name, 0), name.lower()),
         )
 
         for strategy_name in strategy_names:
-            settings = strategies_data.get(strategy_name) or {}
-            try:
-                kelly_pct_value = float(settings.get("kelly_pct", DEFAULT_KELLY_PCT))
-            except (TypeError, ValueError):
+            # Use applied Kelly value if apply trigger fired, otherwise use default
+            if apply_trigger and kelly_fraction_value is not None:
+                kelly_pct_value = kelly_fraction_value
+            else:
                 kelly_pct_value = DEFAULT_KELLY_PCT
-            kelly_pct_value = max(0.0, kelly_pct_value)
 
             cards.append(
                 dmc.Paper(
@@ -434,70 +349,16 @@ def register_position_sizing_callbacks(app):
         )
 
     @app.callback(
-        Output("ps-strategy-action-feedback", "children"),
-        Output("position-sizing-store", "data"),
-        Input("ps-apply-portfolio-kelly", "n_clicks"),
-        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
-        State("ps-kelly-fraction-input", "value"),
-        State("position-sizing-store", "data"),
-        State("current-portfolio-data", "data"),
+        Output("ps-apply-trigger", "data"),
+        Input("ps-apply-kelly-inline", "n_clicks"),
         prevent_initial_call=True,
     )
-    def apply_portfolio_kelly_to_strategies(
-        n_clicks, strategy_ids, portfolio_kelly_pct, store_data, portfolio_data
-    ):
+    def trigger_apply(n_clicks):
+        logger.info(f"BUTTON CLICKED! n_clicks = {n_clicks}")
+        print(f"BUTTON CLICKED! n_clicks = {n_clicks}")  # Force print to terminal
         if not n_clicks:
             raise PreventUpdate
-
-        # Ensure store exists
-        store = _ensure_store(store_data)
-
-        try:
-            portfolio_value = (
-                float(portfolio_kelly_pct) if portfolio_kelly_pct is not None else DEFAULT_KELLY_PCT
-            )
-        except (TypeError, ValueError):
-            portfolio_value = DEFAULT_KELLY_PCT
-        portfolio_value = max(0.0, portfolio_value)
-
-        # If no strategies or portfolio data, return early
-        if not strategy_ids or not portfolio_data:
-            return (
-                dmc.Text("No strategies to update.", size="xs", c="dimmed"),
-                store,
-            )
-
-        # Get portfolio fingerprint to update the store
-        fingerprint = _portfolio_fingerprint(portfolio_data)
-        if fingerprint:
-            # Ensure portfolio entry exists
-            if fingerprint not in store["portfolios"]:
-                store["portfolios"][fingerprint] = {"strategies": {}}
-
-            # Update each strategy's kelly_pct in the store
-            for comp_id in strategy_ids:
-                if isinstance(comp_id, dict) and comp_id.get("strategy"):
-                    strategy_name = comp_id.get("strategy")
-                    if "strategies" not in store["portfolios"][fingerprint]:
-                        store["portfolios"][fingerprint]["strategies"] = {}
-                    if strategy_name not in store["portfolios"][fingerprint]["strategies"]:
-                        store["portfolios"][fingerprint]["strategies"][strategy_name] = {}
-                    store["portfolios"][fingerprint]["strategies"][strategy_name][
-                        "kelly_pct"
-                    ] = portfolio_value
-
-        # Count valid strategies for feedback
-        valid_strategies = sum(
-            1 for comp_id in strategy_ids if isinstance(comp_id, dict) and comp_id.get("strategy")
-        )
-
-        feedback = dmc.Text(
-            f"Applied {portfolio_value}% Kelly to {valid_strategies} strateg{'y' if valid_strategies == 1 else 'ies'}",
-            size="xs",
-            c="teal.6",
-        )
-
-        return feedback, store
+        return {"timestamp": datetime.now().isoformat(), "n_clicks": n_clicks}
 
     @app.callback(
         Output("ps-portfolio-kelly-summary", "children"),
@@ -510,8 +371,8 @@ def register_position_sizing_callbacks(app):
         Input("theme-store", "data"),
         State("ps-starting-capital-input", "value"),
         State("ps-kelly-fraction-input", "value"),
-        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
-        State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
+        State("ps-margin-calc-mode", "value"),
+        State("current-daily-log-data", "data"),
         prevent_initial_call=True,
     )
     def run_strategy_analysis(
@@ -520,8 +381,8 @@ def register_position_sizing_callbacks(app):
         theme_data,
         starting_capital_input,
         kelly_fraction_input,
-        strategy_kelly_values,
-        strategy_kelly_ids,
+        margin_calc_mode,
+        daily_log_data,
     ):
         placeholder_fig = _blank_margin_figure(theme_data)
 
@@ -541,8 +402,8 @@ def register_position_sizing_callbacks(app):
         if not portfolio_data:
             return _empty_outputs("Upload a portfolio to see Kelly analysis.")
 
-        triggered_id = ctx.triggered_id
-        if triggered_id != "current-portfolio-data" and (n_clicks is None or n_clicks == 0):
+        # Only run when button is clicked, not on portfolio load
+        if n_clicks is None or n_clicks == 0:
             return _empty_outputs(
                 "Adjust Kelly inputs and click Run Allocation to calculate metrics."
             )
@@ -569,20 +430,26 @@ def register_position_sizing_callbacks(app):
         if starting_capital <= 0:
             starting_capital = DEFAULT_STARTING_CAPITAL
 
-        # Build strategy kelly settings from UI inputs
+        # Build strategy kelly settings using global Kelly fraction
+        try:
+            global_kelly_pct = (
+                float(kelly_fraction_input)
+                if kelly_fraction_input not in (None, "")
+                else DEFAULT_KELLY_PCT
+            )
+        except (TypeError, ValueError):
+            global_kelly_pct = DEFAULT_KELLY_PCT
+
+        # Get unique strategies from portfolio
+        unique_strategies = set()
+        for trade in trades:
+            if hasattr(trade, "strategy") and trade.strategy:
+                unique_strategies.add(trade.strategy)
+
+        # Apply the same Kelly percentage to all strategies
         strategies_settings = {}
-        if strategy_kelly_values and strategy_kelly_ids:
-            for value, comp_id in zip(strategy_kelly_values, strategy_kelly_ids):
-                if isinstance(comp_id, dict):
-                    strategy_name = comp_id.get("strategy")
-                    if strategy_name:
-                        try:
-                            kelly_pct = (
-                                float(value) if value not in (None, "") else DEFAULT_KELLY_PCT
-                            )
-                        except (TypeError, ValueError):
-                            kelly_pct = DEFAULT_KELLY_PCT
-                        strategies_settings[strategy_name] = {"kelly_pct": kelly_pct}
+        for strategy_name in unique_strategies:
+            strategies_settings[strategy_name] = {"kelly_pct": global_kelly_pct}
 
         portfolio_metrics = calculate_kelly_metrics(trades)
         if not (portfolio_metrics.avg_win > 0 and portfolio_metrics.avg_loss > 0):
@@ -601,7 +468,12 @@ def register_position_sizing_callbacks(app):
             key=lambda name: (-trade_counts.get(name, 0), name.lower()),
         )
 
+        # Use the margin calculation mode from the UI
+        margin_mode = margin_calc_mode if margin_calc_mode else "fixed"
+        logger.info(f"Margin calculation mode: {margin_mode} (received: {margin_calc_mode})")
+
         margin_totals: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+
         for trade in trades:
             margin_req = getattr(trade, "margin_req", None)
             if margin_req in (None, 0):
@@ -651,18 +523,110 @@ def register_position_sizing_callbacks(app):
         sorted_dates = sorted(margin_totals.keys())
         portfolio_margin_pct = []
         strategy_margin_pct_series: Dict[str, list] = {name: [] for name in strategy_names}
+
+        # If in compounding mode, calculate running P&L for each date
+        date_to_net_liq = {}
+        if margin_mode == "compounding":
+            # Build a map of date -> net liquidity
+            cumulative_pnl = 0
+            closed_dates_seen = set()
+
+            # Log initial state
+            logger.info(f"Starting compounding calculation with {len(trades)} trades")
+            trades_with_pl = sum(1 for t in trades if getattr(t, "pl", None) is not None)
+            logger.info(f"Trades with P&L data: {trades_with_pl}/{len(trades)}")
+
+            for date_key in sorted_dates:
+                # First check if we have actual net liq from daily log
+                net_liq_from_log = (
+                    get_net_liq_from_daily_log(daily_log_data, date_key) if daily_log_data else None
+                )
+
+                if net_liq_from_log is not None:
+                    date_to_net_liq[date_key] = net_liq_from_log
+                else:
+                    # Calculate based on closed trades
+                    for trade in trades:
+                        date_closed = getattr(trade, "date_closed", None)
+                        if date_closed:
+                            if hasattr(date_closed, "isoformat"):
+                                closed_str = date_closed.isoformat()
+                            else:
+                                try:
+                                    closed_str = (
+                                        datetime.fromisoformat(str(date_closed)).date().isoformat()
+                                    )
+                                except:
+                                    continue
+                            if closed_str <= date_key and closed_str not in closed_dates_seen:
+                                # Use 'pl' field (Trade model uses 'pl' not 'pnl')
+                                trade_pnl = getattr(trade, "pl", None)
+                                if trade_pnl is not None:
+                                    cumulative_pnl += trade_pnl
+                                    logger.debug(
+                                        f"Added P&L {trade_pnl} on {closed_str}, cumulative: {cumulative_pnl}"
+                                    )
+                                closed_dates_seen.add(closed_str)
+                    date_to_net_liq[date_key] = starting_capital + cumulative_pnl
+
+            # Log for debugging
+            logger.info(
+                f"Compounding mode: Cumulative P&L = ${cumulative_pnl:,.0f}, Final net liq = ${starting_capital + cumulative_pnl:,.0f}"
+            )
+            logger.info(
+                f"Date range: {sorted_dates[0] if sorted_dates else 'N/A'} to {sorted_dates[-1] if sorted_dates else 'N/A'}"
+            )
+            logger.info(
+                f"Net liq changes: {list(set(date_to_net_liq.values()))[:5]}"
+            )  # Show first 5 unique values
+            logger.info(f"Number of unique net liq values: {len(set(date_to_net_liq.values()))}")
+
         for date_key in sorted_dates:
             total_margin = margin_totals[date_key].get("__total__", 0.0)
+
+            # Calculate denominator based on mode
+            if margin_mode == "compounding":
+                denominator = date_to_net_liq.get(date_key, starting_capital)
+            else:
+                denominator = starting_capital
+
             portfolio_margin_pct.append(
-                (total_margin / starting_capital) * 100 if starting_capital else 0.0
+                (total_margin / denominator) * 100 if denominator > 0 else 0.0
             )
             for name in strategy_names:
                 strategy_margin = margin_totals[date_key].get(name, 0.0)
                 strategy_margin_pct_series[name].append(
-                    (strategy_margin / starting_capital) * 100 if starting_capital else 0.0
+                    (strategy_margin / denominator) * 100 if denominator > 0 else 0.0
                 )
 
         margin_fig = _blank_margin_figure(theme_data)
+
+        # Add mode indicator and calculation info
+        if margin_mode == "compounding":
+            final_net_liq = (
+                date_to_net_liq.get(sorted_dates[-1], starting_capital)
+                if sorted_dates
+                else starting_capital
+            )
+            pnl_change = final_net_liq - starting_capital
+            mode_text = f"Mode: Compounding Returns<br>Starting: ${starting_capital:,.0f}<br>Final Net Liq: ${final_net_liq:,.0f}<br>P&L Impact: ${pnl_change:+,.0f}"
+        else:
+            mode_text = f"Mode: Fixed Capital<br>Using: ${starting_capital:,.0f} throughout"
+
+        margin_fig.add_annotation(
+            text=mode_text,
+            xref="paper",
+            yref="paper",
+            x=0.02,
+            y=0.98,
+            showarrow=False,
+            font=dict(size=10),
+            align="left",
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="gray",
+            borderwidth=1,
+        )
+
         if sorted_dates:
             margin_fig.add_trace(
                 go.Scatter(
@@ -1432,11 +1396,8 @@ def register_position_sizing_callbacks(app):
         else:
             margin_warning = ""
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if triggered_id == "ps-run-strategy-analysis":
-            feedback = dmc.Text(f"Updated at {timestamp}", size="xs", c="teal.6")
-        else:
-            feedback = dmc.Text(f"Auto-calculated at {timestamp}", size="xs", c="dimmed")
+        # Simple feedback without timestamp
+        feedback = ""
 
         return (
             portfolio_summary,

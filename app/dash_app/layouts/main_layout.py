@@ -325,9 +325,21 @@ def create_main_layout():
                                             dmc.NumberInput(
                                                 id="ps-kelly-fraction-input", value=100
                                             ),
+                                            dmc.SegmentedControl(
+                                                id="ps-margin-calc-mode", value="fixed", data=[]
+                                            ),
+                                            # Placeholder removed to fix duplicate IDs
                                             html.Div(id="ps-saved-feedback"),
                                             dmc.Button(id="ps-save-settings", n_clicks=0),
                                             dmc.Button(id="ps-reset-settings", n_clicks=0),
+                                            # Hidden button placeholder for registration
+                                            dmc.Button(
+                                                "hidden",
+                                                id="ps-apply-kelly-inline",
+                                                style={"display": "none"},
+                                                n_clicks=0,
+                                            ),
+                                            dcc.Store(id="ps-apply-trigger"),
                                             html.Div(id="ps-portfolio-kelly-summary"),
                                             html.Div(id="ps-strategy-results"),
                                             dcc.Graph(
