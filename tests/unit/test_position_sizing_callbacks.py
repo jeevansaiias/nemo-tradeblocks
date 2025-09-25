@@ -10,7 +10,13 @@ import dash_mantine_components as dmc
 from app.dash_app.callbacks.position_sizing_callbacks import (
     register_position_sizing_callbacks,
     _blank_margin_figure,
-    _build_strategy_settings,
+)
+from app.calculations.position_sizing import (
+    _build_date_to_net_liq,
+    build_strategy_settings,
+    calculate_margin_pct,
+    calculate_running_net_liq,
+    get_net_liq_from_daily_log,
 )
 
 
@@ -212,8 +218,6 @@ class TestMarginCalculationModes:
 
     def test_fixed_mode_constant_denominator(self):
         """In fixed mode, all margins use initial capital as denominator."""
-        from app.dash_app.callbacks.position_sizing_callbacks import calculate_margin_pct
-
         starting_capital = 100000
         trades = [
             {"margin_req": 10000, "pnl": 5000},  # 10% of starting
@@ -228,11 +232,6 @@ class TestMarginCalculationModes:
 
     def test_compounding_mode_with_gains(self):
         """In compounding mode with gains, denominator increases over time."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_margin_pct,
-            calculate_running_net_liq,
-        )
-
         starting_capital = 100000
         trades = [
             {
@@ -266,11 +265,6 @@ class TestMarginCalculationModes:
 
     def test_compounding_mode_with_losses(self):
         """In compounding mode with losses, denominator decreases."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_margin_pct,
-            calculate_running_net_liq,
-        )
-
         starting_capital = 100000
         trades = [
             {
@@ -298,10 +292,6 @@ class TestMarginCalculationModes:
 
     def test_compounding_mode_concurrent_trades(self):
         """Test compounding mode with overlapping trades."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_running_net_liq,
-        )
-
         starting_capital = 100000
         trades = [
             {
@@ -339,7 +329,7 @@ class TestMarginCalculationModes:
             {"strategy": "Beta"},
         ]
 
-        settings = _build_strategy_settings(trades, strategy_values, strategy_ids, 80.0)
+        settings = build_strategy_settings(trades, strategy_values, strategy_ids, 80.0)
 
         assert settings["Alpha"]["kelly_pct"] == 25.0
         assert settings["Beta"]["kelly_pct"] == 80.0  # Fallback to global on invalid input
@@ -352,14 +342,12 @@ class TestMarginCalculationModes:
         strategy_values = [-10]
         strategy_ids = [{"strategy": "Gamma"}]
 
-        settings = _build_strategy_settings(trades, strategy_values, strategy_ids, 100.0)
+        settings = build_strategy_settings(trades, strategy_values, strategy_ids, 100.0)
 
         assert settings["Gamma"]["kelly_pct"] == 0.0
 
     def test_compounding_counts_multiple_closes_same_day(self):
         """Compounding mode should aggregate P&L from every trade closing on a date."""
-        from app.dash_app.callbacks.position_sizing_callbacks import _build_date_to_net_liq
-
         starting_capital = 100000
         trades = [
             {
@@ -393,11 +381,6 @@ class TestMarginCalculationModes:
 
     def test_with_daily_log_data(self):
         """Test margin calculations when daily log is available."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_running_net_liq,
-            get_net_liq_from_daily_log,
-        )
-
         starting_capital = 100000
         daily_log = [
             {"date": "2025-01-01", "net_liq": 100000},
@@ -435,10 +418,6 @@ class TestMarginCalculationModes:
 
     def test_without_daily_log_data(self):
         """Test margin calculations fallback when daily log is not available."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_running_net_liq,
-        )
-
         starting_capital = 100000
         trades = [
             {
@@ -464,10 +443,6 @@ class TestMarginCalculationModes:
 
     def test_daily_log_vs_calculated_pnl(self):
         """Test that daily log takes precedence over calculated P&L."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_running_net_liq,
-        )
-
         starting_capital = 100000
 
         # Daily log shows different values (maybe due to deposits/withdrawals)
@@ -502,8 +477,6 @@ class TestMarginCalculationModes:
 
     def test_negative_net_liq_handling(self):
         """Test handling when account goes negative (should show warning)."""
-        from app.dash_app.callbacks.position_sizing_callbacks import calculate_margin_pct
-
         starting_capital = 10000
         trades = [
             {"margin_req": 5000, "pnl": -15000},  # Loses more than capital
@@ -515,11 +488,6 @@ class TestMarginCalculationModes:
 
     def test_mode_comparison(self):
         """Compare fixed vs compounding modes with same trades."""
-        from app.dash_app.callbacks.position_sizing_callbacks import (
-            calculate_margin_pct,
-            calculate_running_net_liq,
-        )
-
         starting_capital = 100000
         trade = {
             "margin_req": 20000,
