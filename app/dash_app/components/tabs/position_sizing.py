@@ -26,6 +26,43 @@ def create_position_sizing_tab():
                     ),
                 ],
             ),
+            dmc.Paper(
+                withBorder=True,
+                p="lg",
+                children=dmc.Stack(
+                    gap="sm",
+                    children=[
+                        dmc.Text("How to Use This Page", fw=600, size="md"),
+                        dmc.Text(
+                            "Use this page to explore how Kelly-driven sizing could shape your backtests before you commit to a new allocation.",
+                            size="sm",
+                        ),
+                        dmc.List(
+                            spacing="xs",
+                            size="sm",
+                            children=[
+                                dmc.ListItem(
+                                    "Set your starting capital and portfolio-level Kelly fraction to mirror the account you plan to backtest."
+                                ),
+                                dmc.ListItem(
+                                    "Review each strategy card and adjust the Kelly % to reflect conviction, correlation, or capital limits."
+                                ),
+                                dmc.ListItem(
+                                    "Run Allocation to surface portfolio Kelly metrics, applied capital, and projected margin demand so you can translate findings into your backtest position rules."
+                                ),
+                                dmc.ListItem(
+                                    "Iterate often—capture settings that feel sustainable, then take those parameters into your backtests for validation."
+                                ),
+                            ],
+                        ),
+                        dmc.Text(
+                            "Nothing here is a directive to size larger or smaller; it is a sandbox for stress-testing ideas with real trade history before you backtest or deploy.",
+                            size="xs",
+                            c="dimmed",
+                        ),
+                    ],
+                ),
+            ),
             dmc.Stack(
                 gap="lg",
                 children=[
@@ -233,48 +270,69 @@ def create_position_sizing_tab():
                                         justify="flex-start",
                                         align="center",
                                     ),
-                                    html.Div(id="ps-portfolio-kelly-summary"),
-                                    html.Div(id="ps-strategy-results"),
                                 ],
                             )
                         ],
                     ),
-                    dmc.Paper(
-                        p="lg",
-                        withBorder=True,
-                        children=[
-                            dmc.Stack(
-                                gap="md",
-                                children=[
-                                    dmc.Group(
-                                        [
-                                            dmc.Title("Margin Utilization", order=4),
-                                            create_info_tooltip(
-                                                title="📈 Margin Utilization",
-                                                content="Track how much buying power each strategy consumes. This chart shows historical margin requirements scaled by your Kelly settings.",
-                                                detailed_content="Margin spikes indicate periods when multiple strategies held positions simultaneously. Margin requirements scale linearly with Kelly percentage—halving Kelly halves expected margin usage.",
-                                                tooltip_id="ps-margin-utilization",
-                                            ),
-                                        ],
-                                        justify="space-between",
-                                        align="center",
-                                    ),
-                                    dcc.Loading(
-                                        dcc.Graph(
-                                            id="ps-strategy-margin-chart",
-                                            config={"displayModeBar": False},
-                                            style={"height": "320px"},
-                                            figure=create_placeholder_figure(
-                                                "Run Allocation to see margin utilization",
-                                                font_size=14,
-                                            ),
+                    dmc.Space(h="sm"),
+                    html.Div(
+                        id="ps-results-container",
+                        style={"display": "none"},
+                        children=dmc.Paper(
+                            p="lg",
+                            withBorder=True,
+                            children=[
+                                dmc.Stack(
+                                    gap="md",
+                                    children=[
+                                        html.Div(id="ps-portfolio-kelly-summary"),
+                                        html.Div(id="ps-strategy-results"),
+                                    ],
+                                )
+                            ],
+                        ),
+                    ),
+                    dmc.Space(h="sm"),
+                    html.Div(
+                        id="ps-margin-card-container",
+                        style={"display": "none"},
+                        children=dmc.Paper(
+                            p="lg",
+                            withBorder=True,
+                            children=[
+                                dmc.Stack(
+                                    gap="md",
+                                    children=[
+                                        dmc.Group(
+                                            [
+                                                dmc.Title("Margin Utilization", order=4),
+                                                create_info_tooltip(
+                                                    title="📈 Margin Utilization",
+                                                    content="Track how much buying power each strategy consumes. This chart shows historical margin requirements scaled by your Kelly settings.",
+                                                    detailed_content="Margin spikes indicate periods when multiple strategies held positions simultaneously. Margin requirements scale linearly with Kelly percentage—halving Kelly halves expected margin usage.",
+                                                    tooltip_id="ps-margin-utilization",
+                                                ),
+                                            ],
+                                            justify="space-between",
+                                            align="center",
                                         ),
-                                        type="default",
-                                    ),
-                                    html.Div(id="ps-strategy-margin-warning"),
-                                ],
-                            )
-                        ],
+                                        dcc.Loading(
+                                            dcc.Graph(
+                                                id="ps-strategy-margin-chart",
+                                                config={"displayModeBar": False},
+                                                style={"height": "320px"},
+                                                figure=create_placeholder_figure(
+                                                    "Run Allocation to see margin utilization",
+                                                    font_size=14,
+                                                ),
+                                            ),
+                                            type="default",
+                                        ),
+                                        html.Div(id="ps-strategy-margin-warning"),
+                                    ],
+                                )
+                            ],
+                        ),
                     ),
                 ],
             ),

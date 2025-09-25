@@ -198,8 +198,6 @@ def register_monte_carlo_callbacks(app):
             if not cache or "result" not in cache:
                 return None
 
-            logger.info("Rebuilding Monte Carlo figures from cached simulation data")
-
             cached_initial_capital = cache.get("initial_capital", initial_capital)
             cached_time_horizon = cache.get("time_horizon", time_horizon)
 
@@ -258,9 +256,6 @@ def register_monte_carlo_callbacks(app):
                     updated_cache,
                 )
 
-            logger.info(
-                "Theme changed but no cached simulation available; returning themed placeholders"
-            )
             return build_placeholder_response(theme_data)
 
         if triggered_id in ["mc-scale-selector", "mc-show-paths"]:
