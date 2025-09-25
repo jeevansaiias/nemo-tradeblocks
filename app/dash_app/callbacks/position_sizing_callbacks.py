@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 import dash_mantine_components as dmc
 from dash import ALL, Input, Output, State, callback, ctx, no_update
 from dash.exceptions import PreventUpdate
+from dash_iconify import DashIconify
 import plotly.graph_objects as go
 
 from app.calculations.shared import (
@@ -22,6 +23,7 @@ from app.calculations.shared import (
 )
 from app.data.models import Portfolio
 from app.utils.kelly import calculate_kelly_metrics
+from app.dash_app.components.common import create_info_tooltip
 
 logger = logging.getLogger(__name__)
 
@@ -744,79 +746,211 @@ def register_position_sizing_callbacks(app):
             else "--"
         )
 
-        portfolio_summary = dmc.Stack(
-            gap="md",
-            children=[
-                dmc.Group(
-                    [
-                        dmc.Text("Portfolio Kelly", fw=600, size="lg"),
-                        dmc.Group(
-                            [
-                                dmc.Badge(
-                                    f"Full Kelly {portfolio_metrics.percent:.1f}%",
-                                    color=portfolio_color,
-                                    variant="filled",
-                                ),
-                                dmc.Badge(
-                                    f"Weighted Applied {weighted_applied_pct:.1f}%",
-                                    color="blue",
-                                    variant="light",
-                                ),
-                            ],
-                            gap="xs",
-                        ),
-                    ],
-                    justify="space-between",
-                    align="center",
-                ),
-                dmc.SimpleGrid(
-                    cols={"base": 1, "sm": 1, "md": 2},
-                    spacing="md",
-                    children=[
-                        dmc.Stack(
-                            [
-                                dmc.Text("Win Rate", size="xs", c="dimmed"),
-                                dmc.Text(f"{portfolio_metrics.win_rate:.1%}", fw=600),
-                            ],
-                            gap="xs",
-                        ),
-                        dmc.Stack(
-                            [
-                                dmc.Text("Avg Win/Loss Ratio", size="xs", c="dimmed"),
-                                dmc.Text(payoff_display, fw=600),
-                            ],
-                            gap="xs",
-                        ),
-                        dmc.Stack(
-                            [
-                                dmc.Text("Average Win", size="xs", c="dimmed"),
-                                dmc.Text(f"${portfolio_metrics.avg_win:,.0f}", fw=600, c="green"),
-                            ],
-                            gap="xs",
-                        ),
-                        dmc.Stack(
-                            [
-                                dmc.Text("Average Loss", size="xs", c="dimmed"),
-                                dmc.Text(f"-${portfolio_metrics.avg_loss:,.0f}", fw=600, c="red"),
-                            ],
-                            gap="xs",
-                        ),
-                    ],
-                ),
-                dmc.Group(
-                    [
-                        dmc.Text(
-                            f"Starting capital: ${starting_capital:,.0f}", size="sm", c="dimmed"
-                        ),
-                        dmc.Text(
-                            f"Weighted applied capital: ${applied_capital:,.0f}",
-                            size="sm",
-                            c="dimmed",
-                        ),
-                    ],
-                    justify="space-between",
-                ),
-            ],
+        portfolio_summary = dmc.Paper(
+            withBorder=True,
+            radius="md",
+            p="lg",
+            children=dmc.Stack(
+                gap="lg",
+                children=[
+                    # Header with title and badges
+                    dmc.Group(
+                        [
+                            dmc.Group(
+                                [
+                                    dmc.Text("Portfolio Kelly", fw=600, size="lg"),
+                                    create_info_tooltip(
+                                        title="📊 Portfolio Kelly",
+                                        content="Aggregated Kelly criterion across all strategies, weighted by trade count. Shows the mathematical optimal allocation percentage.",
+                                        detailed_content="The portfolio Kelly emerges from the weighted combination of individual strategy Kelly percentages. Strategies with more trades have greater influence on the overall portfolio allocation.",
+                                        tooltip_id="ps-portfolio-kelly-header",
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                            dmc.Group(
+                                [
+                                    dmc.Tooltip(
+                                        label="Mathematically optimal allocation based on win rate and payoff ratio",
+                                        children=dmc.Badge(
+                                            f"FULL KELLY {portfolio_metrics.percent:.1f}%",
+                                            color=portfolio_color,
+                                            variant="filled",
+                                            size="lg",
+                                        ),
+                                    ),
+                                    dmc.Tooltip(
+                                        label="Your Kelly fraction applied to the optimal allocation",
+                                        children=dmc.Badge(
+                                            f"WEIGHTED APPLIED {weighted_applied_pct:.1f}%",
+                                            color="blue",
+                                            variant="light",
+                                            size="lg",
+                                        ),
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                        ],
+                        justify="space-between",
+                        align="center",
+                    ),
+                    dmc.Divider(variant="dashed"),
+                    # Metrics grid
+                    dmc.SimpleGrid(
+                        cols={"base": 2, "sm": 2, "md": 4},
+                        spacing="xl",
+                        children=[
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Win Rate", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="🎲 Win Rate",
+                                                content="Percentage of trades that were profitable across your entire portfolio.",
+                                                detailed_content="Win rate alone doesn't determine profitability—a 30% win rate with large wins can outperform a 70% win rate with small wins. The Kelly formula considers both win rate and payoff ratio together.",
+                                                tooltip_id="ps-portfolio-win-rate",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(
+                                        f"{portfolio_metrics.win_rate:.1%}", fw=600, size="lg"
+                                    ),
+                                ],
+                                gap=4,
+                            ),
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Avg Win/Loss Ratio", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="📈 Win/Loss Ratio",
+                                                content="Average winning trade divided by average losing trade, showing the asymmetry in your outcomes.",
+                                                detailed_content="A ratio above 1.0 means your average win exceeds your average loss. Higher ratios allow for profitable trading even with lower win rates—this is the mathematical edge that Kelly sizing helps capture.",
+                                                tooltip_id="ps-portfolio-payoff-ratio",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(payoff_display, fw=600, size="lg"),
+                                ],
+                                gap=4,
+                            ),
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Average Win", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="💚 Average Win",
+                                                content="Mean profit from winning trades across your portfolio.",
+                                                detailed_content="This value represents the typical gain when a trade goes your way. Larger average wins relative to losses create positive expectancy even with modest win rates.",
+                                                tooltip_id="ps-portfolio-avg-win",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(
+                                        f"${portfolio_metrics.avg_win:,.0f}",
+                                        fw=600,
+                                        size="lg",
+                                        c="teal.6",
+                                    ),
+                                ],
+                                gap=4,
+                            ),
+                            dmc.Stack(
+                                [
+                                    dmc.Group(
+                                        [
+                                            dmc.Text("Average Loss", size="xs", c="dimmed"),
+                                            create_info_tooltip(
+                                                title="💔 Average Loss",
+                                                content="Mean loss from losing trades across your portfolio.",
+                                                detailed_content="This value shows the typical cost when a trade doesn't work out. Keeping losses small relative to wins is a key component of long-term trading success.",
+                                                tooltip_id="ps-portfolio-avg-loss",
+                                            ),
+                                        ],
+                                        gap=4,
+                                    ),
+                                    dmc.Text(
+                                        f"-${portfolio_metrics.avg_loss:,.0f}",
+                                        fw=600,
+                                        size="lg",
+                                        c="red.6",
+                                    ),
+                                ],
+                                gap=4,
+                            ),
+                        ],
+                    ),
+                    dmc.Divider(variant="dashed"),
+                    # Capital summary
+                    dmc.SimpleGrid(
+                        cols={"base": 1, "sm": 2},
+                        spacing="md",
+                        children=[
+                            dmc.Group(
+                                [
+                                    dmc.Text(
+                                        [
+                                            dmc.Text(
+                                                "Starting capital: ",
+                                                span=True,
+                                                size="sm",
+                                                c="dimmed",
+                                            ),
+                                            dmc.Text(
+                                                f"${starting_capital:,.0f}",
+                                                span=True,
+                                                size="sm",
+                                                fw=500,
+                                            ),
+                                        ],
+                                    ),
+                                    create_info_tooltip(
+                                        title="🏦 Starting Capital",
+                                        content="The capital base used for all percentage calculations.",
+                                        detailed_content="This is your initial account value or available trading capital. All Kelly percentages are calculated relative to this amount.",
+                                        tooltip_id="ps-portfolio-starting-capital",
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                            dmc.Group(
+                                [
+                                    dmc.Text(
+                                        [
+                                            dmc.Text(
+                                                "Weighted applied capital: ",
+                                                span=True,
+                                                size="sm",
+                                                c="dimmed",
+                                            ),
+                                            dmc.Text(
+                                                f"${applied_capital:,.0f}",
+                                                span=True,
+                                                size="sm",
+                                                fw=500,
+                                            ),
+                                        ],
+                                    ),
+                                    create_info_tooltip(
+                                        title="💰 Applied Capital",
+                                        content="Total capital allocated after applying your Kelly fraction settings.",
+                                        detailed_content="This represents the actual dollar amount allocated across all strategies based on your chosen Kelly percentages. The difference between this and starting capital shows your unallocated reserve.",
+                                        tooltip_id="ps-portfolio-applied-capital",
+                                    ),
+                                ],
+                                gap="xs",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
         )
 
         strategy_cards = []
@@ -938,15 +1072,37 @@ def register_position_sizing_callbacks(app):
                                     align="center",
                                     w="100%",
                                 ),
-                                dmc.Text(
-                                    f"Max margin used: {analysis['max_margin_pct']:.1f}% of capital",
-                                    size="xs",
-                                    c="dimmed",
+                                dmc.Group(
+                                    [
+                                        dmc.Text(
+                                            f"Max margin used: {analysis['max_margin_pct']:.1f}% of capital",
+                                            size="xs",
+                                            c="dimmed",
+                                        ),
+                                        create_info_tooltip(
+                                            title="📊 Max Margin Used",
+                                            content="Peak margin requirement observed historically for this strategy.",
+                                            detailed_content="This represents the highest percentage of capital that was tied up as margin when this strategy had open positions. Higher values indicate more capital-intensive strategies.",
+                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-margin",
+                                        ),
+                                    ],
+                                    gap=4,
                                 ),
-                                dmc.Text(
-                                    f"Applied capital: ${applied_capital_strategy:,.0f}",
-                                    size="xs",
-                                    c="dimmed",
+                                dmc.Group(
+                                    [
+                                        dmc.Text(
+                                            f"Applied capital: ${applied_capital_strategy:,.0f}",
+                                            size="xs",
+                                            c="dimmed",
+                                        ),
+                                        create_info_tooltip(
+                                            title="💵 Applied Capital",
+                                            content="Dollar amount allocated to this strategy based on Kelly settings.",
+                                            detailed_content="This is your starting capital multiplied by this strategy's applied percentage. It represents the actual dollars available for this strategy's position sizing.",
+                                            tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-capital",
+                                        ),
+                                    ],
+                                    gap=4,
                                 ),
                             ],
                         ),
@@ -972,35 +1128,306 @@ def register_position_sizing_callbacks(app):
                 variant="light",
             )
 
-        # Margin warnings should only appear when allocating too aggressively
-        # At low Kelly %, you're being conservative and shouldn't get warnings
-        # The warning threshold should be based on margin/capital ratio getting too high
-        warnings = []
+        # Calculate margin utilization statistics
+        # Show all margin information transparently without arbitrary thresholds
+        margin_stats = []
 
-        # For now, let's disable the broken logic until we can properly calculate
-        # whether the allocated Kelly will cause margin issues
-        # TODO: Implement proper margin risk calculation based on position sizing
+        # Portfolio-level margin statistics
+        portfolio_max_margin_pct = max(portfolio_margin_pct) if portfolio_margin_pct else 0.0
+        if portfolio_max_margin_pct and kelly_fraction_input:
+            # Scale historical margin by current portfolio Kelly to get expected margin
+            expected_portfolio_margin = portfolio_max_margin_pct * (kelly_fraction_input / 100.0)
+            margin_stats.append(
+                {
+                    "name": "Portfolio",
+                    "historical_max": portfolio_max_margin_pct,
+                    "expected": expected_portfolio_margin,
+                    "allocated": weighted_applied_pct,
+                    "is_portfolio": True,
+                }
+            )
 
-        # Original broken logic commented out:
-        # portfolio_max_margin_pct = max(portfolio_margin_pct) if portfolio_margin_pct else 0.0
-        # if portfolio_max_margin_pct and weighted_applied_pct > portfolio_max_margin_pct:
-        #     warnings.append(...)
-        # for analysis in strategy_analysis:
-        #     if analysis["max_margin_pct"] and analysis["applied_pct"] > analysis["max_margin_pct"]:
-        #         warnings.append(...)
+        # Individual strategy margin statistics
+        for analysis in strategy_analysis:
+            if analysis["max_margin_pct"] and analysis["input_pct"]:
+                # Scale historical margin by this strategy's Kelly setting
+                expected_margin = analysis["max_margin_pct"] * (analysis["input_pct"] / 100.0)
+                margin_stats.append(
+                    {
+                        "name": analysis["name"],
+                        "historical_max": analysis["max_margin_pct"],
+                        "expected": expected_margin,
+                        "allocated": analysis["applied_pct"],
+                        "is_portfolio": False,
+                    }
+                )
 
-        if warnings:
-            margin_warning = dmc.Alert(
+        # Display margin statistics if any exist
+        if margin_stats:
+            # Sort strategies by expected margin (descending), with portfolio first
+            portfolio_stat = [s for s in margin_stats if s["is_portfolio"]]
+            strategy_stats = sorted(
+                [s for s in margin_stats if not s["is_portfolio"]],
+                key=lambda x: x["expected"],
+                reverse=True,
+            )
+
+            # Create table rows for statistics
+            table_rows = []
+
+            # Header row with tooltips
+            header_row = dmc.TableTr(
+                [
+                    dmc.TableTh("Strategy", style={"width": "30%"}),
+                    dmc.TableTh(
+                        dmc.Group(
+                            [
+                                dmc.Text("Historical Max", size="sm"),
+                                dmc.Tooltip(
+                                    label="Peak margin requirement as % of starting capital when trades were actually placed",
+                                    children=dmc.ThemeIcon(
+                                        DashIconify(icon="tabler:help", width=14),
+                                        size="xs",
+                                        variant="subtle",
+                                        color="gray",
+                                    ),
+                                ),
+                            ],
+                            gap="xs",
+                            justify="flex-end",
+                        ),
+                        style={"textAlign": "right", "width": "17.5%"},
+                    ),
+                    dmc.TableTh(
+                        dmc.Group(
+                            [
+                                dmc.Text("Kelly %", size="sm"),
+                                dmc.Tooltip(
+                                    label="Your current Kelly fraction setting for this strategy",
+                                    children=dmc.ThemeIcon(
+                                        DashIconify(icon="tabler:help", width=14),
+                                        size="xs",
+                                        variant="subtle",
+                                        color="gray",
+                                    ),
+                                ),
+                            ],
+                            gap="xs",
+                            justify="flex-end",
+                        ),
+                        style={"textAlign": "right", "width": "17.5%"},
+                    ),
+                    dmc.TableTh(
+                        dmc.Group(
+                            [
+                                dmc.Text("Expected Margin", size="sm"),
+                                dmc.Tooltip(
+                                    label="Projected margin need = Historical Max × (Kelly % / 100)",
+                                    children=dmc.ThemeIcon(
+                                        DashIconify(icon="tabler:help", width=14),
+                                        size="xs",
+                                        variant="subtle",
+                                        color="gray",
+                                    ),
+                                ),
+                            ],
+                            gap="xs",
+                            justify="flex-end",
+                        ),
+                        style={"textAlign": "right", "width": "17.5%"},
+                    ),
+                    dmc.TableTh(
+                        dmc.Group(
+                            [
+                                dmc.Text("Allocated", size="sm"),
+                                dmc.Tooltip(
+                                    label="Capital allocated to this strategy = Optimal Kelly × (Kelly % / 100)",
+                                    children=dmc.ThemeIcon(
+                                        DashIconify(icon="tabler:help", width=14),
+                                        size="xs",
+                                        variant="subtle",
+                                        color="gray",
+                                    ),
+                                ),
+                            ],
+                            gap="xs",
+                            justify="flex-end",
+                        ),
+                        style={"textAlign": "right", "width": "17.5%"},
+                    ),
+                ]
+            )
+
+            # Portfolio row (if exists)
+            for stat in portfolio_stat:
+                table_rows.append(
+                    dmc.TableTr(
+                        [
+                            dmc.TableTd(
+                                dmc.Text(stat["name"], fw=600),
+                            ),
+                            dmc.TableTd(
+                                f"{stat['historical_max']:.1f}%",
+                                style={"textAlign": "right"},
+                            ),
+                            dmc.TableTd(
+                                f"{kelly_fraction_input:.0f}%",
+                                style={"textAlign": "right"},
+                            ),
+                            dmc.TableTd(
+                                dmc.Text(
+                                    f"{stat['expected']:.1f}%",
+                                    fw=500,
+                                    c=(
+                                        "blue.6"
+                                        if stat["expected"] <= stat["allocated"]
+                                        else "orange.6"
+                                    ),
+                                ),
+                                style={"textAlign": "right"},
+                            ),
+                            dmc.TableTd(
+                                f"{stat['allocated']:.1f}%",
+                                style={"textAlign": "right"},
+                            ),
+                        ]
+                    )
+                )
+
+            # Strategy rows (all strategies)
+            for stat in strategy_stats:
+                table_rows.append(
+                    dmc.TableTr(
+                        [
+                            dmc.TableTd(
+                                dmc.Text(stat["name"], size="sm"),
+                            ),
+                            dmc.TableTd(
+                                dmc.Text(f"{stat['historical_max']:.1f}%", size="sm"),
+                                style={"textAlign": "right"},
+                            ),
+                            dmc.TableTd(
+                                dmc.Text(
+                                    f"{stat['expected'] / stat['historical_max'] * 100 if stat['historical_max'] else 0:.0f}%",
+                                    size="sm",
+                                ),
+                                style={"textAlign": "right"},
+                            ),
+                            dmc.TableTd(
+                                dmc.Text(
+                                    f"{stat['expected']:.1f}%",
+                                    size="sm",
+                                    c=(
+                                        "blue.6"
+                                        if stat["expected"] <= stat["allocated"]
+                                        else "orange.6"
+                                    ),
+                                ),
+                                style={"textAlign": "right"},
+                            ),
+                            dmc.TableTd(
+                                dmc.Text(f"{stat['allocated']:.1f}%", size="sm"),
+                                style={"textAlign": "right"},
+                            ),
+                        ]
+                    )
+                )
+
+            margin_warning = dmc.Paper(
+                withBorder=True,
+                radius="md",
+                p="md",
                 children=[
-                    dmc.Text("⚠️ Margin Shortfall", fw=600, size="sm"),
-                    dmc.List(
-                        spacing="xs",
-                        size="sm",
-                        children=[dmc.ListItem(item) for item in warnings],
+                    dmc.Group(
+                        [
+                            dmc.Text("📊 Margin Utilization Analysis", fw=600, size="md"),
+                            dmc.Text(
+                                "How your Kelly settings affect margin requirements",
+                                size="xs",
+                                c="dimmed",
+                            ),
+                        ],
+                        justify="space-between",
+                        align="center",
+                        mb="sm",
+                    ),
+                    dmc.Alert(
+                        [
+                            dmc.Text("Understanding these numbers:", fw=500, size="sm", mb="xs"),
+                            dmc.List(
+                                [
+                                    dmc.ListItem(
+                                        dmc.Text(
+                                            [
+                                                dmc.Text("Historical Max: ", span=True, fw=500),
+                                                "The peak margin used when these trades were actually placed, as % of your starting capital. ",
+                                                "High values (>100%) mean the strategy used more margin than your capital base.",
+                                            ],
+                                            size="xs",
+                                        )
+                                    ),
+                                    dmc.ListItem(
+                                        dmc.Text(
+                                            [
+                                                dmc.Text("Kelly %: ", span=True, fw=500),
+                                                "Your position sizing setting. At 10%, you're trading 10% of the optimal Kelly size.",
+                                            ],
+                                            size="xs",
+                                        )
+                                    ),
+                                    dmc.ListItem(
+                                        dmc.Text(
+                                            [
+                                                dmc.Text("Expected Margin: ", span=True, fw=500),
+                                                "Projected margin need at your Kelly %. If Historical Max is 100% and Kelly is 10%, expect 10% margin usage.",
+                                            ],
+                                            size="xs",
+                                        )
+                                    ),
+                                    dmc.ListItem(
+                                        dmc.Text(
+                                            [
+                                                dmc.Text("Allocated: ", span=True, fw=500),
+                                                "How much capital this strategy gets based on its calculated Kelly criterion and your Kelly % setting.",
+                                            ],
+                                            size="xs",
+                                        )
+                                    ),
+                                ],
+                                spacing="xs",
+                                size="xs",
+                            ),
+                        ],
+                        color="gray",
+                        variant="light",
+                        mb="md",
+                    ),
+                    dmc.Table(
+                        striped=True,
+                        highlightOnHover=True,
+                        withTableBorder=True,
+                        withColumnBorders=False,
+                        children=[
+                            dmc.TableThead([header_row]),
+                            dmc.TableTbody(table_rows),
+                        ],
+                    ),
+                    dmc.Alert(
+                        dmc.Text(
+                            [
+                                dmc.Text("Color coding: ", span=True, fw=500),
+                                dmc.Text("Blue", span=True, c="blue.6", fw=500),
+                                " = Expected margin ≤ Allocated capital (good). ",
+                                dmc.Text("Orange", span=True, c="orange.6", fw=500),
+                                " = Expected margin > Allocated capital (may need more capital or lower Kelly %).",
+                            ],
+                            size="xs",
+                        ),
+                        color="blue",
+                        variant="light",
+                        mt="sm",
                     ),
                 ],
-                color="orange",
-                variant="light",
             )
         else:
             margin_warning = ""

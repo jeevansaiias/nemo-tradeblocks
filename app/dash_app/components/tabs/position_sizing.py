@@ -42,9 +42,9 @@ def create_position_sizing_tab():
                                                 "Position Sizing & Kelly Allocation", order=4
                                             ),
                                             create_info_tooltip(
-                                                title="Position Sizing & Kelly Allocation",
-                                                content="Set your capital base and Kelly fractions to build an optimal allocation plan.",
-                                                detailed_content="Adjust starting capital and Kelly percentages, then run the allocation to see portfolio and strategy metrics.",
+                                                title="📊 Position Sizing & Kelly Allocation",
+                                                content="Transform your trading edge into optimal position sizes. The Kelly criterion mathematically determines how much capital to risk based on your win rate and payoff ratio.",
+                                                detailed_content="Most professional traders use 10-25% of full Kelly to reduce volatility. Your historical trades reveal each strategy's optimal size—this tool helps you scale them appropriately.",
                                                 tooltip_id="ps-kelly-allocation",
                                             ),
                                         ],
@@ -59,28 +59,70 @@ def create_position_sizing_tab():
                                                 gap="md",
                                                 grow=True,
                                                 children=[
-                                                    dmc.NumberInput(
-                                                        id="ps-starting-capital-input",
-                                                        label="Starting Capital ($)",
-                                                        description="Net liquidity or capital base",
-                                                        min=0,
-                                                        step=1000,
-                                                        allowNegative=False,
-                                                        prefix="$ ",
-                                                        thousandSeparator=",",
+                                                    dmc.Stack(
+                                                        gap="xs",
                                                         style={"flex": 1},
+                                                        children=[
+                                                            dmc.Group(
+                                                                [
+                                                                    dmc.Text(
+                                                                        "Starting Capital ($)",
+                                                                        size="sm",
+                                                                        fw=500,
+                                                                    ),
+                                                                    create_info_tooltip(
+                                                                        title="💰 Starting Capital",
+                                                                        content="Your account size or available trading capital. This becomes the denominator for all percentage calculations.",
+                                                                        detailed_content="Kelly sizing scales linearly with capital—doubling your account doubles position sizes. The calculations assume this entire amount is available for trading.",
+                                                                        tooltip_id="ps-starting-capital",
+                                                                    ),
+                                                                ],
+                                                                gap="xs",
+                                                            ),
+                                                            dmc.NumberInput(
+                                                                id="ps-starting-capital-input",
+                                                                description="Net liquidity or capital base",
+                                                                min=0,
+                                                                step=1000,
+                                                                allowNegative=False,
+                                                                prefix="$ ",
+                                                                thousandSeparator=",",
+                                                                w="100%",
+                                                            ),
+                                                        ],
                                                     ),
-                                                    dmc.NumberInput(
-                                                        id="ps-kelly-fraction-input",
-                                                        label="Portfolio Kelly Fraction (%)",
-                                                        description="Percent of Kelly to apply globally",
-                                                        min=0,
-                                                        max=200,
-                                                        step=1,
-                                                        value=100,
-                                                        allowNegative=False,
-                                                        suffix="%",
+                                                    dmc.Stack(
+                                                        gap="xs",
                                                         style={"flex": 1},
+                                                        children=[
+                                                            dmc.Group(
+                                                                [
+                                                                    dmc.Text(
+                                                                        "Portfolio Kelly Fraction (%)",
+                                                                        size="sm",
+                                                                        fw=500,
+                                                                    ),
+                                                                    create_info_tooltip(
+                                                                        title="🎯 Portfolio Kelly Fraction",
+                                                                        content="Your risk dial. At 100%, you're using full Kelly sizing. At 25%, you're trading quarter Kelly—which reduces volatility.",
+                                                                        detailed_content="Full Kelly targets maximum geometric growth rate but produces high volatility. Fractional Kelly reduces both expected returns and volatility proportionally—the tradeoff depends on individual risk tolerance.",
+                                                                        tooltip_id="ps-portfolio-kelly",
+                                                                    ),
+                                                                ],
+                                                                gap="xs",
+                                                            ),
+                                                            dmc.NumberInput(
+                                                                id="ps-kelly-fraction-input",
+                                                                description="Percent of Kelly to apply globally",
+                                                                min=0,
+                                                                max=200,
+                                                                step=1,
+                                                                value=100,
+                                                                allowNegative=False,
+                                                                suffix="%",
+                                                                w="100%",
+                                                            ),
+                                                        ],
                                                     ),
                                                 ],
                                             ),
@@ -99,10 +141,21 @@ def create_position_sizing_tab():
                                     dmc.Stack(
                                         gap="xs",
                                         children=[
-                                            dmc.Text(
-                                                "Adjust the Kelly multiplier for each strategy individually:",
-                                                size="sm",
-                                                c="dimmed",
+                                            dmc.Group(
+                                                [
+                                                    dmc.Text(
+                                                        "Adjust the Kelly multiplier for each strategy individually:",
+                                                        size="sm",
+                                                        c="dimmed",
+                                                    ),
+                                                    create_info_tooltip(
+                                                        title="🎮 Strategy-Level Control",
+                                                        content="Fine-tune each strategy's risk independently. Strategies with different characteristics may warrant different Kelly fractions.",
+                                                        detailed_content="Different Kelly fractions let you express varying confidence levels across strategies. Strategy correlation affects total portfolio risk—uncorrelated strategies contribute less to overall volatility than correlated ones.",
+                                                        tooltip_id="ps-strategy-kelly",
+                                                    ),
+                                                ],
+                                                gap="xs",
                                             ),
                                             html.Div(id="ps-strategy-action-feedback"),
                                         ],
@@ -148,9 +201,9 @@ def create_position_sizing_tab():
                                         [
                                             dmc.Title("Margin Utilization", order=4),
                                             create_info_tooltip(
-                                                title="Margin Utilization",
-                                                content="Visualize margin needs for the portfolio and each strategy.",
-                                                detailed_content="We chart margin as a percent of starting capital for the combined portfolio and overlay each strategy's historical usage.",
+                                                title="📈 Margin Utilization",
+                                                content="Track how much buying power each strategy consumes. This chart shows historical margin requirements scaled by your Kelly settings.",
+                                                detailed_content="Margin spikes indicate periods when multiple strategies held positions simultaneously. Margin requirements scale linearly with Kelly percentage—halving Kelly halves expected margin usage.",
                                                 tooltip_id="ps-margin-utilization",
                                             ),
                                         ],
