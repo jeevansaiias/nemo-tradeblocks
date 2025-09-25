@@ -26,6 +26,43 @@ def create_position_sizing_tab():
                     ),
                 ],
             ),
+            dmc.Paper(
+                withBorder=True,
+                p="lg",
+                children=dmc.Stack(
+                    gap="sm",
+                    children=[
+                        dmc.Text("How to Use This Page", fw=600, size="md"),
+                        dmc.Text(
+                            "Use this page to explore how Kelly-driven sizing could shape your backtests before you commit to a new allocation.",
+                            size="sm",
+                        ),
+                        dmc.List(
+                            spacing="xs",
+                            size="sm",
+                            children=[
+                                dmc.ListItem(
+                                    "Set your starting capital and portfolio-level Kelly fraction to mirror the account you plan to backtest."
+                                ),
+                                dmc.ListItem(
+                                    "Review each strategy card and adjust the Kelly % to reflect conviction, correlation, or capital limits."
+                                ),
+                                dmc.ListItem(
+                                    "Run Allocation to surface portfolio Kelly metrics, applied capital, and projected margin demand so you can translate findings into your backtest position rules."
+                                ),
+                                dmc.ListItem(
+                                    "Iterate often—capture settings that feel sustainable, then take those parameters into your backtests for validation."
+                                ),
+                            ],
+                        ),
+                        dmc.Text(
+                            "Nothing here is a directive to size larger or smaller; it is a sandbox for stress-testing ideas with real trade history before you backtest or deploy.",
+                            size="xs",
+                            c="dimmed",
+                        ),
+                    ],
+                ),
+            ),
             dmc.Stack(
                 gap="lg",
                 children=[

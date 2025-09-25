@@ -655,8 +655,9 @@ def register_position_sizing_callbacks(app):
                                     ),
                                     create_info_tooltip(
                                         title="💰 Applied Capital",
-                                        content="Total capital allocated after applying your Kelly fraction settings.",
-                                        detailed_content="This represents the actual dollar amount allocated across all strategies based on your chosen Kelly percentages. The difference between this and starting capital shows your unallocated reserve.",
+                                        content="Starting capital × weighted applied % after Kelly."
+                                        "",
+                                        detailed_content="This is your base capital multiplied by the portfolio's weighted applied percentage after Kelly sizing. It reflects how much of your starting capital would be put to work under the current settings.",
                                         tooltip_id="ps-portfolio-applied-capital",
                                     ),
                                 ],
@@ -807,8 +808,8 @@ def register_position_sizing_callbacks(app):
                                         ),
                                         create_info_tooltip(
                                             title="💵 Applied Capital",
-                                            content="Dollar amount allocated to this strategy based on Kelly settings.",
-                                            detailed_content="This is your starting capital multiplied by this strategy's applied percentage. It represents the actual dollars available for this strategy's position sizing.",
+                                            content="Starting capital × this strategy's applied % (post-Kelly).",
+                                            detailed_content="This is the portion of your starting capital the model would allocate to this strategy after applying its Kelly percentage and any overrides you set.",
                                             tooltip_id=f"ps-strategy-{analysis['name'].replace(' ', '-').lower()}-capital",
                                         ),
                                     ],
