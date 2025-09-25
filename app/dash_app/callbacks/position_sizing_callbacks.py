@@ -972,17 +972,22 @@ def register_position_sizing_callbacks(app):
                 variant="light",
             )
 
+        # Margin warnings should only appear when allocating too aggressively
+        # At low Kelly %, you're being conservative and shouldn't get warnings
+        # The warning threshold should be based on margin/capital ratio getting too high
         warnings = []
-        portfolio_max_margin_pct = max(portfolio_margin_pct) if portfolio_margin_pct else 0.0
-        if portfolio_max_margin_pct and weighted_applied_pct < portfolio_max_margin_pct:
-            warnings.append(
-                f"Portfolio margin peaked at {portfolio_max_margin_pct:.1f}% of capital while applied Kelly covers {weighted_applied_pct:.1f}%."
-            )
-        for analysis in strategy_analysis:
-            if analysis["max_margin_pct"] and analysis["applied_pct"] < analysis["max_margin_pct"]:
-                warnings.append(
-                    f"{analysis['name']} margin reached {analysis['max_margin_pct']:.1f}% of capital versus {analysis['applied_pct']:.1f}% applied."
-                )
+
+        # For now, let's disable the broken logic until we can properly calculate
+        # whether the allocated Kelly will cause margin issues
+        # TODO: Implement proper margin risk calculation based on position sizing
+
+        # Original broken logic commented out:
+        # portfolio_max_margin_pct = max(portfolio_margin_pct) if portfolio_margin_pct else 0.0
+        # if portfolio_max_margin_pct and weighted_applied_pct > portfolio_max_margin_pct:
+        #     warnings.append(...)
+        # for analysis in strategy_analysis:
+        #     if analysis["max_margin_pct"] and analysis["applied_pct"] > analysis["max_margin_pct"]:
+        #         warnings.append(...)
 
         if warnings:
             margin_warning = dmc.Alert(

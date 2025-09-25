@@ -5,6 +5,7 @@ from dash import html, dcc
 from dash_iconify import DashIconify
 
 from ..common import create_info_tooltip
+from app.utils.placeholders import create_placeholder_figure
 
 
 def create_position_sizing_tab():
@@ -161,6 +162,10 @@ def create_position_sizing_tab():
                                             id="ps-strategy-margin-chart",
                                             config={"displayModeBar": False},
                                             style={"height": "320px"},
+                                            figure=create_placeholder_figure(
+                                                "Run Allocation to see margin utilization",
+                                                font_size=14,
+                                            ),
                                         ),
                                         type="default",
                                     ),
