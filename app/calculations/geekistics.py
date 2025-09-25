@@ -20,6 +20,7 @@ from .shared import (
     get_initial_capital_from_daily_log,
     calculate_max_drawdown_from_daily_log,
 )
+from app.utils.kelly import calculate_kelly_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -456,33 +457,8 @@ class GeekisticsCalculator:
 
     def calculate_kelly_criterion(self, trades_data: List[Dict]) -> float:
         """Calculate Kelly criterion percentage"""
-        if not trades_data:
-            return 0.0
-
-        wins = [trade.get("pl", 0) for trade in trades_data if trade.get("pl", 0) > 0]
-        losses = [abs(trade.get("pl", 0)) for trade in trades_data if trade.get("pl", 0) < 0]
-
-        if not wins or not losses:
-            return 0.0
-
-        # Calculate win probability and average win/loss
-        total_trades = len(trades_data)
-        win_probability = len(wins) / total_trades
-        avg_win = np.mean(wins)
-        avg_loss = np.mean(losses)
-
-        if avg_loss == 0:
-            return 0.0
-
-        # Kelly formula: f = (bp - q) / b
-        # where b = avg_win/avg_loss, p = win_probability, q = 1-p
-        b = avg_win / avg_loss
-        p = win_probability
-        q = 1 - p
-
-        kelly_fraction = (b * p - q) / b
-
-        return kelly_fraction * 100  # Return as percentage
+        kelly_metrics = calculate_kelly_metrics(trades_data)
+        return kelly_metrics.percent
 
     def _get_daily_returns(
         self, trades_data: List[Dict], daily_log_data: List[Dict] = None

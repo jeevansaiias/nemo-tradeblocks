@@ -1,143 +1,180 @@
-"""
-🎯 Position Sizing Tab - Optimal Position Sizing Analysis
-
-Advanced position sizing strategies and risk management tools for portfolio optimization.
-Features Kelly Criterion, Risk of Ruin, and comparative position sizing methodologies.
-"""
+from __future__ import annotations
 
 import dash_mantine_components as dmc
 from dash import html, dcc
 from dash_iconify import DashIconify
-import plotly.graph_objects as go
 
 from ..common import create_info_tooltip
+from app.utils.placeholders import create_placeholder_figure
 
 
 def create_position_sizing_tab():
-    """Create the Position Sizing tab with comprehensive risk management tools"""
+    """Create the Position Sizing tab with settings-first workflow."""
+
     return dmc.Stack(
+        gap="xl",
+        p="lg",
         children=[
-            # Header with title and description
-            dmc.Group(
-                [
-                    dmc.Stack(
-                        [
-                            dmc.Title("🎯 Position Sizing Analysis", order=2),
-                            dmc.Text(
-                                "Optimize your position sizing strategy using proven mathematical frameworks and risk management principles.",
-                                size="sm",
-                                c="dimmed",
-                            ),
-                        ],
-                        gap="xs",
+            dmc.Stack(
+                gap="xs",
+                children=[
+                    dmc.Title("🎯 Position Sizing Analysis", order=2),
+                    dmc.Text(
+                        "Tune position sizing with portfolio-aware recommendations saved locally for quick iteration.",
+                        size="sm",
+                        c="dimmed",
                     ),
                 ],
-                justify="space-between",
-                align="center",
             ),
-            # Kelly Criterion Section
-            dmc.Paper(
+            dmc.Stack(
+                gap="lg",
                 children=[
-                    dmc.Stack(
-                        [
-                            dmc.Group(
-                                [
-                                    dmc.Title("🧱 Kelly Criterion", order=3),
-                                    create_info_tooltip(
-                                        title="🎯 Kelly Criterion",
-                                        content="Mathematically optimal position sizing based on your historical win rate and average win/loss ratio. Maximizes long-term growth while managing risk of ruin.",
-                                        detailed_content="Formula: f = (bp - q) / b, where b = avg_win/avg_loss, p = win_probability, q = 1-p. Many traders use fractional Kelly (25-50%) for more conservative approach. TradeBlocks builds insights, not investment advice.",
-                                        tooltip_id="kelly-criterion",
-                                    ),
-                                ],
-                                justify="space-between",
-                            ),
-                            html.Div(id="position-sizing-kelly-analysis"),
-                        ],
-                        gap="md",
-                    )
-                ],
-                p="lg",
-                withBorder=True,
-            ),
-            # Coming Soon Section - Additional Position Sizing Tools
-            dmc.Center(
-                children=[
-                    dmc.Stack(
+                    dmc.Paper(
+                        p="lg",
+                        withBorder=True,
                         children=[
-                            dmc.Center(
-                                dmc.Text(
-                                    "🎯",
-                                    size="120px",
-                                    style={"lineHeight": "1", "fontSize": "120px"},
-                                )
-                            ),
-                            dmc.Title(
-                                "🎯 Advanced Position Sizing Tools",
-                                order=2,
-                                ta="center",
-                                c="orange.6",
-                            ),
-                            dmc.Title(
-                                "More Features Coming Soon", order=3, ta="center", c="dimmed"
-                            ),
-                            dmc.Text(
-                                "Building powerful position sizing tools to optimize your risk management and maximize long-term growth",
-                                ta="center",
-                                size="lg",
-                                c="dimmed",
-                                w=600,
-                            ),
                             dmc.Stack(
+                                gap="lg",
                                 children=[
-                                    dmc.Paper(
-                                        children=[
-                                            dmc.Text(
-                                                "🎯 Planned Features:", fw=600, size="md", mb="sm"
+                                    dmc.Group(
+                                        [
+                                            dmc.Title(
+                                                "Position Sizing & Kelly Allocation", order=4
                                             ),
-                                            dmc.List(
+                                            create_info_tooltip(
+                                                title="Position Sizing & Kelly Allocation",
+                                                content="Set your capital base and Kelly fractions to build an optimal allocation plan.",
+                                                detailed_content="Adjust starting capital and Kelly percentages, then run the allocation to see portfolio and strategy metrics.",
+                                                tooltip_id="ps-kelly-allocation",
+                                            ),
+                                        ],
+                                        justify="space-between",
+                                        align="center",
+                                    ),
+                                    dmc.Stack(
+                                        gap="md",
+                                        mb="lg",
+                                        children=[
+                                            dmc.Group(
+                                                gap="md",
+                                                grow=True,
                                                 children=[
-                                                    dmc.ListItem(
-                                                        "Position Sizing Methods Comparison (Fixed Fractional vs Kelly variants)"
+                                                    dmc.NumberInput(
+                                                        id="ps-starting-capital-input",
+                                                        label="Starting Capital ($)",
+                                                        description="Net liquidity or capital base",
+                                                        min=0,
+                                                        step=1000,
+                                                        allowNegative=False,
+                                                        prefix="$ ",
+                                                        thousandSeparator=",",
+                                                        style={"flex": 1},
                                                     ),
-                                                    dmc.ListItem(
-                                                        "Risk of Ruin Calculator with interactive probability charts"
-                                                    ),
-                                                    dmc.ListItem(
-                                                        "Position Size Backtester - replay trades with different sizing"
-                                                    ),
-                                                    dmc.ListItem(
-                                                        "Strategy Allocation Optimizer using modern portfolio theory"
-                                                    ),
-                                                    dmc.ListItem(
-                                                        "Volatility-based sizing with dynamic risk adjustment"
-                                                    ),
-                                                    dmc.ListItem(
-                                                        "Confidence-based sizing for hot/cold streak management"
+                                                    dmc.NumberInput(
+                                                        id="ps-kelly-fraction-input",
+                                                        label="Portfolio Kelly Fraction (%)",
+                                                        description="Percent of Kelly to apply globally",
+                                                        min=0,
+                                                        max=200,
+                                                        step=1,
+                                                        value=100,
+                                                        allowNegative=False,
+                                                        suffix="%",
+                                                        style={"flex": 1},
                                                     ),
                                                 ],
-                                                spacing="xs",
+                                            ),
+                                            dmc.Button(
+                                                "Apply to All Strategies",
+                                                id="ps-apply-portfolio-kelly",
+                                                leftSection=DashIconify(
+                                                    icon="tabler:arrow-down", width=16
+                                                ),
+                                                variant="light",
+                                                color="teal",
+                                                fullWidth=True,
+                                            ),
+                                        ],
+                                    ),
+                                    dmc.Stack(
+                                        gap="xs",
+                                        children=[
+                                            dmc.Text(
+                                                "Adjust the Kelly multiplier for each strategy individually:",
                                                 size="sm",
                                                 c="dimmed",
                                             ),
+                                            html.Div(id="ps-strategy-action-feedback"),
                                         ],
-                                        p="md",
-                                        withBorder=True,
-                                        radius="md",
-                                        style={"maxWidth": "600px"},
                                     ),
+                                    html.Div(
+                                        id="ps-strategy-input-grid",
+                                        children=dmc.Alert(
+                                            "Upload a portfolio to configure strategy sizing.",
+                                            color="gray",
+                                            variant="light",
+                                        ),
+                                    ),
+                                    dmc.Group(
+                                        [
+                                            dmc.Button(
+                                                "Run Allocation",
+                                                id="ps-run-strategy-analysis",
+                                                leftSection=DashIconify(
+                                                    icon="tabler:calculator", width=16
+                                                ),
+                                                variant="filled",
+                                                color="blue",
+                                                size="md",
+                                            ),
+                                        ],
+                                        justify="flex-start",
+                                        align="center",
+                                    ),
+                                    html.Div(id="ps-portfolio-kelly-summary"),
+                                    html.Div(id="ps-strategy-results"),
                                 ],
-                                gap="lg",
-                                align="center",
-                            ),
+                            )
                         ],
-                        gap="lg",
-                        align="center",
-                    )
+                    ),
+                    dmc.Paper(
+                        p="lg",
+                        withBorder=True,
+                        children=[
+                            dmc.Stack(
+                                gap="md",
+                                children=[
+                                    dmc.Group(
+                                        [
+                                            dmc.Title("Margin Utilization", order=4),
+                                            create_info_tooltip(
+                                                title="Margin Utilization",
+                                                content="Visualize margin needs for the portfolio and each strategy.",
+                                                detailed_content="We chart margin as a percent of starting capital for the combined portfolio and overlay each strategy's historical usage.",
+                                                tooltip_id="ps-margin-utilization",
+                                            ),
+                                        ],
+                                        justify="space-between",
+                                        align="center",
+                                    ),
+                                    dcc.Loading(
+                                        dcc.Graph(
+                                            id="ps-strategy-margin-chart",
+                                            config={"displayModeBar": False},
+                                            style={"height": "320px"},
+                                            figure=create_placeholder_figure(
+                                                "Run Allocation to see margin utilization",
+                                                font_size=14,
+                                            ),
+                                        ),
+                                        type="default",
+                                    ),
+                                    html.Div(id="ps-strategy-margin-warning"),
+                                ],
+                            )
+                        ],
+                    ),
                 ],
-                style={"minHeight": "60vh"},
             ),
         ],
-        gap="xl",
-        p="lg",
     )

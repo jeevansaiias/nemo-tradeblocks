@@ -454,6 +454,7 @@ def register_callbacks(app):
             Output("nav-correlation", "active"),
             Output("nav-margin", "active"),
             Output("nav-optimizer", "active"),
+            Output("position-sizing-present", "data"),
         ],
         [
             Input("nav-geekistics", "n_clicks"),
@@ -481,7 +482,18 @@ def register_callbacks(app):
     ):
         """Update main content and navigation highlighting"""
         if not portfolio_data:
-            return create_welcome_content(), True, False, False, False, False, False, False, False
+            return (
+                create_welcome_content(),
+                True,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+            )
 
         triggered = ctx.triggered_id
 
@@ -490,7 +502,7 @@ def register_callbacks(app):
 
         if triggered == "nav-geekistics":
             nav_states[0] = True  # geekistics active
-            return create_geekistics_tab(), *nav_states
+            return create_geekistics_tab(), *nav_states, False
         elif triggered == "nav-performance":
             nav_states[1] = True  # performance active
             # Build layout and log component IDs for debugging
@@ -520,28 +532,37 @@ def register_callbacks(app):
             except Exception as e:
                 logger.warning(f"Could not collect performance tab IDs: {e}")
 
-            return tab_layout, *nav_states
+            return tab_layout, *nav_states, False
         elif triggered == "nav-trade-data":
             nav_states[2] = True  # trade-data active
-            return create_trade_data_tab(), *nav_states
+            return create_trade_data_tab(), *nav_states, False
         elif triggered == "nav-monte-carlo":
             nav_states[3] = True  # monte-carlo active
-            return create_risk_simulator_tab(), *nav_states  # New risk simulator tab
+            return create_risk_simulator_tab(), *nav_states, False  # New risk simulator tab
         elif triggered == "nav-position-sizing":
             nav_states[4] = True  # position-sizing active
-            return create_position_sizing_tab(), *nav_states
+            try:
+                return create_position_sizing_tab(), *nav_states, True
+            except Exception as exc:  # pragma: no cover - defensive UI guard
+                logger.exception("Failed to render Position Sizing tab: %s", exc)
+                fallback = dmc.Alert(
+                    "Position Sizing tab failed to render. Check logs for details.",
+                    color="red",
+                    variant="light",
+                )
+                return fallback, *nav_states, True
         elif triggered == "nav-correlation":
             nav_states[5] = True  # correlation active
-            return create_correlation_matrix_tab(), *nav_states
+            return create_correlation_matrix_tab(), *nav_states, False
         elif triggered == "nav-margin":
             nav_states[6] = True  # margin active
-            return create_capital_blocks_coming_soon(), *nav_states  # Coming soon page
+            return create_capital_blocks_coming_soon(), *nav_states, False  # Coming soon page
         elif triggered == "nav-optimizer":
             nav_states[7] = True  # optimizer active
-            return create_walk_forward_coming_soon(), *nav_states  # Coming soon page
+            return create_walk_forward_coming_soon(), *nav_states, False  # Coming soon page
         else:
             nav_states[0] = True  # Default to geekistics
-            return create_geekistics_tab(), *nav_states
+            return create_geekistics_tab(), *nav_states, False
 
     @app.callback(
         [
