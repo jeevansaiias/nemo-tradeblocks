@@ -278,14 +278,19 @@ def _contains_component_id(node: Any, target_id: str) -> bool:
     return False
 
 
-def _blank_margin_figure() -> go.Figure:
+def _blank_margin_figure(theme_data=None) -> go.Figure:
+    is_dark = theme_data and theme_data.get("resolved") == "dark"
+    template = "plotly_dark" if is_dark else "plotly_white"
+
     figure = go.Figure()
     figure.update_layout(
-        template="plotly_white",
+        template=template,
         margin=dict(l=40, r=20, t=60, b=40),
         height=320,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         yaxis=dict(title="% of Starting Capital", ticksuffix="%"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
     )
     return figure
 
@@ -666,10 +671,11 @@ def register_position_sizing_callbacks(app):
         Output("ps-strategy-action-feedback", "children"),
         Input("ps-run-strategy-analysis", "n_clicks"),
         Input("current-portfolio-data", "data"),
+        Input("theme-store", "data"),
         State("position-sizing-store", "data"),
     )
-    def run_strategy_analysis(n_clicks, portfolio_data, store_data):
-        placeholder_fig = _blank_margin_figure()
+    def run_strategy_analysis(n_clicks, portfolio_data, theme_data, store_data):
+        placeholder_fig = _blank_margin_figure(theme_data)
 
         def _empty_outputs(message: str):
             return (
@@ -783,7 +789,7 @@ def register_position_sizing_callbacks(app):
                     (strategy_margin / starting_capital) * 100 if starting_capital else 0.0
                 )
 
-        margin_fig = _blank_margin_figure()
+        margin_fig = _blank_margin_figure(theme_data)
         if sorted_dates:
             margin_fig.add_trace(
                 go.Scatter(
@@ -993,6 +999,7 @@ def register_position_sizing_callbacks(app):
                             children=[
                                 # Strategy name with padding to avoid badge overlap
                                 dmc.Text(analysis["name"], fw=600, style={"paddingRight": "180px"}),
+                                # Kelly percentages in horizontal layout
                                 dmc.Group(
                                     [
                                         dmc.Text(
@@ -1014,10 +1021,9 @@ def register_position_sizing_callbacks(app):
                                     size="xs",
                                     c="dimmed",
                                 ),
-                                dmc.SimpleGrid(
-                                    cols={"base": 1, "sm": 1, "md": 2},
-                                    spacing="sm",
-                                    children=[
+                                # Win Rate and Avg Win/Loss Ratio in a row
+                                dmc.Group(
+                                    [
                                         dmc.Stack(
                                             [
                                                 dmc.Text("Win Rate", size="xs", c="dimmed"),
@@ -1034,6 +1040,14 @@ def register_position_sizing_callbacks(app):
                                             ],
                                             gap="xs",
                                         ),
+                                    ],
+                                    justify="space-between",
+                                    align="center",
+                                    w="100%",
+                                ),
+                                # Average Win and Average Loss in a row
+                                dmc.Group(
+                                    [
                                         dmc.Stack(
                                             [
                                                 dmc.Text("Average Win", size="xs", c="dimmed"),
@@ -1049,6 +1063,9 @@ def register_position_sizing_callbacks(app):
                                             gap="xs",
                                         ),
                                     ],
+                                    justify="space-between",
+                                    align="center",
+                                    w="100%",
                                 ),
                                 dmc.Text(
                                     f"Max margin used: {analysis['max_margin_pct']:.1f}% of capital",
