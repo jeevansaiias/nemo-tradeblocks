@@ -2,6 +2,7 @@
 
 import pytest
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from dash import no_update
 import dash_mantine_components as dmc
@@ -9,6 +10,7 @@ import dash_mantine_components as dmc
 from app.dash_app.callbacks.position_sizing_callbacks import (
     register_position_sizing_callbacks,
     _blank_margin_figure,
+    _build_strategy_settings,
 )
 
 
@@ -321,6 +323,38 @@ class TestMarginCalculationModes:
         # Both trades should use starting capital since they overlap
         for trade_id in net_liq_timeline.values():
             assert trade_id == starting_capital
+
+    def test_build_strategy_settings_uses_overrides_and_defaults(self):
+        """Per-strategy inputs override global Kelly while missing values fallback."""
+
+        trades = [
+            SimpleNamespace(strategy="Alpha"),
+            SimpleNamespace(strategy="Beta"),
+            SimpleNamespace(strategy=None),
+        ]
+
+        strategy_values = [25, "oops"]
+        strategy_ids = [
+            {"strategy": "Alpha"},
+            {"strategy": "Beta"},
+        ]
+
+        settings = _build_strategy_settings(trades, strategy_values, strategy_ids, 80.0)
+
+        assert settings["Alpha"]["kelly_pct"] == 25.0
+        assert settings["Beta"]["kelly_pct"] == 80.0  # Fallback to global on invalid input
+        assert settings["Uncategorized"]["kelly_pct"] == 80.0  # Added from trade with no strategy
+
+    def test_build_strategy_settings_clamps_negative_values(self):
+        """Negative overrides are clamped to zero to avoid negative allocations."""
+
+        trades = [SimpleNamespace(strategy="Gamma")]
+        strategy_values = [-10]
+        strategy_ids = [{"strategy": "Gamma"}]
+
+        settings = _build_strategy_settings(trades, strategy_values, strategy_ids, 100.0)
+
+        assert settings["Gamma"]["kelly_pct"] == 0.0
 
     def test_compounding_counts_multiple_closes_same_day(self):
         """Compounding mode should aggregate P&L from every trade closing on a date."""
