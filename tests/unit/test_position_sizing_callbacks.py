@@ -1,16 +1,13 @@
 """Unit tests for position sizing callbacks, particularly margin warning logic."""
 
 import pytest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from unittest.mock import Mock, patch
 from dash import no_update
 import dash_mantine_components as dmc
 
 from app.dash_app.callbacks.position_sizing_callbacks import (
     register_position_sizing_callbacks,
-    _portfolio_fingerprint,
-    _ensure_store,
-    _collect_strategies,
     _blank_margin_figure,
 )
 
@@ -133,75 +130,7 @@ class TestMarginWarningLogic:
         assert strategy_analysis["max_margin_pct"] is None
 
 
-class TestStoreHelpers:
-    """Test helper functions for store management."""
-
-    def test_ensure_store_creates_default(self):
-        """Test _ensure_store creates proper default structure."""
-        store = _ensure_store(None)
-        assert "portfolios" in store
-        assert isinstance(store["portfolios"], dict)
-
-        store = _ensure_store({})
-        assert "portfolios" in store
-        assert isinstance(store["portfolios"], dict)
-
-    def test_portfolio_fingerprint_consistency(self):
-        """Test portfolio fingerprint is consistent for same data."""
-        portfolio1 = {
-            "filename": "portfolio1.csv",
-            "upload_timestamp": "2025-01-01T10:00:00",
-            "total_trades": 10,
-            "trades": [{"id": 1, "pnl": 100}],
-        }
-        portfolio2 = {
-            "filename": "portfolio1.csv",
-            "upload_timestamp": "2025-01-01T10:00:00",
-            "total_trades": 10,
-            "trades": [{"id": 1, "pnl": 100}],
-        }
-        portfolio3 = {
-            "filename": "portfolio2.csv",
-            "upload_timestamp": "2025-01-01T11:00:00",
-            "total_trades": 20,
-            "trades": [{"id": 2, "pnl": 200}],
-        }
-
-        fp1 = _portfolio_fingerprint(portfolio1)
-        fp2 = _portfolio_fingerprint(portfolio2)
-        fp3 = _portfolio_fingerprint(portfolio3)
-
-        # Same data should give same fingerprint
-        assert fp1 == fp2
-        # Different data should give different fingerprint
-        assert fp1 != fp3
-
-        # Fingerprint should be 12 chars
-        assert len(fp1) == 12
-
-    def test_collect_strategies_from_portfolio(self):
-        """Test strategy collection from portfolio data."""
-        portfolio_data = {
-            "trades": [
-                {"strategy": "Strategy A"},
-                {"strategy": "Strategy B"},
-                {"strategy": "Strategy A"},  # Duplicate
-                {"strategy": "Strategy C"},
-            ]
-        }
-
-        strategies = _collect_strategies(portfolio_data)
-
-        # Should have 3 unique strategies
-        assert len(strategies) == 3
-        assert "Strategy A" in strategies
-        assert "Strategy B" in strategies
-        assert "Strategy C" in strategies
-
-        # Each should have default kelly_pct
-        for strategy_name, settings in strategies.items():
-            assert "kelly_pct" in settings
-            assert settings["kelly_pct"] == 100.0  # DEFAULT_KELLY_PCT
+# TestStoreHelpers class removed - store-related functions no longer exist
 
 
 class TestMarginFigure:
@@ -274,6 +203,319 @@ class TestMarginScalingScenarios:
         assert expected_margins[3] == 40.0  # 100% Kelly -> 40% margin
         assert expected_margins[4] == 60.0  # 150% Kelly -> 60% margin
         assert expected_margins[5] == 80.0  # 200% Kelly -> 80% margin
+
+
+class TestMarginCalculationModes:
+    """Test margin calculations in fixed vs compounding modes."""
+
+    def test_fixed_mode_constant_denominator(self):
+        """In fixed mode, all margins use initial capital as denominator."""
+        from app.dash_app.callbacks.position_sizing_callbacks import calculate_margin_pct
+
+        starting_capital = 100000
+        trades = [
+            {"margin_req": 10000, "pnl": 5000},  # 10% of starting
+            {"margin_req": 15000, "pnl": -3000},  # 15% of starting
+            {"margin_req": 20000, "pnl": 8000},  # 20% of starting
+        ]
+
+        for trade in trades:
+            margin_pct = calculate_margin_pct(trade, starting_capital, margin_mode="fixed")
+            expected = (trade["margin_req"] / starting_capital) * 100
+            assert margin_pct == expected, f"Fixed mode should always use {starting_capital}"
+
+    def test_compounding_mode_with_gains(self):
+        """In compounding mode with gains, denominator increases over time."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_margin_pct,
+            calculate_running_net_liq,
+        )
+
+        starting_capital = 100000
+        trades = [
+            {
+                "margin_req": 10000,
+                "pnl": 5000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 10000,
+                "pnl": 3000,
+                "date_opened": date(2025, 1, 6),  # Opens after first closes
+                "date_closed": date(2025, 1, 10),
+            },
+        ]
+
+        net_liq_timeline = calculate_running_net_liq(trades, starting_capital)
+
+        # First trade: uses starting capital
+        margin_pct_1 = calculate_margin_pct(
+            trades[0], starting_capital, "compounding", net_liq_timeline
+        )
+        assert margin_pct_1 == 10.0  # 10000/100000 = 10%
+
+        # Second trade: should use 105000 (starting + 5000 profit)
+        margin_pct_2 = calculate_margin_pct(
+            trades[1], starting_capital, "compounding", net_liq_timeline
+        )
+        expected_pct_2 = (10000 / 105000) * 100
+        assert abs(margin_pct_2 - expected_pct_2) < 0.01  # ~9.52%
+
+    def test_compounding_mode_with_losses(self):
+        """In compounding mode with losses, denominator decreases."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_margin_pct,
+            calculate_running_net_liq,
+        )
+
+        starting_capital = 100000
+        trades = [
+            {
+                "margin_req": 10000,
+                "pnl": -5000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 10000,
+                "pnl": -3000,
+                "date_opened": date(2025, 1, 6),
+                "date_closed": date(2025, 1, 10),
+            },
+        ]
+
+        net_liq_timeline = calculate_running_net_liq(trades, starting_capital)
+
+        # Second trade uses reduced capital (95000)
+        margin_pct_2 = calculate_margin_pct(
+            trades[1], starting_capital, "compounding", net_liq_timeline
+        )
+        expected_pct_2 = (10000 / 95000) * 100
+        assert abs(margin_pct_2 - expected_pct_2) < 0.01  # ~10.53%
+
+    def test_compounding_mode_concurrent_trades(self):
+        """Test compounding mode with overlapping trades."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_running_net_liq,
+        )
+
+        starting_capital = 100000
+        trades = [
+            {
+                "margin_req": 10000,
+                "pnl": 5000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 10),
+            },
+            {
+                "margin_req": 15000,
+                "pnl": 3000,
+                "date_opened": date(2025, 1, 5),  # Opens while first is still open
+                "date_closed": date(2025, 1, 15),
+            },
+        ]
+
+        net_liq_timeline = calculate_running_net_liq(trades, starting_capital)
+
+        # Both trades should use starting capital since they overlap
+        for trade_id in net_liq_timeline.values():
+            assert trade_id == starting_capital
+
+    def test_compounding_counts_multiple_closes_same_day(self):
+        """Compounding mode should aggregate P&L from every trade closing on a date."""
+        from app.dash_app.callbacks.position_sizing_callbacks import _build_date_to_net_liq
+
+        starting_capital = 100000
+        trades = [
+            {
+                "margin_req": 10000,
+                "pl": 5000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 8000,
+                "pl": 2000,
+                "date_opened": date(2025, 1, 2),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 6000,
+                "pl": -1000,
+                "date_opened": date(2025, 1, 6),
+                "date_closed": date(2025, 1, 8),
+            },
+        ]
+
+        date_keys = [
+            (date(2025, 1, 1) + timedelta(days=offset)).isoformat() for offset in range(0, 8)
+        ]
+
+        net_liq_map = _build_date_to_net_liq(trades, date_keys, starting_capital)
+
+        assert net_liq_map["2025-01-05"] == 107000  # 100000 + 5000 + 2000
+        assert net_liq_map["2025-01-08"] == 106000  # 107000 - 1000
+
+    def test_with_daily_log_data(self):
+        """Test margin calculations when daily log is available."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_running_net_liq,
+            get_net_liq_from_daily_log,
+        )
+
+        starting_capital = 100000
+        daily_log = [
+            {"date": "2025-01-01", "net_liq": 100000},
+            {"date": "2025-01-05", "net_liq": 105000},  # After deposits/gains
+            {"date": "2025-01-10", "net_liq": 108000},  # Further gains
+        ]
+
+        trades = [
+            {
+                "margin_req": 10000,
+                "pnl": 3000,
+                "date_opened": date(2025, 1, 5),  # Should use 105000 from log
+                "date_closed": date(2025, 1, 7),
+            },
+            {
+                "margin_req": 15000,
+                "pnl": 2000,
+                "date_opened": date(2025, 1, 10),  # Should use 108000 from log
+                "date_closed": date(2025, 1, 12),
+            },
+        ]
+
+        # Test get_net_liq_from_daily_log function
+        assert get_net_liq_from_daily_log(daily_log, "2025-01-05") == 105000
+        assert get_net_liq_from_daily_log(daily_log, "2025-01-10") == 108000
+        assert get_net_liq_from_daily_log(daily_log, "2025-01-15") is None
+
+        # Test calculate_running_net_liq with daily log
+        net_liq_timeline = calculate_running_net_liq(trades, starting_capital, daily_log)
+
+        # Should use actual values from daily log, not calculated P&L
+        trade_ids = list(net_liq_timeline.keys())
+        assert net_liq_timeline[trade_ids[0]] == 105000  # From daily log
+        assert net_liq_timeline[trade_ids[1]] == 108000  # From daily log
+
+    def test_without_daily_log_data(self):
+        """Test margin calculations fallback when daily log is not available."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_running_net_liq,
+        )
+
+        starting_capital = 100000
+        trades = [
+            {
+                "margin_req": 10000,
+                "pnl": 5000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 15000,
+                "pnl": 3000,
+                "date_opened": date(2025, 1, 10),  # After first trade closes
+                "date_closed": date(2025, 1, 15),
+            },
+        ]
+
+        # Test without daily log (should calculate from P&L)
+        net_liq_timeline = calculate_running_net_liq(trades, starting_capital, None)
+
+        trade_ids = list(net_liq_timeline.keys())
+        assert net_liq_timeline[trade_ids[0]] == 100000  # Starting capital
+        assert net_liq_timeline[trade_ids[1]] == 105000  # Starting + 5000 P&L
+
+    def test_daily_log_vs_calculated_pnl(self):
+        """Test that daily log takes precedence over calculated P&L."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_running_net_liq,
+        )
+
+        starting_capital = 100000
+
+        # Daily log shows different values (maybe due to deposits/withdrawals)
+        daily_log = [
+            {"date": "2025-01-01", "net_liq": 100000},
+            {"date": "2025-01-10", "net_liq": 120000},  # Shows 120k (not just from trades)
+        ]
+
+        trades = [
+            {
+                "margin_req": 10000,
+                "pnl": 5000,  # Only 5k profit from trading
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            {
+                "margin_req": 15000,
+                "pnl": 3000,
+                "date_opened": date(2025, 1, 10),
+                "date_closed": date(2025, 1, 15),
+            },
+        ]
+
+        # With daily log
+        net_liq_with_log = calculate_running_net_liq(trades, starting_capital, daily_log)
+        trade_ids = list(net_liq_with_log.keys())
+        assert net_liq_with_log[trade_ids[1]] == 120000  # From daily log
+
+        # Without daily log
+        net_liq_without_log = calculate_running_net_liq(trades, starting_capital, None)
+        assert net_liq_without_log[trade_ids[1]] == 105000  # Calculated: 100k + 5k
+
+    def test_negative_net_liq_handling(self):
+        """Test handling when account goes negative (should show warning)."""
+        from app.dash_app.callbacks.position_sizing_callbacks import calculate_margin_pct
+
+        starting_capital = 10000
+        trades = [
+            {"margin_req": 5000, "pnl": -15000},  # Loses more than capital
+        ]
+
+        # Should handle gracefully even with negative denominator
+        margin_pct = calculate_margin_pct(trades[0], starting_capital, margin_mode="fixed")
+        assert margin_pct == 50.0  # Still uses starting capital in fixed mode
+
+    def test_mode_comparison(self):
+        """Compare fixed vs compounding modes with same trades."""
+        from app.dash_app.callbacks.position_sizing_callbacks import (
+            calculate_margin_pct,
+            calculate_running_net_liq,
+        )
+
+        starting_capital = 100000
+        trade = {
+            "margin_req": 20000,
+            "pnl": 10000,
+            "date_opened": date(2025, 1, 10),
+            "date_closed": date(2025, 1, 15),
+        }
+
+        # After previous trades with +10000 total P&L
+        trades_history = [
+            {
+                "margin_req": 10000,
+                "pnl": 10000,
+                "date_opened": date(2025, 1, 1),
+                "date_closed": date(2025, 1, 5),
+            },
+            trade,
+        ]
+
+        # Fixed mode
+        fixed_pct = calculate_margin_pct(trade, starting_capital, "fixed")
+        assert fixed_pct == 20.0  # Always 20000/100000
+
+        # Compounding mode
+        net_liq_timeline = calculate_running_net_liq(trades_history, starting_capital)
+        compound_pct = calculate_margin_pct(
+            trade, starting_capital, "compounding", net_liq_timeline
+        )
+        expected = (20000 / 110000) * 100  # Uses 110000 (100000 + 10000)
+        assert abs(compound_pct - expected) < 0.01
 
 
 if __name__ == "__main__":
