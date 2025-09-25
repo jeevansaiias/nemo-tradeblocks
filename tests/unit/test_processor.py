@@ -91,3 +91,26 @@ def test_column_mapping(portfolio_processor):
     except ValueError:
         # Expected due to missing required columns, but BOM should be removed
         pass
+
+
+def test_missing_closing_commissions_defaults_to_zero(portfolio_processor):
+    """Missing closing commissions should be coerced to zero for validation"""
+    csv_content = """Date Opened,Time Opened,Opening Price,Legs,Premium,Closing Price,Date Closed,Time Closed,Avg. Closing Cost,Reason For Close,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy,Opening Commissions + Fees,Closing Commissions + Fees,Opening Short/Long Ratio,Closing Short/Long Ratio,Gap,Movement,Max Profit,Max Loss\n"""
+    csv_content += "2025-09-23,09:32:00,6694.8,Sample Legs,55,6656.92,2025-09-23,16:00:00,0,Expired,4930.2,99,945113.8,93555,Test Strategy,514.8,,1.48,1,-1.31,2.36,100,-400\n"
+
+    portfolio = portfolio_processor.parse_csv(csv_content, "missing_closing_fees.csv")
+
+    assert len(portfolio.trades) == 1
+    assert portfolio.trades[0].closing_commissions_fees == 0
+
+
+def test_missing_closing_commissions_column(portfolio_processor):
+    """Missing closing commission column should default to zeros"""
+    csv_content = """Date Opened,Time Opened,Opening Price,Legs,Premium,Closing Price,Date Closed,Time Closed,Avg. Closing Cost,Reason For Close,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy,Opening Commissions + Fees,Opening Short/Long Ratio,Closing Short/Long Ratio,Gap,Movement,Max Profit,Max Loss\n"""
+    csv_content += "2025-09-23,09:32:00,6694.8,Sample Legs,55,6656.92,2025-09-23,16:00:00,0,Expired,4930.2,99,945113.8,93555,Test Strategy,514.8,1.48,1,-1.31,2.36,100,-400\n"
+    csv_content += "2025-09-22,09:32:00,6653.54,Sample Legs 2,40,6693.75,2025-09-22,16:00:00,500,Expired,-47450.4,102,940183.6,97920,Test Strategy,530.4,1.38,1.515,-10.08,-0.74,25,-1150\n"
+
+    portfolio = portfolio_processor.parse_csv(csv_content, "missing_closing_column.csv")
+
+    assert portfolio.total_trades == 2
+    assert all(trade.closing_commissions_fees == 0 for trade in portfolio.trades)

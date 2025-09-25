@@ -21,6 +21,10 @@ class PortfolioProcessor:
     """Processes portfolio CSV data and converts to structured models"""
 
     def __init__(self):
+        # Primary column mapping for known OptionOmega exports. Some exports rename
+        # the commission column or drop it entirely, so we keep a separate alias
+        # map below to normalise these variants before applying the canonical
+        # mapping here.
         self.column_mapping = {
             "Date Opened": "date_opened",
             "Time Opened": "time_opened",
@@ -47,6 +51,12 @@ class PortfolioProcessor:
             "Movement": "movement",
             "Max Profit": "max_profit",
             "Max Loss": "max_loss",
+        }
+        self.column_aliases = {
+            "Opening comms & fees": "Opening Commissions + Fees",
+            "Opening Commissions & Fees": "Opening Commissions + Fees",
+            "Closing comms & fees": "Closing Commissions + Fees",
+            "Closing Commissions & Fees": "Closing Commissions + Fees",
         }
 
     def parse_csv(self, file_content: str, filename: str) -> Portfolio:
@@ -75,6 +85,10 @@ class PortfolioProcessor:
         # Remove BOM character if present
         df.columns = df.columns.str.replace("\ufeff", "")
 
+        # Normalise known alternate column headers before applying the canonical mapping
+        if self.column_aliases:
+            df = df.rename(columns=self.column_aliases)
+
         # Rename columns using mapping
         df = df.rename(columns=self.column_mapping)
 
@@ -84,9 +98,14 @@ class PortfolioProcessor:
         if missing_columns:
             raise ValueError(f"Required columns missing: {missing_columns}")
 
-        # Ensure all expected columns are present
+        # Ensure all expected columns are present. Missing numeric commission
+        # columns should be created so that downstream code receives zeros.
         all_columns = list(self.column_mapping.values())
         df = df.reindex(columns=all_columns)
+
+        for commission_column in ["opening_commissions_fees", "closing_commissions_fees"]:
+            if commission_column not in df.columns:
+                df[commission_column] = 0
 
         # Convert date columns
         if "date_opened" in df.columns:
@@ -127,6 +146,11 @@ class PortfolioProcessor:
         for col in numeric_columns:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # Default missing commission values to zero so downstream models receive numbers
+        for col in ["opening_commissions_fees", "closing_commissions_fees"]:
+            if col in df.columns:
+                df[col] = df[col].fillna(0)
 
         # Fill NaN values appropriately - use empty string for text fields, keep NaN for numeric
         text_columns = ["reason_for_close", "strategy"]
