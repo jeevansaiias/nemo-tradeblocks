@@ -128,6 +128,11 @@ class PortfolioProcessor:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
+        # Default missing commission values to zero so downstream models receive numbers
+        for col in ["opening_commissions_fees", "closing_commissions_fees"]:
+            if col in df.columns:
+                df[col] = df[col].fillna(0)
+
         # Fill NaN values appropriately - use empty string for text fields, keep NaN for numeric
         text_columns = ["reason_for_close", "strategy"]
         for col in text_columns:
