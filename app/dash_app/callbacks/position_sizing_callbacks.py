@@ -24,6 +24,7 @@ from app.calculations.position_sizing import (
     calculate_position_sizing,
     extract_strategy_name,
 )
+from app.utils.theme import apply_theme_layout, get_theme_colors
 from app.data.models import Portfolio
 from app.dash_app.components.common import create_info_tooltip
 
@@ -94,12 +95,6 @@ def _infer_starting_capital(
         capital = float(capital)
         if capital > 0:
             capital = int(round(capital))
-            logger.info(
-                "Inferred starting capital %.2f from %d trades%s",
-                capital,
-                len(trades),
-                " using daily log" if daily_entries else "",
-            )
             return capital
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to infer starting capital: %s", exc)
@@ -250,8 +245,6 @@ def register_position_sizing_callbacks(app):
         prevent_initial_call=True,
     )
     def trigger_apply(n_clicks):
-        logger.info(f"BUTTON CLICKED! n_clicks = {n_clicks}")
-        print(f"BUTTON CLICKED! n_clicks = {n_clicks}")  # Force print to terminal
         if not n_clicks:
             raise PreventUpdate
         return {"timestamp": datetime.now().isoformat(), "n_clicks": n_clicks}
@@ -338,7 +331,6 @@ def register_position_sizing_callbacks(app):
             global_kelly_pct = DEFAULT_KELLY_PCT
 
         margin_mode = margin_calc_mode if margin_calc_mode else "fixed"
-        logger.info("Margin calculation mode: %s (received: %s)", margin_mode, margin_calc_mode)
 
         calc_result: PositionSizingCalculations = calculate_position_sizing(
             trades,
@@ -384,48 +376,8 @@ def register_position_sizing_callbacks(app):
 
         margin_fig = _blank_margin_figure(theme_data)
 
-        if margin_mode == "compounding":
-            if sorted_dates:
-                final_key = sorted_dates[-1]
-                final_net_liq = date_to_net_liq.get(final_key, starting_capital)
-            else:
-                final_net_liq = starting_capital
-            pnl_change = final_net_liq - starting_capital
-            unique_values = sorted({v for v in date_to_net_liq.values()}) if date_to_net_liq else []
-            logger.info(
-                "Compounding mode: Final net liq = $%s",
-                f"{final_net_liq:,.0f}",
-            )
-            if sorted_dates:
-                logger.info("Date range: %s to %s", sorted_dates[0], sorted_dates[-1])
-            if unique_values:
-                logger.info("Sample net liq values: %s", unique_values[:5])
-        else:
-            final_net_liq = starting_capital
-            pnl_change = 0.0
-
-        if margin_mode == "compounding":
-            mode_text = (
-                "Mode: Compounding Returns"
-                f"<br>Starting: ${starting_capital:,.0f}"
-                f"<br>Final Net Liq: ${final_net_liq:,.0f}"
-                f"<br>P&L Impact: ${pnl_change:+,.0f}"
-            )
-        else:
-            mode_text = "Mode: Fixed Capital" f"<br>Using: ${starting_capital:,.0f} throughout"
-
-        margin_fig.add_annotation(
-            text=mode_text,
-            xref="paper",
-            yref="paper",
-            x=0.02,
-            y=0.98,
-            showarrow=False,
-            font=dict(size=10),
-            align="left",
-            bgcolor="rgba(255, 255, 255, 0.8)",
-            bordercolor="gray",
-            borderwidth=1,
+        hover_template = (
+            "<b>Date:</b> %{x|%b %d, %Y}<br>" "<b>%{fullData.name}:</b> %{y:.2f}%<extra></extra>"
         )
 
         if sorted_dates:
@@ -437,6 +389,7 @@ def register_position_sizing_callbacks(app):
                     name="Portfolio",
                     line=dict(width=3),
                     marker=dict(size=6),
+                    hovertemplate=hover_template,
                 )
             )
             for name in strategy_names:
@@ -450,6 +403,7 @@ def register_position_sizing_callbacks(app):
                         mode="lines",
                         name=name,
                         line=dict(dash="dot"),
+                        hovertemplate=hover_template,
                     )
                 )
         else:
@@ -462,6 +416,14 @@ def register_position_sizing_callbacks(app):
                 showarrow=False,
                 font=dict(color="#6c6c6c"),
             )
+
+        theme_colors = get_theme_colors(theme_data)
+        apply_theme_layout(
+            margin_fig,
+            theme_colors,
+            margin=dict(l=60, r=30, t=80, b=60),
+        )
+        margin_fig.update_layout(hovermode="closest", hoverdistance=30)
 
         weighted_applied_pct = summary.weighted_applied_pct
         applied_capital = summary.applied_capital
@@ -912,7 +874,7 @@ def register_position_sizing_callbacks(app):
                     dmc.TableTh(
                         dmc.Group(
                             [
-                                dmc.Text("Expected Margin", size="sm"),
+                                dmc.Text("Projected Margin", size="sm"),
                                 dmc.Tooltip(
                                     label="Projected margin need = Historical Max × (Kelly % / 100)",
                                     children=dmc.ThemeIcon(
@@ -1052,8 +1014,8 @@ def register_position_sizing_callbacks(app):
                                 dmc.ListItem(
                                     dmc.Text(
                                         [
-                                            dmc.Text("Expected Margin: ", span=True, fw=500),
-                                            "Projected margin need at your Kelly %. If Historical Max is 100% and Kelly is 10%, expect 10% margin usage.",
+                                            dmc.Text("Projected Margin: ", span=True, fw=500),
+                                            "Projected margin need at your Kelly %. Example: 80% historical max with a 25% Kelly uses ~20% margin.",
                                         ],
                                         size="xs",
                                     )
