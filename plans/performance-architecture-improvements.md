@@ -56,6 +56,7 @@ Cut CPU spikes and memory growth on the Render Free plan (1 vCPU / 2 GB RAM) w
 1. ✅ Prototype cache service in-memory with TTL + size cap (cached analytics now generated on upload).
 2. ✅ Shift Dash stores/callbacks to ID-only payloads and pull data from the cache.
 3. ✅ Reuse calculator instances and strip redundant Geekistics/performance runs.
-4. Profile upload path with pandas vs Polars on sample OptionOmega exports.
-5. Wire up timing/logging around caches and callbacks for regression detection.
-6. ✅ Implement IndexedDB persistence + restart recovery flow.
+4. ✅ Prioritize Performance tab caching (reuse precomputed analytics, memoize strategy/date filters; timing instrumentation pending).
+5. Profile upload path with pandas vs Polars on sample OptionOmega exports.
+6. Wire up timing/logging around caches and callbacks for regression detection.
+7. ✅ Implement IndexedDB persistence + restart recovery flow.

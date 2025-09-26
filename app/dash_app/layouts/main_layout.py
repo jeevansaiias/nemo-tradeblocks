@@ -353,6 +353,75 @@ def create_main_layout():
                                             html.Div(id="ps-strategy-input-grid"),
                                             html.Div(id="ps-results-container"),
                                             html.Div(id="ps-margin-card-container"),
+                                            dmc.MultiSelect(id="perf-strategy-filter", data=[]),
+                                            dmc.Select(id="perf-date-range", data=[], value="all"),
+                                            dmc.Switch(id="equity-scale-toggle", checked=False),
+                                            dmc.Checkbox(id="equity-drawdown-areas", checked=False),
+                                            dmc.Checkbox(id="sequence-show-trend", checked=False),
+                                            dmc.NumberInput(id="rom-ma-period", value=20),
+                                            dmc.Select(
+                                                id="rolling-metric-type", data=[], value="sharpe"
+                                            ),
+                                            dmc.MultiSelect(
+                                                id="geekistics-strategy-filter", data=[]
+                                            ),
+                                            dmc.NumberInput(id="risk-free-rate-input", value=0.02),
+                                            dmc.MultiSelect(id="trade-strategy-filter", data=[]),
+                                            dmc.Select(
+                                                id="correlation-method", data=[], value="pearson"
+                                            ),
+                                            dmc.Checkbox(id="mc-use-random-seed", checked=False),
+                                            dmc.Button(id="mc-run-simulation", n_clicks=0),
+                                            dmc.SegmentedControl(
+                                                id="mc-scale-selector", data=[], value="linear"
+                                            ),
+                                            dmc.Checkbox(id="mc-show-paths", checked=False),
+                                            dmc.Button(id="mc-reset", n_clicks=0),
+                                            html.Div(id="perf-metrics-bar"),
+                                            html.Div(id="trades-table-container"),
+                                            dcc.Graph(
+                                                id="equity-curve-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            html.Div(id="geekistics-content"),
+                                            html.Div(id="trade-summary-stats"),
+                                            dcc.Graph(
+                                                id="drawdown-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="day-of-week-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="rom-distribution-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="streak-distribution-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            html.Div(id="streak-statistics-group"),
+                                            dcc.Graph(
+                                                id="monthly-heatmap-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="trade-sequence-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="rom-timeline-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="rolling-metrics-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
+                                            dcc.Graph(
+                                                id="risk-evolution-chart",
+                                                figure={"data": [], "layout": {}},
+                                            ),
                                         ],
                                     ),
                                     dmc.LoadingOverlay(id="loading-overlay", visible=False),

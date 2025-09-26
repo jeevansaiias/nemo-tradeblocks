@@ -5,7 +5,11 @@ from dash_iconify import DashIconify
 import base64
 import logging
 import uuid
+import json
+import math
 from datetime import datetime
+
+import numpy as np
 from app.data.models import Trade
 from app.dash_app.layouts.main_layout import (
     create_welcome_content,
@@ -67,6 +71,45 @@ from app.services.portfolio_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _jsonify_for_store(value):
+    """Convert values to JSON-serialisable structures for dcc.Store."""
+
+    if value is None:
+        return None
+
+    if isinstance(value, (str, bool)):
+        return value
+
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return None
+        return value
+
+    # NumPy scalars
+    if isinstance(value, np.generic):
+        return _jsonify_for_store(value.item())
+
+    if isinstance(value, (list, tuple)):
+        return [_jsonify_for_store(item) for item in value]
+
+    if isinstance(value, set):
+        return [_jsonify_for_store(item) for item in value]
+
+    if isinstance(value, dict):
+        return {key: _jsonify_for_store(val) for key, val in value.items()}
+
+    if isinstance(value, np.ndarray):
+        return _jsonify_for_store(value.tolist())
+
+    if hasattr(value, "tolist"):
+        try:
+            return _jsonify_for_store(value.tolist())
+        except Exception:  # pragma: no cover - fallback
+            pass
+
+    return value
 
 
 def register_callbacks(app):
@@ -1077,6 +1120,7 @@ def register_callbacks(app):
             Output("rom-timeline-chart", "figure"),
             Output("rolling-metrics-chart", "figure"),
             Output("risk-evolution-chart", "figure"),
+            Output("performance-cache", "data"),
         ],
         [
             Input("current-portfolio-data", "data"),
@@ -1089,6 +1133,7 @@ def register_callbacks(app):
             Input("rolling-metric-type", "value"),
             Input("theme-store", "data"),
         ],
+        [State("performance-cache", "data")],
         prevent_initial_call=False,
     )
     def update_performance_blocks(
@@ -1101,8 +1146,12 @@ def register_callbacks(app):
         rom_ma_period,
         rolling_metric_type,
         theme_data,
+        performance_cache,
     ):
         """Update Performance Blocks charts from uploaded real data."""
+        cache_state = performance_cache or {"entries": []}
+        cache_entries = cache_state.get("entries", [])
+
         try:
             if not portfolio_data:
                 # Nothing loaded yet; show mocks unobtrusively
@@ -1114,11 +1163,13 @@ def register_callbacks(app):
                     mocks["day_of_week"],
                     mocks["rom_distribution"],
                     mocks["streak_distribution"],
+                    generate_streak_statistics_group({}),
                     mocks["monthly_heatmap"],
                     mocks["trade_sequence"],
                     mocks["rom_timeline"],
                     mocks["rolling_metrics"],
                     mocks["risk_evolution"],
+                    cache_state,
                 )
 
             payload, _ = resolve_portfolio_payload(portfolio_data)
@@ -1151,6 +1202,7 @@ def register_callbacks(app):
                     mocks["rom_timeline"],
                     mocks["rolling_metrics"],
                     mocks["risk_evolution"],
+                    cache_state,
                 )
 
             # Convert dicts to Trade objects
@@ -1173,11 +1225,13 @@ def register_callbacks(app):
                     mocks["day_of_week"],
                     mocks["rom_distribution"],
                     mocks["streak_distribution"],
+                    generate_streak_statistics_group({}),
                     mocks["monthly_heatmap"],
                     mocks["trade_sequence"],
                     mocks["rom_timeline"],
                     mocks["rolling_metrics"],
                     mocks["risk_evolution"],
+                    cache_state,
                 )
 
             # Apply strategy filter
@@ -1207,17 +1261,80 @@ def register_callbacks(app):
                 if start:
                     trades = [tr for tr in trades if tr.date_opened >= start]
 
-            # Compute datasets
-            from app.calculations.performance import PerformanceCalculator
+            portfolio_id = payload.get("portfolio_id") if isinstance(payload, dict) else None
+            cache_key = None
+            dataset = None
 
-            calc = PerformanceCalculator()
-            equity_data = calc.calculate_enhanced_cumulative_equity(trades)
-            distribution_data = calc.calculate_trade_distributions(trades)
-            streak_data = calc.calculate_streak_distributions(trades)
-            monthly_data = calc.calculate_monthly_heatmap_data(trades)
-            sequence_data = calc.calculate_trade_sequence_data(trades)
-            rom_data = calc.calculate_rom_over_time(trades)
-            rolling_data = calc.calculate_rolling_metrics(trades)
+            if portfolio_id:
+                normalized_strategies = (
+                    sorted(strategy_filter)
+                    if isinstance(strategy_filter, (list, tuple))
+                    else ([strategy_filter] if strategy_filter else [])
+                )
+                cache_key = json.dumps(
+                    {
+                        "portfolio_id": portfolio_id,
+                        "strategies": normalized_strategies,
+                        "date_range": date_range or "all",
+                        "rom_ma_period": str(rom_ma_period or "30"),
+                        "rolling_metric_type": rolling_metric_type or "win_rate",
+                    },
+                    sort_keys=True,
+                )
+
+                for entry in cache_entries:
+                    if entry.get("key") == cache_key:
+                        dataset = entry.get("data")
+                        break
+
+            if dataset is None:
+                from app.calculations.performance import PerformanceCalculator
+
+                calc = PerformanceCalculator()
+                equity_data = calc.calculate_enhanced_cumulative_equity(trades)
+                distribution_data = calc.calculate_trade_distributions(trades)
+                streak_data = calc.calculate_streak_distributions(trades)
+                monthly_data = calc.calculate_monthly_heatmap_data(trades)
+                sequence_data = calc.calculate_trade_sequence_data(trades)
+                rom_data = calc.calculate_rom_over_time(trades)
+                rolling_data = calc.calculate_rolling_metrics(trades)
+
+                dataset = {
+                    "equity_data": equity_data,
+                    "distribution_data": distribution_data,
+                    "streak_data": streak_data,
+                    "monthly_data": monthly_data,
+                    "sequence_data": sequence_data,
+                    "rom_data": rom_data,
+                    "rolling_data": rolling_data,
+                    "trades": [tr.model_dump() for tr in trades],
+                }
+
+                dataset = _jsonify_for_store(dataset)
+
+                if cache_key:
+                    new_entry = {
+                        "key": cache_key,
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "data": dataset,
+                    }
+                    cache_entries = [
+                        entry for entry in cache_entries if entry.get("key") != cache_key
+                    ]
+                    cache_entries.insert(0, new_entry)
+                    if len(cache_entries) > 8:
+                        cache_entries = cache_entries[:8]
+                    cache_state = {"entries": cache_entries}
+            else:
+                equity_data = dataset.get("equity_data", {})
+                distribution_data = dataset.get("distribution_data", {})
+                streak_data = dataset.get("streak_data", {})
+                monthly_data = dataset.get("monthly_data", {})
+                sequence_data = dataset.get("sequence_data", {})
+                rom_data = dataset.get("rom_data", {})
+                rolling_data = dataset.get("rolling_data", {})
+                trades_payload = dataset.get("trades", [])
+                trades = [Trade(**item) for item in trades_payload]
 
             # Build figures
             equity_fig = create_equity_curve_chart(
@@ -1270,6 +1387,7 @@ def register_callbacks(app):
                 rom_timeline_fig,
                 rolling_fig,
                 risk_fig,
+                cache_state,
             )
         except Exception as e:
             logger.error(f"Error updating Performance Blocks: {e}")
@@ -1288,6 +1406,7 @@ def register_callbacks(app):
                 mocks.get("rom_timeline", {}),
                 mocks.get("rolling_metrics", {}),
                 mocks.get("risk_evolution", {}),
+                cache_state,
             )
 
     @app.callback(
