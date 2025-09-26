@@ -351,6 +351,8 @@ def create_main_layout():
                                             html.Div(id="ps-strategy-action-feedback"),
                                             dmc.Button(id="ps-run-strategy-analysis", n_clicks=0),
                                             html.Div(id="ps-strategy-input-grid"),
+                                            html.Div(id="ps-results-container"),
+                                            html.Div(id="ps-margin-card-container"),
                                         ],
                                     ),
                                     dmc.LoadingOverlay(id="loading-overlay", visible=False),
