@@ -1,8 +1,5 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Image from "next/image"
-import Link from "next/link"
 import {
   IconBarbell,
   IconChartHistogram,
@@ -15,11 +12,14 @@ import {
   IconSettings,
   IconSparkles,
   IconStack2,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
+import { Blocks } from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 
-import { SidebarActiveBlocks } from "@/components/sidebar-active-blocks"
-import { SidebarFooterLegal } from "@/components/sidebar-footer-legal"
-import { NavMain } from "@/components/nav-main"
+import { NavMain } from "@/components/nav-main";
+import { SidebarActiveBlocks } from "@/components/sidebar-active-blocks";
+import { SidebarFooterLegal } from "@/components/sidebar-footer-legal";
 import {
   Sidebar,
   SidebarContent,
@@ -28,7 +28,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const navData = {
   navMain: [
@@ -123,7 +123,7 @@ const navData = {
       },
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -135,17 +135,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-2"
             >
-              <Link href="/block-stats" className="flex items-center gap-2">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background">
-                  <Image
-                    src="/tradeblocks-logo.png"
-                    alt="TradeBlocks logo"
-                    width={24}
-                    height={24}
-                    className="object-contain"
-                    priority
-                  />
-                </span>
+              <Link href="/block-stats" className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <Blocks className="h-8 w-8 text-primary" />
+                </div>
                 <span className="flex flex-col">
                   <span className="text-sm font-semibold leading-tight">
                     TradeBlocks
@@ -167,5 +160,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarFooterLegal />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
