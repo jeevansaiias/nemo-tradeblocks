@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import time
 import logging
+import json
 from dataclasses import dataclass, field
 from threading import RLock
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+from datetime import date, datetime, time as datetime_time, timedelta
+from decimal import Decimal
 from copy import deepcopy
+
+import numpy as np
+from pydantic import BaseModel
 
 from app.calculations.geekistics import GeekisticsCalculator
 from app.calculations.performance import PerformanceCalculator
@@ -17,9 +23,54 @@ from app.calculations.shared import (
     calculate_strategy_breakdown,
 )
 from app.calculations.trade_analysis import TradeAnalysisCalculator
-from app.data.models import Portfolio, DailyLog
+from app.data.models import Portfolio, DailyLog, Trade
 
 logger = logging.getLogger(__name__)
+
+
+def _json_ready(value: Any) -> Any:
+    """Convert complex values to JSON-serialisable primitives."""
+
+    if value is None:
+        return None
+
+    if isinstance(value, (str, bool, int, float)):
+        return value
+
+    if isinstance(value, Decimal):
+        return float(value)
+
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+
+    if isinstance(value, datetime_time):
+        return value.isoformat()
+
+    if isinstance(value, timedelta):
+        return value.total_seconds()
+
+    if isinstance(value, BaseModel):
+        try:
+            return _json_ready(value.model_dump(mode="json"))
+        except TypeError:
+            return _json_ready(value.model_dump())
+
+    if isinstance(value, np.generic):
+        return _json_ready(value.item())
+
+    if isinstance(value, dict):
+        return {key: _json_ready(val) for key, val in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_json_ready(item) for item in value]
+
+    if hasattr(value, "tolist"):
+        try:
+            return _json_ready(value.tolist())
+        except Exception:  # pragma: no cover - defensive fallback
+            pass
+
+    return value
 
 
 @dataclass
@@ -38,6 +89,20 @@ class PortfolioCacheEntry:
     daily_log: Optional[DailyLog] = None
     daily_log_payload: Optional[Dict[str, Any]] = None
     created_at: float = field(default_factory=time.time)
+    performance_blocks_cache: "OrderedDict[str, PerformanceBlocksCacheRecord]" = field(
+        default_factory=OrderedDict
+    )
+
+
+@dataclass
+class PerformanceBlocksCacheRecord:
+    """Cached dataset for Performance Blocks visualisations."""
+
+    dataset: Dict[str, Any]
+    trades: List[Trade]
+    filters: Dict[str, Any]
+    created_at: float = field(default_factory=time.time)
+    last_used: float = field(default_factory=time.time)
 
 
 class PortfolioCache:
@@ -111,6 +176,81 @@ class PortfolioCache:
     def get_margin_data(self, portfolio_id: str) -> Dict[str, Any]:
         return deepcopy(self.get_entry(portfolio_id).margin)
 
+    def get_performance_blocks_dataset(
+        self,
+        portfolio_id: str,
+        *,
+        strategies: Optional[Iterable[str]] = None,
+        date_range: Optional[str] = None,
+        rom_ma_period: Optional[Any] = None,
+        rolling_metric_type: Optional[str] = None,
+    ) -> Tuple[Dict[str, Any], List[Trade], str, bool]:
+        """Return cached Performance Blocks dataset, computing it if missing.
+
+        Returns a tuple of (dataset, trades, cache_key, from_cache).
+        """
+
+        normalized_strategies: Tuple[str, ...] = ()
+        if strategies:
+            normalized_strategies = tuple(sorted({s for s in strategies if s}))
+
+        normalized_date_range = (date_range or "all").lower()
+        normalized_rom_period = str(rom_ma_period or "30")
+        normalized_metric = (rolling_metric_type or "win_rate").lower()
+
+        cache_key = json.dumps(
+            {
+                "portfolio_id": portfolio_id,
+                "strategies": normalized_strategies,
+                "date_range": normalized_date_range,
+                "rom_ma_period": normalized_rom_period,
+                "rolling_metric_type": normalized_metric,
+            },
+            sort_keys=True,
+        )
+
+        with self._lock:
+            self._evict_expired_locked()
+            entry = self._entries.get(portfolio_id)
+            if not entry:
+                raise KeyError(portfolio_id)
+
+            record = entry.performance_blocks_cache.get(cache_key)
+            if record:
+                record.last_used = time.time()
+                entry.performance_blocks_cache.move_to_end(cache_key)
+                return deepcopy(record.dataset), list(record.trades), cache_key, True
+
+            # Copy reference to portfolio for computation outside lock
+            portfolio = entry.portfolio
+
+        trades = self._filter_trades_for_performance(
+            list(portfolio.trades), normalized_strategies, normalized_date_range
+        )
+
+        dataset = self._build_performance_blocks_dataset(trades)
+
+        record = PerformanceBlocksCacheRecord(
+            dataset=deepcopy(dataset),
+            trades=list(trades),
+            filters={
+                "strategies": list(normalized_strategies),
+                "date_range": normalized_date_range,
+                "rom_ma_period": normalized_rom_period,
+                "rolling_metric_type": normalized_metric,
+            },
+        )
+
+        with self._lock:
+            entry = self._entries.get(portfolio_id)
+            if not entry:
+                raise KeyError(portfolio_id)
+        entry.performance_blocks_cache[cache_key] = record
+        entry.performance_blocks_cache.move_to_end(cache_key)
+        self._trim_performance_blocks_cache(entry)
+
+        return deepcopy(dataset), list(trades), cache_key, False
+
     def get_trades(
         self,
         portfolio_id: str,
@@ -136,6 +276,91 @@ class PortfolioCache:
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
+
+    # ------------------------------------------------------------------
+    # Internal helpers for Performance Blocks caching
+    # ------------------------------------------------------------------
+
+    def _trim_performance_blocks_cache(self, entry: PortfolioCacheEntry) -> None:
+        """Keep per-portfolio Performance Blocks cache bounded."""
+
+        max_entries = 16
+        while len(entry.performance_blocks_cache) > max_entries:
+            entry.performance_blocks_cache.popitem(last=False)
+
+    def _filter_trades_for_performance(
+        self,
+        trades: List[Trade],
+        strategies: Tuple[str, ...],
+        date_range: str,
+    ) -> List[Trade]:
+        if not trades:
+            return []
+
+        filtered = trades
+        if strategies:
+            selected = set(strategies)
+            filtered = [trade for trade in filtered if trade.strategy in selected]
+
+        if date_range and date_range not in {"all", "", None}:
+            latest_date = max((trade.date_opened for trade in filtered), default=None)
+            if not latest_date:
+                latest_date = max((trade.date_opened for trade in trades), default=date.today())
+
+            start_date: Optional[date] = None
+            if date_range == "ytd":
+                start_date = date(latest_date.year, 1, 1)
+            elif date_range == "1y":
+                start_date = latest_date - timedelta(days=365)
+            elif date_range == "6m":
+                start_date = latest_date - timedelta(days=182)
+            elif date_range == "3m":
+                start_date = latest_date - timedelta(days=91)
+            elif date_range == "1m":
+                start_date = latest_date - timedelta(days=30)
+
+            if start_date:
+                filtered = [trade for trade in filtered if trade.date_opened >= start_date]
+
+        return filtered
+
+    def _build_performance_blocks_dataset(self, trades: List[Trade]) -> Dict[str, Any]:
+        if not trades:
+            return {
+                "equity_data": {},
+                "distribution_data": {},
+                "streak_data": {},
+                "monthly_data": {},
+                "sequence_data": {},
+                "rom_data": {},
+                "rolling_data": {},
+                "trades": [],
+            }
+
+        calc = self._performance_calc
+
+        equity_data = calc.calculate_enhanced_cumulative_equity(trades)
+        distribution_data = calc.calculate_trade_distributions(trades)
+        streak_data = calc.calculate_streak_distributions(trades)
+        monthly_data = calc.calculate_monthly_heatmap_data(trades)
+        sequence_data = calc.calculate_trade_sequence_data(trades)
+        rom_data = calc.calculate_rom_over_time(trades)
+        rolling_data = calc.calculate_rolling_metrics(trades)
+
+        dataset = {
+            "equity_data": equity_data,
+            "distribution_data": distribution_data,
+            "streak_data": streak_data,
+            "monthly_data": monthly_data,
+            "sequence_data": sequence_data,
+            "rom_data": rom_data,
+            "rolling_data": rolling_data,
+            "trades": [trade.model_dump(mode="json") for trade in trades],
+        }
+
+        return _json_ready(dataset)
+
+        return _json_ready(dataset)
 
     # ------------------------------------------------------------------
     # Internal helpers
