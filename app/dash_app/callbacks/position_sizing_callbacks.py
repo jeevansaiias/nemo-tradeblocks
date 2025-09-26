@@ -301,6 +301,8 @@ def register_position_sizing_callbacks(app):
         State("current-daily-log-data", "data"),
         State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
         State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
+        State("ps-results-container", "id"),
+        State("ps-margin-card-container", "id"),
         prevent_initial_call=True,
     )
     def run_strategy_analysis(
@@ -313,6 +315,8 @@ def register_position_sizing_callbacks(app):
         daily_log_data,
         strategy_kelly_values,
         strategy_kelly_ids,
+        _results_container_id,
+        _margin_container_id,
     ):
         placeholder_fig = _blank_margin_figure(theme_data)
 

@@ -25,10 +25,11 @@ Cut CPU spikes and memory growth on the Render Free plan (1 vCPU / 2 GB RAM) w
 - [x] Switch Dash stores from full JSON payloads to a lightweight `{ "portfolio_id": ..., "filters": ... }` shape.
 - [x] Update callbacks to call the cache helpers and only return the data needed for the figure/table being updated.
 - [ ] Add clientside filtering (e.g., strategy dropdown) where possible so the server avoids needless round-trips.
+- [x] Persist parsed uploads + precomputed bundles to IndexedDB with background re-upload on cache misses (reuse existing “Clear All” control as the delete action).
 
 ### 3. Calculator Reuse & Memoization
-- [ ] Treat `GeekisticsCalculator` and `PerformanceCalculator` as singletons; expose explicit `get_*` methods that reuse cached results per portfolio.
-- [ ] Remove the extra Geekistics run inside `calculate_portfolio_stats_dict`; ask the cache for `max_drawdown` instead of recomputing.
+- [x] Treat `GeekisticsCalculator` and `PerformanceCalculator` as singletons; expose explicit cache-backed helpers that reuse precomputed results per portfolio.
+- [x] Remove the extra Geekistics run inside `calculate_portfolio_stats_dict`; ask the cache for cached portfolio stats instead of recomputing.
 - [ ] Guard Monte Carlo callbacks so Chart-style prop changes reuse cached simulations without rebuilding `Portfolio` objects.
 
 ### 4. CSV Ingestion Optimization
@@ -54,6 +55,7 @@ Cut CPU spikes and memory growth on the Render Free plan (1 vCPU / 2 GB RAM) w
 ## Next Actions (Week 1)
 1. ✅ Prototype cache service in-memory with TTL + size cap (cached analytics now generated on upload).
 2. ✅ Shift Dash stores/callbacks to ID-only payloads and pull data from the cache.
-3. Reuse calculator instances and strip redundant Geekistics/performance runs.
+3. ✅ Reuse calculator instances and strip redundant Geekistics/performance runs.
 4. Profile upload path with pandas vs Polars on sample OptionOmega exports.
 5. Wire up timing/logging around caches and callbacks for regression detection.
+6. ✅ Implement IndexedDB persistence + restart recovery flow.

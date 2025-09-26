@@ -107,6 +107,19 @@ def calculate_portfolio_stats_dict(
     is_filtered: bool = False,
 ) -> Dict[str, Any]:
     """Calculate aggregate portfolio statistics for the provided dataset."""
+
+    portfolio_id = None
+    if isinstance(portfolio_payload, dict):
+        portfolio_id = portfolio_payload.get("portfolio_id")
+    elif isinstance(portfolio_payload, str):
+        portfolio_id = portfolio_payload
+
+    if portfolio_id and not is_filtered:
+        try:
+            return portfolio_cache.get_portfolio_stats(portfolio_id)
+        except KeyError:
+            pass
+
     portfolio = _ensure_portfolio(portfolio_payload)
     trades_data = [trade.model_dump() for trade in portfolio.trades]
 
@@ -178,6 +191,20 @@ def calculate_geekistics_stats_dict(request_payload: Dict[str, Any]) -> Dict[str
     daily_log_payload = request_payload.get("daily_log_data")
     config_data = request_payload.get("config", {})
     is_filtered = request_payload.get("is_filtered", False)
+
+    portfolio_id = None
+    if isinstance(portfolio_payload, dict):
+        portfolio_id = portfolio_payload.get("portfolio_id")
+    elif isinstance(portfolio_payload, str):
+        portfolio_id = portfolio_payload
+
+    if portfolio_id and not is_filtered and _is_default_geekistics_config(config_data):
+        try:
+            cached_stats = portfolio_cache.get_geekistics(portfolio_id)
+            if cached_stats:
+                return cached_stats
+        except KeyError:
+            pass
 
     portfolio = _ensure_portfolio(portfolio_payload)
     trades_data = [trade.model_dump() for trade in portfolio.trades]
@@ -293,13 +320,20 @@ def clear_portfolios_store() -> None:
     portfolio_cache.clear()
 
 
-def _hydrate_cache_entry(portfolio_id: str) -> PortfolioCacheEntry:
+def _hydrate_cache_entry(portfolio_id: str) -> Optional[PortfolioCacheEntry]:
     try:
         return portfolio_cache.get_entry(portfolio_id)
     except KeyError:
-        portfolio = get_portfolio_from_store(portfolio_id)
+        try:
+            portfolio = get_portfolio_from_store(portfolio_id)
+        except KeyError:
+            logger.info("Portfolio %s not found in cache or store", portfolio_id)
+            return None
         portfolio_cache.store_portfolio(portfolio_id, portfolio)
-        return portfolio_cache.get_entry(portfolio_id)
+        try:
+            return portfolio_cache.get_entry(portfolio_id)
+        except KeyError:
+            return None
 
 
 def resolve_portfolio_payload(
@@ -321,11 +355,15 @@ def resolve_portfolio_payload(
         portfolio_id = portfolio_like.get("portfolio_id")
         if portfolio_id:
             entry = _hydrate_cache_entry(portfolio_id)
-            return deepcopy(entry.portfolio_payload), portfolio_id
+            if entry:
+                return deepcopy(entry.portfolio_payload), portfolio_id
+            return None, portfolio_id
 
     if isinstance(portfolio_like, str):
         entry = _hydrate_cache_entry(portfolio_like)
-        return deepcopy(entry.portfolio_payload), portfolio_like
+        if entry:
+            return deepcopy(entry.portfolio_payload), portfolio_like
+        return None, portfolio_like
 
     return None, None
 
@@ -349,7 +387,7 @@ def resolve_daily_log_payload(
             entry = _hydrate_cache_entry(portfolio_id)
         except KeyError:
             return None
-        if entry.daily_log_payload:
+        if entry and entry.daily_log_payload:
             return deepcopy(entry.daily_log_payload)
 
     return None
@@ -368,3 +406,25 @@ def build_filtered_portfolio_payload(
         {trade.get("strategy", "") for trade in trades if trade.get("strategy")}
     )
     return filtered
+
+
+def _is_default_geekistics_config(config_data: Dict[str, Any]) -> bool:
+    """Check whether a geekistics config matches the default cached configuration."""
+
+    if not config_data:
+        return True
+
+    defaults = {
+        "risk_free_rate": 2.0,
+        "annualization_factor": 252,
+        "use_business_days_only": True,
+        "confidence_level": 0.95,
+        "drawdown_threshold": 0.05,
+    }
+
+    for key, default_value in defaults.items():
+        if key in config_data and config_data[key] != default_value:
+            return False
+
+    extra_keys = set(config_data.keys()) - set(defaults.keys())
+    return not extra_keys

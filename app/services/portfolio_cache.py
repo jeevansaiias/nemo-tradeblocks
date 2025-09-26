@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from threading import RLock
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
+from copy import deepcopy
 
 from app.calculations.geekistics import GeekisticsCalculator
 from app.calculations.performance import PerformanceCalculator
@@ -96,10 +97,19 @@ class PortfolioCache:
         return self.get_entry(portfolio_id).portfolio
 
     def get_portfolio_stats(self, portfolio_id: str) -> Dict[str, Any]:
-        return self.get_entry(portfolio_id).portfolio_stats
+        return deepcopy(self.get_entry(portfolio_id).portfolio_stats)
 
     def get_strategy_stats(self, portfolio_id: str) -> Dict[str, Any]:
-        return self.get_entry(portfolio_id).strategy_stats
+        return deepcopy(self.get_entry(portfolio_id).strategy_stats)
+
+    def get_geekistics(self, portfolio_id: str) -> Dict[str, Any]:
+        return deepcopy(self.get_entry(portfolio_id).geekistics)
+
+    def get_performance_data(self, portfolio_id: str) -> Dict[str, Any]:
+        return deepcopy(self.get_entry(portfolio_id).performance)
+
+    def get_margin_data(self, portfolio_id: str) -> Dict[str, Any]:
+        return deepcopy(self.get_entry(portfolio_id).margin)
 
     def get_trades(
         self,

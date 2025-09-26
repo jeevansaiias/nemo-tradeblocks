@@ -1,8 +1,11 @@
 from dash import Input, Output, State, callback, html, ctx, no_update
+from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import base64
 import logging
+import uuid
+from datetime import datetime
 from app.data.models import Trade
 from app.dash_app.layouts.main_layout import (
     create_welcome_content,
@@ -360,15 +363,20 @@ def register_callbacks(app):
             Output("current-portfolio-data", "data"),
             Output("portfolio-filename", "data"),
             Output("trade-upload-feedback", "children"),
+            Output("portfolio-upload-cache", "data", allow_duplicate=True),
+            Output("portfolio-client-meta", "data", allow_duplicate=True),
         ],
         [Input("portfolio-upload", "contents")],
-        [State("portfolio-upload", "filename")],
+        [
+            State("portfolio-upload", "filename"),
+            State("portfolio-client-meta", "data"),
+        ],
         prevent_initial_call=True,
     )
-    def upload_portfolio(contents, filename):
+    def upload_portfolio(contents, filename, meta_state):
         """Handle trade log file upload"""
         if contents is None:
-            return no_update, no_update, ""
+            return no_update, no_update, "", no_update, no_update
 
         try:
             # Decode the file contents
@@ -385,11 +393,41 @@ def register_callbacks(app):
 
             filename_data = {"filename": filename, "total_trades": result["total_trades"]}
 
-            return portfolio_ref, filename_data, success_msg
+            meta_state = meta_state or {}
+            client_key = meta_state.get("client_key") or str(uuid.uuid4())
+            saved_at = datetime.utcnow().isoformat() + "Z"
+            upload_cache_payload = {
+                "client_key": client_key,
+                "filename": filename,
+                "csv_base64": content_string,
+                "portfolio_id": result["portfolio_id"],
+                "summary": {
+                    "total_trades": result["total_trades"],
+                    "total_pl": result["total_pl"],
+                    "upload_timestamp": result.get("upload_timestamp"),
+                },
+                "saved_at": saved_at,
+            }
+
+            updated_meta = {
+                **meta_state,
+                "client_key": client_key,
+                "rehydrated": True,
+                "last_portfolio_id": result["portfolio_id"],
+                "last_saved_at": saved_at,
+            }
+
+            return portfolio_ref, filename_data, success_msg, upload_cache_payload, updated_meta
 
         except Exception as e:
             logger.error(f"Error uploading trade log file: {str(e)}")
-            return no_update, no_update, create_upload_error_message(str(e))
+            return (
+                no_update,
+                no_update,
+                create_upload_error_message(str(e)),
+                no_update,
+                no_update,
+            )
 
     @app.callback(
         [
@@ -397,18 +435,21 @@ def register_callbacks(app):
             Output("daily-log-filename", "data"),
             Output("daily-upload-feedback", "children"),
             Output("daily-log-upload", "children"),
+            Output("daily-log-upload-cache", "data", allow_duplicate=True),
+            Output("portfolio-client-meta", "data", allow_duplicate=True),
         ],
         [Input("daily-log-upload", "contents")],
         [
             State("daily-log-upload", "filename"),
             State("current-portfolio-data", "data"),
+            State("portfolio-client-meta", "data"),
         ],
         prevent_initial_call=True,
     )
-    def upload_daily_log(contents, filename, portfolio_ref):
+    def upload_daily_log(contents, filename, portfolio_ref, meta_state):
         """Handle daily log file upload"""
         if contents is None:
-            return no_update, no_update, "", no_update
+            return no_update, no_update, "", no_update, no_update, no_update
 
         try:
             # Decode the file contents
@@ -450,11 +491,322 @@ def register_callbacks(app):
                 daily_log_data = result["daily_log_data"]
             filename_data = {"filename": filename, "total_entries": result["total_entries"]}
 
-            return daily_log_data, filename_data, success_msg, no_update
+            meta_state = meta_state or {}
+            client_key = meta_state.get("client_key") or str(uuid.uuid4())
+            saved_at = datetime.utcnow().isoformat() + "Z"
+            upload_cache_payload = {
+                "client_key": client_key,
+                "filename": filename,
+                "csv_base64": content_string,
+                "portfolio_id": portfolio_id,
+                "summary": {
+                    "total_entries": result["total_entries"],
+                    "date_range_start": result["date_range_start"],
+                    "date_range_end": result["date_range_end"],
+                },
+                "saved_at": saved_at,
+            }
+
+            updated_meta = {
+                **meta_state,
+                "client_key": client_key,
+                "has_daily_log": True,
+                "last_daily_log_saved_at": saved_at,
+            }
+
+            return (
+                daily_log_data,
+                filename_data,
+                success_msg,
+                no_update,
+                upload_cache_payload,
+                updated_meta,
+            )
 
         except Exception as e:
             logger.error(f"Error uploading daily log file: {str(e)}")
-            return no_update, no_update, create_upload_error_message(str(e)), no_update
+            return (
+                no_update,
+                no_update,
+                create_upload_error_message(str(e)),
+                no_update,
+                no_update,
+                no_update,
+            )
+
+    @app.callback(
+        [
+            Output("current-portfolio-data", "data", allow_duplicate=True),
+            Output("portfolio-filename", "data", allow_duplicate=True),
+            Output("trade-upload-feedback", "children", allow_duplicate=True),
+            Output("portfolio-upload-cache", "data", allow_duplicate=True),
+            Output("portfolio-client-meta", "data", allow_duplicate=True),
+            Output("portfolio-rehydrate-payload", "data", allow_duplicate=True),
+            Output("current-daily-log-data", "data", allow_duplicate=True),
+            Output("daily-log-filename", "data", allow_duplicate=True),
+            Output("daily-upload-feedback", "children", allow_duplicate=True),
+            Output("daily-log-upload", "children", allow_duplicate=True),
+            Output("daily-log-upload-cache", "data", allow_duplicate=True),
+        ],
+        Input("portfolio-rehydrate-payload", "data"),
+        State("portfolio-client-meta", "data"),
+        prevent_initial_call=True,
+    )
+    def rehydrate_portfolio(rehydrate_payload, meta_state):
+        """Rehydrate portfolio/daily log from IndexedDB payload"""
+        if not rehydrate_payload:
+            raise PreventUpdate
+
+        try:
+            portfolio_section = rehydrate_payload.get("portfolio") or {}
+            csv_base64 = portfolio_section.get("csv_base64")
+            filename = portfolio_section.get("filename", "portfolio.csv")
+            client_key = rehydrate_payload.get("client_key") or str(uuid.uuid4())
+
+            if not csv_base64:
+                raise ValueError("Missing portfolio data for rehydration")
+
+            file_content = base64.b64decode(csv_base64).decode("utf-8")
+            result = process_portfolio_upload(file_content, filename)
+
+            portfolio_ref = {"portfolio_id": result["portfolio_id"], "schema": "v2"}
+            filename_data = {"filename": filename, "total_trades": result["total_trades"]}
+            success_msg = create_upload_success_message(
+                filename, result["total_trades"], result["total_pl"]
+            )
+
+            saved_at = datetime.utcnow().isoformat() + "Z"
+            upload_cache_payload = {
+                "client_key": client_key,
+                "filename": filename,
+                "csv_base64": csv_base64,
+                "portfolio_id": result["portfolio_id"],
+                "summary": {
+                    "total_trades": result["total_trades"],
+                    "total_pl": result["total_pl"],
+                    "upload_timestamp": result.get("upload_timestamp"),
+                },
+                "saved_at": saved_at,
+            }
+
+            meta_state = meta_state or {}
+            meta_update = {
+                **meta_state,
+                "client_key": client_key,
+                "rehydrated": True,
+                "rehydrating": False,
+                "last_portfolio_id": result["portfolio_id"],
+                "last_saved_at": saved_at,
+            }
+
+            # Rehydrate daily log if available
+            daily_log_section = rehydrate_payload.get("daily_log") or {}
+            daily_outputs = (no_update, no_update, no_update, no_update, no_update)
+
+            if daily_log_section.get("csv_base64"):
+                dl_csv = base64.b64decode(daily_log_section["csv_base64"]).decode("utf-8")
+                dl_filename = daily_log_section.get("filename", "daily-log.csv")
+                dl_result = process_daily_log_upload(
+                    dl_csv, dl_filename, portfolio_id=result["portfolio_id"]
+                )
+
+                daily_upload_msg = dmc.Alert(
+                    children=[
+                        dmc.Group(
+                            children=[
+                                DashIconify(icon="tabler:check", width=20, height=20),
+                                dmc.Stack(
+                                    children=[
+                                        dmc.Text(f"Restored daily log: {dl_filename}", fw=500),
+                                        dmc.Text(
+                                            f"Loaded {dl_result['total_entries']} daily entries",
+                                            size="sm",
+                                        ),
+                                    ],
+                                    gap="xs",
+                                ),
+                            ],
+                            gap="sm",
+                        )
+                    ],
+                    color="green",
+                    variant="light",
+                )
+
+                daily_log_data = {"portfolio_id": result["portfolio_id"], "schema": "v2"}
+                daily_filename_data = {
+                    "filename": dl_filename,
+                    "total_entries": dl_result["total_entries"],
+                }
+                daily_upload_cache = {
+                    "client_key": client_key,
+                    "filename": dl_filename,
+                    "csv_base64": daily_log_section["csv_base64"],
+                    "portfolio_id": result["portfolio_id"],
+                    "summary": {
+                        "total_entries": dl_result["total_entries"],
+                        "date_range_start": dl_result["date_range_start"],
+                        "date_range_end": dl_result["date_range_end"],
+                    },
+                    "saved_at": saved_at,
+                }
+
+                meta_update.update(
+                    {
+                        "has_daily_log": True,
+                        "last_daily_log_saved_at": saved_at,
+                    }
+                )
+
+                daily_outputs = (
+                    daily_log_data,
+                    daily_filename_data,
+                    daily_upload_msg,
+                    no_update,
+                    daily_upload_cache,
+                )
+
+            return (
+                portfolio_ref,
+                filename_data,
+                success_msg,
+                upload_cache_payload,
+                meta_update,
+                None,
+                *daily_outputs,
+            )
+
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error(f"Error rehydrating portfolio from IndexedDB: {exc}")
+            return (
+                no_update,
+                no_update,
+                create_upload_error_message("Rehydration failed"),
+                no_update,
+                no_update,
+                None,
+                no_update,
+                no_update,
+                create_upload_error_message("Daily log rehydration failed"),
+                no_update,
+                no_update,
+            )
+
+    # Persist portfolio payloads to IndexedDB clientside
+    app.clientside_callback(
+        """
+        async function(payload) {
+            if (!payload || !payload.csv_base64) {
+                return window.dash_clientside.no_update;
+            }
+            if (window.tradeblocksStorage && window.tradeblocksStorage.savePortfolio) {
+                try {
+                    await window.tradeblocksStorage.savePortfolio(payload);
+                } catch (err) {
+                    console.error('Failed to save portfolio to IndexedDB', err);
+                }
+            }
+            return null;
+        }
+        """,
+        Output("portfolio-upload-cache", "data", allow_duplicate=True),
+        Input("portfolio-upload-cache", "data"),
+        prevent_initial_call=True,
+    )
+
+    # Persist daily log payloads to IndexedDB clientside
+    app.clientside_callback(
+        """
+        async function(payload) {
+            if (!payload || !payload.csv_base64) {
+                return window.dash_clientside.no_update;
+            }
+            if (window.tradeblocksStorage && window.tradeblocksStorage.saveDailyLog) {
+                try {
+                    await window.tradeblocksStorage.saveDailyLog(payload);
+                } catch (err) {
+                    console.error('Failed to save daily log to IndexedDB', err);
+                }
+            }
+            return null;
+        }
+        """,
+        Output("daily-log-upload-cache", "data", allow_duplicate=True),
+        Input("daily-log-upload-cache", "data"),
+        prevent_initial_call=True,
+    )
+
+    # Clear IndexedDB when user clears portfolio
+    app.clientside_callback(
+        """
+        async function(action) {
+            if (!action || action.action !== 'clear') {
+                return window.dash_clientside.no_update;
+            }
+            if (window.tradeblocksStorage && window.tradeblocksStorage.clearAll) {
+                try {
+                    await window.tradeblocksStorage.clearAll();
+                } catch (err) {
+                    console.error('Failed to clear IndexedDB cache', err);
+                }
+            }
+            return null;
+        }
+        """,
+        Output("local-cache-actions", "data", allow_duplicate=True),
+        Input("local-cache-actions", "data"),
+        prevent_initial_call=True,
+    )
+
+    # Bootstrap rehydration on page load if server cache is empty
+    app.clientside_callback(
+        """
+        async function(portfolioRef, meta) {
+            const storage = window.tradeblocksStorage;
+            const currentMeta = meta || {};
+            if (!storage || !storage.getLatestPayload) {
+                return [window.dash_clientside.no_update, currentMeta];
+            }
+
+            if (currentMeta.rehydrating) {
+                return [window.dash_clientside.no_update, currentMeta];
+            }
+
+            const latest = await storage.getLatestPayload();
+            if (!latest) {
+                return [window.dash_clientside.no_update, currentMeta];
+            }
+
+            const serverId = portfolioRef && portfolioRef.portfolio_id;
+            if (serverId) {
+                try {
+                    const res = await fetch(`/api/v1/portfolio/${serverId}/stats`, { credentials: 'same-origin' });
+                    if (res && res.ok) {
+                        return [window.dash_clientside.no_update, { ...currentMeta, client_key: latest.client_key, rehydrated: true }];
+                    }
+                } catch (err) {
+                    console.debug('Portfolio stats fetch failed, attempting rehydrate', err);
+                }
+            }
+
+            return [
+                {
+                    client_key: latest.client_key,
+                    portfolio: latest.portfolio,
+                    daily_log: latest.daily_log,
+                },
+                { ...currentMeta, client_key: latest.client_key, rehydrating: true },
+            ];
+        }
+        """,
+        [
+            Output("portfolio-rehydrate-payload", "data", allow_duplicate=True),
+            Output("portfolio-client-meta", "data", allow_duplicate=True),
+        ],
+        Input("current-portfolio-data", "data"),
+        State("portfolio-client-meta", "data"),
+        prevent_initial_call="initial_duplicate",
+    )
 
     @app.callback(
         [
@@ -603,7 +955,29 @@ def register_callbacks(app):
         try:
             portfolio_payload, portfolio_id = resolve_portfolio_payload(portfolio_data)
             if not portfolio_payload:
-                raise ValueError("Portfolio payload unavailable")
+                logger.info("Portfolio payload missing for geekistics tab; prompting re-upload")
+                return (
+                    dmc.Center(
+                        dmc.Stack(
+                            [
+                                dmc.Text(
+                                    "We've changed how we cache your portfolio data in your browser.",
+                                    c="orange",
+                                    size="lg",
+                                    fw=600,
+                                ),
+                                dmc.Text(
+                                    "Please re-upload your trade log to continue.",
+                                    c="dimmed",
+                                ),
+                            ],
+                            gap="xs",
+                            align="center",
+                        ),
+                        style={"height": "400px"},
+                    ),
+                    [],
+                )
 
             daily_log_payload = resolve_daily_log_payload(daily_log_data, portfolio_id)
 
@@ -676,7 +1050,10 @@ def register_callbacks(app):
             return []
         try:
             payload, _ = resolve_portfolio_payload(portfolio_data)
-            trades = payload.get("trades", []) if payload else []
+            if not payload:
+                logger.info("Portfolio payload missing for performance filter options")
+                return []
+            trades = payload.get("trades", [])
             strategies = sorted(
                 list({t.get("strategy", "") for t in trades if isinstance(t, dict)})
             )
@@ -746,7 +1123,35 @@ def register_callbacks(app):
 
             payload, _ = resolve_portfolio_payload(portfolio_data)
             if not payload:
-                raise ValueError("Portfolio payload unavailable")
+                logger.info("Portfolio payload missing; prompting re-upload for performance tab")
+                notice = dmc.Stack(
+                    [
+                        dmc.Text(
+                            "We've changed how we cache your portfolio data in your browser.",
+                            c="orange",
+                            fw=600,
+                        ),
+                        dmc.Text(
+                            "Please re-upload your files to refresh the analytics.", c="dimmed"
+                        ),
+                    ],
+                    gap="xs",
+                )
+                mocks = get_mock_charts()
+                return (
+                    notice,
+                    mocks["equity_curve"],
+                    mocks["drawdown"],
+                    mocks["day_of_week"],
+                    mocks["rom_distribution"],
+                    mocks["streak_distribution"],
+                    generate_streak_statistics_group({}),
+                    mocks["monthly_heatmap"],
+                    mocks["trade_sequence"],
+                    mocks["rom_timeline"],
+                    mocks["rolling_metrics"],
+                    mocks["risk_evolution"],
+                )
 
             # Convert dicts to Trade objects
             all_trades_data = payload.get("trades", []) if isinstance(payload, dict) else []
@@ -906,7 +1311,12 @@ def register_callbacks(app):
         try:
             payload, _ = resolve_portfolio_payload(portfolio_data)
             if not payload:
-                raise ValueError("Portfolio payload unavailable")
+                logger.info("Portfolio payload missing for trade data tab; prompting re-upload")
+                message = dmc.Text(
+                    "Please re-upload your trade log to view trade history.",
+                    c="dimmed",
+                )
+                return message, [], []
 
             all_trades = payload.get("trades", [])
 
@@ -980,6 +1390,10 @@ def register_callbacks(app):
             Output("portfolio-filename", "data", allow_duplicate=True),
             Output("current-daily-log-data", "data", allow_duplicate=True),
             Output("daily-log-filename", "data", allow_duplicate=True),
+            Output("portfolio-upload-cache", "data", allow_duplicate=True),
+            Output("daily-log-upload-cache", "data", allow_duplicate=True),
+            Output("portfolio-client-meta", "data", allow_duplicate=True),
+            Output("local-cache-actions", "data", allow_duplicate=True),
         ],
         [Input("clear-confirm-button", "n_clicks")],
         prevent_initial_call=True,
@@ -987,8 +1401,26 @@ def register_callbacks(app):
     def clear_portfolio(n_clicks):
         """Clear portfolio and daily log data from localStorage"""
         if n_clicks:
-            return None, None, None, None
-        return no_update, no_update, no_update, no_update
+            return (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                {},
+                {"action": "clear"},
+            )
+        return (
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+        )
 
     # Disclaimer modal callback
     @app.callback(
