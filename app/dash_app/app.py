@@ -7,6 +7,7 @@ from flask_cors import CORS
 from app.dash_app.callbacks.portfolio_callbacks import register_callbacks
 from app.dash_app.layouts.main_layout import create_main_layout
 from app.dash_app.components.tabs.position_sizing import create_position_sizing_tab
+from app.dash_app.components.tabs.performance_charts import create_performance_charts_tab
 
 
 def create_dash_app():
@@ -158,6 +159,13 @@ def create_dash_app():
             dcc.Store(id="current-daily-log-data", storage_type="local"),
             dcc.Store(id="daily-log-filename", storage_type="local"),
             dcc.Store(id="theme-store", storage_type="local", data={"theme": "auto"}),
+            dcc.Store(id="portfolio-upload-cache", storage_type="memory"),
+            dcc.Store(id="daily-log-upload-cache", storage_type="memory"),
+            dcc.Store(id="portfolio-rehydrate-payload", storage_type="memory"),
+            dcc.Store(id="daily-log-rehydrate-payload", storage_type="memory"),
+            dcc.Store(id="portfolio-client-meta", storage_type="local", data={}),
+            dcc.Store(id="local-cache-actions", storage_type="memory"),
+            dcc.Store(id="performance-cache", storage_type="memory"),
             # Hidden div for theme callback output
             html.Div(id="theme-output", style={"display": "none"}),
             # Main layout
@@ -174,7 +182,8 @@ def create_dash_app():
     validation_components = html.Div(
         style={"display": "none"},
         children=[
-            # Placeholder components are now handled in main_layout.py
+            create_position_sizing_tab(),
+            create_performance_charts_tab(),
         ],
     )
 

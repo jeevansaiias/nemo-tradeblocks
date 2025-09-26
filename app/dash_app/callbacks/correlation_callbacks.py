@@ -23,6 +23,7 @@ from typing import Dict, List, Any
 
 from app.calculations.correlation import CorrelationCalculator
 from app.data.processor import PortfolioProcessor
+from app.services.portfolio_service import resolve_portfolio_payload
 
 logger = logging.getLogger(__name__)
 
@@ -911,11 +912,12 @@ def register_correlation_callbacks(app):
             )
 
         try:
-            # Extract trades data from portfolio
+            payload, _ = resolve_portfolio_payload(portfolio_data)
             trades_data = []
-            if isinstance(portfolio_data, dict) and "trades" in portfolio_data:
-                trades_data = portfolio_data["trades"]
+            if payload and isinstance(payload, dict):
+                trades_data = payload.get("trades", [])
             elif isinstance(portfolio_data, list):
+                # Fallback for legacy direct list inputs
                 trades_data = portfolio_data
 
             if not trades_data:

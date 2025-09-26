@@ -27,6 +27,7 @@ from app.calculations.position_sizing import (
 from app.utils.theme import apply_theme_layout, get_theme_colors
 from app.data.models import Portfolio
 from app.dash_app.components.common import create_info_tooltip
+from app.services.portfolio_service import resolve_portfolio_payload, resolve_daily_log_payload
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +42,20 @@ def _infer_starting_capital(
     if not portfolio_data:
         return None
 
-    trades = portfolio_data.get("trades") or []
+    payload, portfolio_id = resolve_portfolio_payload(portfolio_data)
+    if not payload:
+        return None
+
+    trades = payload.get("trades") or []
+
+    daily_payload = resolve_daily_log_payload(daily_log_data, portfolio_id)
 
     try:
         daily_entries = None
-        if isinstance(daily_log_data, dict):
-            daily_entries = daily_log_data.get("entries")
-        elif isinstance(daily_log_data, list):
-            daily_entries = daily_log_data
+        if isinstance(daily_payload, dict):
+            daily_entries = daily_payload.get("entries")
+        elif isinstance(daily_payload, list):
+            daily_entries = daily_payload
 
         if daily_entries:
             capital = get_initial_capital_from_daily_log(daily_entries)
@@ -150,9 +157,17 @@ def register_position_sizing_callbacks(app):
                 variant="light",
             )
 
+        payload, _ = resolve_portfolio_payload(portfolio_data)
+        if not payload:
+            return dmc.Alert(
+                "Portfolio data unavailable. Try re-uploading your trades.",
+                color="gray",
+                variant="light",
+            )
+
         # Collect unique strategies from the portfolio
         strategies = set()
-        trades = portfolio_data.get("trades", []) or []
+        trades = payload.get("trades", []) or []
         for trade in trades:
             strategy = extract_strategy_name(trade)
             if strategy and strategy != "Uncategorized":
@@ -165,7 +180,6 @@ def register_position_sizing_callbacks(app):
                 variant="light",
             )
 
-        trades = portfolio_data.get("trades") or []
         trade_counts: Dict[str, int] = defaultdict(int)
         for trade in trades:
             strategy_name = extract_strategy_name(trade)
@@ -287,6 +301,8 @@ def register_position_sizing_callbacks(app):
         State("current-daily-log-data", "data"),
         State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "value"),
         State({"type": "ps-strategy-kelly-input", "strategy": ALL}, "id"),
+        State("ps-results-container", "id"),
+        State("ps-margin-card-container", "id"),
         prevent_initial_call=True,
     )
     def run_strategy_analysis(
@@ -299,6 +315,8 @@ def register_position_sizing_callbacks(app):
         daily_log_data,
         strategy_kelly_values,
         strategy_kelly_ids,
+        _results_container_id,
+        _margin_container_id,
     ):
         placeholder_fig = _blank_margin_figure(theme_data)
 
@@ -325,8 +343,12 @@ def register_position_sizing_callbacks(app):
                 "Adjust Kelly inputs and click Run Allocation to calculate metrics."
             )
 
+        payload, portfolio_id = resolve_portfolio_payload(portfolio_data)
+        if not payload:
+            return _empty_outputs("Portfolio data unavailable. Try re-uploading your trades.")
+
         try:
-            portfolio = Portfolio(**portfolio_data)
+            portfolio = Portfolio(**payload)
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("Error deserializing portfolio for Kelly analysis: %s", exc)
             return _empty_outputs(f"Error reading portfolio: {exc}")
@@ -357,6 +379,8 @@ def register_position_sizing_callbacks(app):
 
         margin_mode = margin_calc_mode if margin_calc_mode else "fixed"
 
+        daily_payload = resolve_daily_log_payload(daily_log_data, portfolio_id)
+
         calc_result: PositionSizingCalculations = calculate_position_sizing(
             trades,
             starting_capital,
@@ -364,7 +388,7 @@ def register_position_sizing_callbacks(app):
             strategy_kelly_values,
             strategy_kelly_ids,
             margin_mode,
-            daily_log_data,
+            daily_payload,
         )
 
         portfolio_metrics = calc_result.portfolio_metrics
