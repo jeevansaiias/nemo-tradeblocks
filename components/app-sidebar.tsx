@@ -18,10 +18,8 @@ import {
 } from "@tabler/icons-react"
 
 import { SidebarActiveBlocks } from "@/components/sidebar-active-blocks"
+import { SidebarFooterLegal } from "@/components/sidebar-footer-legal"
 import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
-import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -33,11 +31,6 @@ import {
 } from "@/components/ui/sidebar"
 
 const navData = {
-  user: {
-    name: "TradeBlocks Studio",
-    email: "hi@tradeblocks.dev",
-    avatar: "/tradeblocks-logo.png",
-  },
   navMain: [
     {
       title: "Block Stats",
@@ -65,6 +58,11 @@ const navData = {
       icon: IconChartHistogram,
     },
     {
+      title: "Trade Blocks",
+      href: "/trade-blocks",
+      icon: IconStack2,
+    },
+    {
       title: "Capital Blocks",
       href: "/capital-blocks",
       icon: IconBarbell,
@@ -76,13 +74,6 @@ const navData = {
       icon: IconSparkles,
       soon: true,
     },
-    {
-      title: "Trade Blocks",
-      href: "/trade-blocks",
-      icon: IconStack2,
-    },
-  ],
-  navSecondary: [
     {
       title: "Upload Center",
       href: "/uploads",
@@ -171,15 +162,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={navData.navMain} />
         <SidebarActiveBlocks sets={navData.activeSets} />
-        <div className="group-data-[collapsible=icon]:hidden">
-          <Button asChild variant="outline" className="mt-3 w-full justify-center">
-            <Link href="/uploads">Upload New Logs</Link>
-          </Button>
-        </div>
-        <NavSecondary items={navData.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={navData.user} />
+        <SidebarFooterLegal />
       </SidebarFooter>
     </Sidebar>
   )
