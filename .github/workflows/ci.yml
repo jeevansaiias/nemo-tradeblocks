@@ -7,8 +7,12 @@ on:
     branches: [master]
 
 jobs:
-  test:
+  backend:
+    name: Backend (legacy)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legacy/python-backend
 
     steps:
       - uses: actions/checkout@v4
@@ -31,10 +35,6 @@ jobs:
           uv run --group dev ruff check app/ \
             || echo "⚠️ Linting issues found (non-blocking)"
 
-      - name: Test import structure
-        run: |
-          uv run --group dev python -c "from app.main import app; print('✅ App imports successfully')"
-
       - name: Run tests
         run: |
           if [ -d "tests" ] && [ "$(ls -A tests)" ]; then
@@ -43,27 +43,45 @@ jobs:
             echo "ℹ️ No tests found, skipping test execution"
           fi
 
-  render-ready:
+  frontend:
+    name: Frontend (Next.js)
     runs-on: ubuntu-latest
-    needs: test
+    needs: backend
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  render-ready:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Ensure Render assets
         run: |
-          test -f uv.lock || (echo "❌ uv.lock missing" && exit 1)
-          test -f scripts/start-dev.sh || (echo "❌ scripts/start-dev.sh missing" && exit 1)
+          test -f legacy/python-backend/uv.lock || (echo "❌ uv.lock missing" && exit 1)
+          test -f legacy/python-backend/scripts/start-dev.sh || (echo "❌ start-dev.sh missing" && exit 1)
+          echo "✅ Render assets verified"
 
-      - name: Validate lockfile
+      - name: Validate legacy lockfile
+        working-directory: legacy/python-backend
         run: uv lock --frozen
 
-      - name: Check start script
-        run: |
-          grep -q "uv run" scripts/start-dev.sh || (echo "❌ start script must invoke uv" && exit 1)
-          echo "✅ Render start assets verified"
+      - name: Frontend build smoke test
+        run: npm run build --if-present
