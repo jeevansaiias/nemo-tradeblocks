@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import uuid
 import logging
-from typing import Any, Dict, List, Optional
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.calculations.geekistics import GeekisticsCalculator
 from app.calculations.performance import PerformanceCalculator
@@ -16,7 +17,7 @@ from app.calculations.trade_analysis import TradeAnalysisCalculator
 from app.data.daily_log_processor import DailyLogProcessor
 from app.data.models import DailyLog, Portfolio, PortfolioStats, StrategyStats
 from app.data.processor import PortfolioProcessor
-from app.services.portfolio_cache import portfolio_cache
+from app.services.portfolio_cache import portfolio_cache, PortfolioCacheEntry
 
 # Stateless processors / calculators reused across application surfaces.
 processor = PortfolioProcessor()
@@ -26,6 +27,8 @@ trade_analysis_calc = TradeAnalysisCalculator()
 
 # Simple in-memory store that mimics the behaviour of the FastAPI layer.
 portfolios_store: Dict[str, Portfolio] = {}
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_portfolio(portfolio_like: Any) -> Portfolio:
@@ -55,7 +58,6 @@ def process_portfolio_upload(file_content: str, filename: str) -> Dict[str, Any]
     try:
         portfolio_cache.store_portfolio(portfolio_id, portfolio)
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger = logging.getLogger(__name__)
         logger.warning("Failed to cache portfolio %s: %s", portfolio_id, exc)
 
     return {
@@ -69,10 +71,24 @@ def process_portfolio_upload(file_content: str, filename: str) -> Dict[str, Any]
     }
 
 
-def process_daily_log_upload(file_content: str, filename: str) -> Dict[str, Any]:
-    """Parse a daily log CSV and return summary payload."""
+def process_daily_log_upload(
+    file_content: str, filename: str, portfolio_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Parse a daily log CSV, optionally attach to cached portfolio, and return summary payload."""
     daily_log = daily_log_processor.parse_csv(file_content, filename)
-    response = {
+
+    if portfolio_id:
+        try:
+            portfolio_cache.update_daily_log(portfolio_id, daily_log)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Failed to cache daily log %s for portfolio %s: %s",
+                filename,
+                portfolio_id,
+                exc,
+            )
+
+    return {
         "daily_log_data": daily_log.model_dump(),
         "filename": filename,
         "total_entries": daily_log.total_entries,
@@ -82,9 +98,6 @@ def process_daily_log_upload(file_content: str, filename: str) -> Dict[str, Any]
         "max_drawdown": daily_log.max_drawdown,
         "upload_timestamp": daily_log.upload_timestamp.isoformat(),
     }
-
-    # Cache integration will require portfolio context; placeholder hook retained.
-    return response
 
 
 def calculate_portfolio_stats_dict(
@@ -278,3 +291,80 @@ def get_trades_from_store(
 def clear_portfolios_store() -> None:
     portfolios_store.clear()
     portfolio_cache.clear()
+
+
+def _hydrate_cache_entry(portfolio_id: str) -> PortfolioCacheEntry:
+    try:
+        return portfolio_cache.get_entry(portfolio_id)
+    except KeyError:
+        portfolio = get_portfolio_from_store(portfolio_id)
+        portfolio_cache.store_portfolio(portfolio_id, portfolio)
+        return portfolio_cache.get_entry(portfolio_id)
+
+
+def resolve_portfolio_payload(
+    portfolio_like: Any,
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Return a portfolio payload dict regardless of input shape."""
+
+    if not portfolio_like:
+        return None, None
+
+    if isinstance(portfolio_like, Portfolio):
+        payload = portfolio_like.model_dump()
+        return payload, getattr(portfolio_like, "portfolio_id", None)
+
+    if isinstance(portfolio_like, dict):
+        if "trades" in portfolio_like:
+            return deepcopy(portfolio_like), portfolio_like.get("portfolio_id")
+
+        portfolio_id = portfolio_like.get("portfolio_id")
+        if portfolio_id:
+            entry = _hydrate_cache_entry(portfolio_id)
+            return deepcopy(entry.portfolio_payload), portfolio_id
+
+    if isinstance(portfolio_like, str):
+        entry = _hydrate_cache_entry(portfolio_like)
+        return deepcopy(entry.portfolio_payload), portfolio_like
+
+    return None, None
+
+
+def resolve_daily_log_payload(
+    daily_log_like: Optional[Any], portfolio_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Return a daily log payload dict regardless of input shape."""
+
+    if not daily_log_like and not portfolio_id:
+        return None
+
+    if isinstance(daily_log_like, DailyLog):
+        return daily_log_like.model_dump()
+
+    if isinstance(daily_log_like, dict) and "entries" in daily_log_like:
+        return deepcopy(daily_log_like)
+
+    if portfolio_id:
+        try:
+            entry = _hydrate_cache_entry(portfolio_id)
+        except KeyError:
+            return None
+        if entry.daily_log_payload:
+            return deepcopy(entry.daily_log_payload)
+
+    return None
+
+
+def build_filtered_portfolio_payload(
+    base_payload: Dict[str, Any], trades: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Clone a portfolio payload and overwrite summary fields for filtered trades."""
+
+    filtered = deepcopy(base_payload)
+    filtered["trades"] = trades
+    filtered["total_trades"] = len(trades)
+    filtered["total_pl"] = sum(trade.get("pl", 0) for trade in trades)
+    filtered["strategies"] = sorted(
+        {trade.get("strategy", "") for trade in trades if trade.get("strategy")}
+    )
+    return filtered

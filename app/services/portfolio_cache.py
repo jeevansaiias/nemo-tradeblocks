@@ -26,6 +26,7 @@ class PortfolioCacheEntry:
     """Container for cached portfolio analytics."""
 
     portfolio: Portfolio
+    portfolio_payload: Dict[str, Any]
     trades_data: List[Dict[str, Any]]
     geekistics: Dict[str, Any]
     portfolio_stats: Dict[str, Any]
@@ -33,8 +34,9 @@ class PortfolioCacheEntry:
     margin: Dict[str, Any]
     strategy_stats: Dict[str, Any]
     trade_lookup: Dict[str, Any]
+    daily_log: Optional[DailyLog] = None
+    daily_log_payload: Optional[Dict[str, Any]] = None
     created_at: float = field(default_factory=time.time)
-    daily_log_data: Optional[List[Dict[str, Any]]] = None
 
 
 class PortfolioCache:
@@ -60,6 +62,9 @@ class PortfolioCache:
         """Compute analytics for the portfolio and cache the results."""
         with self._lock:
             entry = self._build_entry(portfolio, daily_log)
+            entry.portfolio_payload.setdefault("portfolio_id", portfolio_id)
+            if entry.daily_log_payload is not None:
+                entry.daily_log_payload.setdefault("portfolio_id", portfolio_id)
             self._entries.pop(portfolio_id, None)
             self._entries[portfolio_id] = entry
             self._evict_expired_locked()
@@ -73,6 +78,9 @@ class PortfolioCache:
                 return
             portfolio = entry.portfolio
             refreshed = self._build_entry(portfolio, daily_log)
+            refreshed.portfolio_payload.setdefault("portfolio_id", portfolio_id)
+            if refreshed.daily_log_payload is not None:
+                refreshed.daily_log_payload.setdefault("portfolio_id", portfolio_id)
             self._entries[portfolio_id] = refreshed
 
     def get_entry(self, portfolio_id: str) -> PortfolioCacheEntry:
@@ -126,14 +134,13 @@ class PortfolioCache:
         self, portfolio: Portfolio, daily_log: Optional[DailyLog]
     ) -> PortfolioCacheEntry:
         trades_data = [trade.model_dump() for trade in portfolio.trades]
-        daily_log_data = (
-            [entry.model_dump() for entry in daily_log.entries] if daily_log is not None else None
-        )
+        portfolio_payload = portfolio.model_dump()
+        daily_log_payload = daily_log.model_dump() if daily_log is not None else None
 
         geekistics: Dict[str, Any] = {}
         try:
             geekistics = GeekisticsCalculator().calculate_all_geekistics_stats(
-                trades_data, daily_log_data
+                trades_data, daily_log_payload.get("entries") if daily_log_payload else None
             )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Geekistics precompute failed: %s", exc)
@@ -184,6 +191,7 @@ class PortfolioCache:
 
         return PortfolioCacheEntry(
             portfolio=portfolio,
+            portfolio_payload=portfolio_payload,
             trades_data=trades_data,
             geekistics=geekistics,
             portfolio_stats=portfolio_stats,
@@ -191,7 +199,8 @@ class PortfolioCache:
             margin=margin,
             strategy_stats=strategy_stats,
             trade_lookup={"trades": trades_data},
-            daily_log_data=daily_log_data,
+            daily_log=daily_log,
+            daily_log_payload=daily_log_payload,
         )
 
     def _evict_expired_locked(self) -> None:

@@ -22,6 +22,7 @@ from app.calculations.shared import (
 from app.data.models import Portfolio, Trade, MonteCarloRequest
 from app.utils.theme import get_theme_colors, apply_theme_layout
 from app.dash_app.components.tabs.risk_simulator import get_monte_carlo_placeholder_state
+from app.services.portfolio_service import resolve_portfolio_payload, resolve_daily_log_payload
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +84,12 @@ def register_monte_carlo_callbacks(app):
             return default_strategy_options, 100000  # Default capital
 
         try:
+            payload, portfolio_id = resolve_portfolio_payload(portfolio_data)
+            if not payload:
+                raise ValueError("Portfolio payload unavailable")
+
             # Parse portfolio data
-            portfolio = Portfolio.model_validate(portfolio_data)
+            portfolio = Portfolio.model_validate(payload)
             strategies = portfolio.strategies
 
             # Calculate initial capital from the data
@@ -100,10 +105,14 @@ def register_monte_carlo_callbacks(app):
                 trades_data.append(trade_dict)
 
             # Calculate initial capital using existing function
-            if daily_log_data:
+            daily_payload = resolve_daily_log_payload(daily_log_data, portfolio_id)
+
+            if daily_payload and isinstance(daily_payload, dict):
                 try:
                     # Use daily log if available (more accurate)
-                    initial_capital = get_initial_capital_from_daily_log(daily_log_data)
+                    initial_capital = get_initial_capital_from_daily_log(
+                        daily_payload.get("entries", [])
+                    )
                 except Exception:
                     # Fallback to trade data
                     initial_capital = calculate_initial_capital_from_trades(trades_data)
@@ -299,8 +308,12 @@ def register_monte_carlo_callbacks(app):
             return no_update
 
         try:
+            payload, portfolio_id = resolve_portfolio_payload(portfolio_data)
+            if not payload:
+                return build_placeholder_response(theme_data)
+
             # Parse portfolio data
-            portfolio = Portfolio.model_validate(portfolio_data)
+            portfolio = Portfolio.model_validate(payload)
 
             # Determine strategy filter
             strategy_filter = None

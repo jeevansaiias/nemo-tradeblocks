@@ -58,6 +58,9 @@ from app.services.portfolio_service import (
     calculate_trades_dict,
     process_daily_log_upload,
     process_portfolio_upload,
+    resolve_portfolio_payload,
+    resolve_daily_log_payload,
+    build_filtered_portfolio_payload,
 )
 
 logger = logging.getLogger(__name__)
@@ -374,7 +377,7 @@ def register_callbacks(app):
             file_content = decoded.decode("utf-8")
 
             result = process_portfolio_upload(file_content, filename)
-            portfolio_data = result["portfolio_data"]
+            portfolio_ref = {"portfolio_id": result["portfolio_id"], "schema": "v2"}
 
             success_msg = create_upload_success_message(
                 filename, result["total_trades"], result["total_pl"]
@@ -382,7 +385,7 @@ def register_callbacks(app):
 
             filename_data = {"filename": filename, "total_trades": result["total_trades"]}
 
-            return portfolio_data, filename_data, success_msg
+            return portfolio_ref, filename_data, success_msg
 
         except Exception as e:
             logger.error(f"Error uploading trade log file: {str(e)}")
@@ -396,10 +399,13 @@ def register_callbacks(app):
             Output("daily-log-upload", "children"),
         ],
         [Input("daily-log-upload", "contents")],
-        [State("daily-log-upload", "filename")],
+        [
+            State("daily-log-upload", "filename"),
+            State("current-portfolio-data", "data"),
+        ],
         prevent_initial_call=True,
     )
-    def upload_daily_log(contents, filename):
+    def upload_daily_log(contents, filename, portfolio_ref):
         """Handle daily log file upload"""
         if contents is None:
             return no_update, no_update, "", no_update
@@ -410,7 +416,11 @@ def register_callbacks(app):
             decoded = base64.b64decode(content_string)
             file_content = decoded.decode("utf-8")
 
-            result = process_daily_log_upload(file_content, filename)
+            portfolio_id = None
+            if isinstance(portfolio_ref, dict):
+                portfolio_id = portfolio_ref.get("portfolio_id")
+
+            result = process_daily_log_upload(file_content, filename, portfolio_id=portfolio_id)
 
             success_msg = dmc.Alert(
                 children=[
@@ -434,7 +444,10 @@ def register_callbacks(app):
                 variant="light",
             )
 
-            daily_log_data = result["daily_log_data"]
+            if portfolio_id:
+                daily_log_data = {"portfolio_id": portfolio_id, "schema": "v2"}
+            else:
+                daily_log_data = result["daily_log_data"]
             filename_data = {"filename": filename, "total_entries": result["total_entries"]}
 
             return daily_log_data, filename_data, success_msg, no_update
@@ -588,8 +601,13 @@ def register_callbacks(app):
             )
 
         try:
-            trades_response = calculate_trades_dict(portfolio_data)
-            all_trades_data = trades_response.get("trades", [])
+            portfolio_payload, portfolio_id = resolve_portfolio_payload(portfolio_data)
+            if not portfolio_payload:
+                raise ValueError("Portfolio payload unavailable")
+
+            daily_log_payload = resolve_daily_log_payload(daily_log_data, portfolio_id)
+
+            all_trades_data = portfolio_payload.get("trades", []) or []
 
             all_strategies = list(set(trade.get("strategy", "") for trade in all_trades_data))
             strategy_options = [
@@ -606,19 +624,20 @@ def register_callbacks(app):
                     if trade.get("strategy") in selected_strategies
                 ]
 
-            filtered_portfolio_data = portfolio_data.copy()
-            filtered_portfolio_data["trades"] = filtered_trades
+            filtered_portfolio_data = build_filtered_portfolio_payload(
+                portfolio_payload, filtered_trades
+            )
 
             portfolio_stats = calculate_portfolio_stats_dict(
                 filtered_portfolio_data,
-                daily_log_payload=daily_log_data,
+                daily_log_payload=daily_log_payload,
                 is_filtered=is_filtered,
             )
             strategy_stats = calculate_strategy_stats_dict(filtered_portfolio_data)
 
             advanced_stats_request = {
                 "portfolio_data": filtered_portfolio_data,
-                "daily_log_data": daily_log_data,
+                "daily_log_data": daily_log_payload,
                 "config": {"risk_free_rate": risk_free_rate or 2.0, "annualization_factor": 252},
                 "is_filtered": is_filtered,
             }
@@ -656,7 +675,8 @@ def register_callbacks(app):
         if not portfolio_data:
             return []
         try:
-            trades = portfolio_data.get("trades", []) if isinstance(portfolio_data, dict) else []
+            payload, _ = resolve_portfolio_payload(portfolio_data)
+            trades = payload.get("trades", []) if payload else []
             strategies = sorted(
                 list({t.get("strategy", "") for t in trades if isinstance(t, dict)})
             )
@@ -724,10 +744,12 @@ def register_callbacks(app):
                     mocks["risk_evolution"],
                 )
 
+            payload, _ = resolve_portfolio_payload(portfolio_data)
+            if not payload:
+                raise ValueError("Portfolio payload unavailable")
+
             # Convert dicts to Trade objects
-            all_trades_data = (
-                portfolio_data.get("trades", []) if isinstance(portfolio_data, dict) else []
-            )
+            all_trades_data = payload.get("trades", []) if isinstance(payload, dict) else []
             trades = []
             for t in all_trades_data:
                 try:
@@ -882,9 +904,11 @@ def register_callbacks(app):
             return "", [], []
 
         try:
-            request_data = portfolio_data.copy()
-            trades_response = calculate_trades_dict(request_data)
-            all_trades = trades_response.get("trades", [])
+            payload, _ = resolve_portfolio_payload(portfolio_data)
+            if not payload:
+                raise ValueError("Portfolio payload unavailable")
+
+            all_trades = payload.get("trades", [])
 
             if strategy_filter:
                 trades_data = [

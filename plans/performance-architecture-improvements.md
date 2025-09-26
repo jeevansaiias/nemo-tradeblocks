@@ -22,8 +22,8 @@ Cut CPU spikes and memory growth on the Render Free plan (1 vCPU / 2 GB RAM) w
 - [x] Expose lightweight fetch helpers that return slices by key instead of recomputing.
 
 ### 2. Callback Payload Slimming
-- [ ] Switch Dash stores from full JSON payloads to a lightweight `{ "portfolio_id": ..., "filters": ... }` shape.
-- [ ] Update callbacks to call the cache helpers and only return the data needed for the figure/table being updated.
+- [x] Switch Dash stores from full JSON payloads to a lightweight `{ "portfolio_id": ..., "filters": ... }` shape.
+- [x] Update callbacks to call the cache helpers and only return the data needed for the figure/table being updated.
 - [ ] Add clientside filtering (e.g., strategy dropdown) where possible so the server avoids needless round-trips.
 
 ### 3. Calculator Reuse & Memoization
@@ -53,7 +53,7 @@ Cut CPU spikes and memory growth on the Render Free plan (1 vCPU / 2 GB RAM) w
 
 ## Next Actions (Week 1)
 1. ✅ Prototype cache service in-memory with TTL + size cap (cached analytics now generated on upload).
-2. Shift Dash stores/callbacks to ID-only payloads and pull data from the cache.
+2. ✅ Shift Dash stores/callbacks to ID-only payloads and pull data from the cache.
 3. Reuse calculator instances and strip redundant Geekistics/performance runs.
 4. Profile upload path with pandas vs Polars on sample OptionOmega exports.
 5. Wire up timing/logging around caches and callbacks for regression detection.
