@@ -5,76 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useBlockStore, type Block } from "@/lib/stores/block-store";
 import { Activity, Calendar, Grid3X3, List, Plus, Search } from "lucide-react";
 import { useState } from "react";
-
-// Mock data - will be replaced with real data later
-const mockBlocks = [
-  {
-    id: "2025-demo",
-    name: "2025 Over 100k Trials",
-    description: "High-volume testing with over 100k trial runs",
-    isActive: true,
-    created: new Date("2025-01-15"),
-    lastModified: new Date("2025-09-18"),
-    tradeLog: {
-      fileName: "2025-Over-100k-With-Trial-Tests.csv",
-      rowCount: 749,
-      fileSize: 1.2 * 1024 * 1024,
-    },
-    dailyLog: {
-      fileName: "2025-Over-100k-With-Trial-Tests (1).csv",
-      rowCount: 178,
-      fileSize: 0.3 * 1024 * 1024,
-    },
-  },
-  {
-    id: "2024-swing",
-    name: "2024 Swing Book",
-    description: "Swing trading strategy performance for 2024",
-    isActive: false,
-    created: new Date("2024-01-01"),
-    lastModified: new Date("2025-08-02"),
-    tradeLog: {
-      fileName: "2024-Swing-Trades.csv",
-      rowCount: 553,
-      fileSize: 0.9 * 1024 * 1024,
-    },
-    dailyLog: {
-      fileName: "2024-Swing-Notes.csv",
-      rowCount: 211,
-      fileSize: 0.2 * 1024 * 1024,
-    },
-  },
-  {
-    id: "scalp-tests",
-    name: "Scalp Tests",
-    description: "Short-term scalping experiments",
-    isActive: false,
-    created: new Date("2025-03-10"),
-    lastModified: new Date("2025-07-15"),
-    tradeLog: {
-      fileName: "Scalp-Tests.csv",
-      rowCount: 234,
-      fileSize: 0.4 * 1024 * 1024,
-    },
-  },
-];
 
 function BlockCard({
   block,
   onEdit,
 }: {
-  block: (typeof mockBlocks)[0];
-  onEdit: (block: (typeof mockBlocks)[0]) => void;
+  block: Block;
+  onEdit: (block: Block) => void;
 }) {
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
+  const setActiveBlock = useBlockStore(state => state.setActiveBlock);
 
   const formatDate = (date: Date) =>
     new Intl.DateTimeFormat("en-US", {
@@ -131,7 +73,11 @@ function BlockCard({
         {/* Actions */}
         <div className="flex gap-2 pt-2">
           {!block.isActive && (
-            <Button size="sm" className="flex-1">
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={() => setActiveBlock(block.id)}
+            >
               Activate
             </Button>
           )}
@@ -150,11 +96,10 @@ function BlockCard({
 }
 
 export default function BlockManagementPage() {
+  const blocks = useBlockStore(state => state.blocks);
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"new" | "edit">("new");
-  const [selectedBlock, setSelectedBlock] = useState<
-    (typeof mockBlocks)[0] | null
-  >(null);
+  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
 
   const handleNewBlock = () => {
     setDialogMode("new");
@@ -162,7 +107,7 @@ export default function BlockManagementPage() {
     setIsBlockDialogOpen(true);
   };
 
-  const handleEditBlock = (block: (typeof mockBlocks)[0]) => {
+  const handleEditBlock = (block: Block) => {
     setDialogMode("edit");
     setSelectedBlock(block);
     setIsBlockDialogOpen(true);
@@ -195,12 +140,12 @@ export default function BlockManagementPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Trading Blocks</h2>
           <span className="text-sm text-muted-foreground">
-            {mockBlocks.length} blocks
+            {blocks.length} blocks
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockBlocks.map((block) => (
+          {blocks.map((block) => (
             <BlockCard key={block.id} block={block} onEdit={handleEditBlock} />
           ))}
         </div>

@@ -13,6 +13,8 @@ import { Blocks } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
+import { useBlockStore } from "@/lib/stores/block-store";
+
 import { NavMain } from "@/components/nav-main";
 import { SidebarActiveBlocks } from "@/components/sidebar-active-blocks";
 import { SidebarFooterLegal } from "@/components/sidebar-footer-legal";
@@ -100,6 +102,11 @@ const navData = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const blocks = useBlockStore(state => state.blocks);
+  const activeBlockId = useBlockStore(state => state.activeBlockId);
+  const activeBlock = blocks.find(block => block.id === activeBlockId) || null;
+  const hasActiveBlock = activeBlock !== null;
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -128,8 +135,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navData.navMain} />
-        <SidebarActiveBlocks sets={navData.activeSets} />
       </SidebarContent>
+      {hasActiveBlock && activeBlock && (
+        <SidebarActiveBlocks activeBlock={activeBlock} />
+      )}
       <SidebarFooter>
         <SidebarFooterLegal />
       </SidebarFooter>
