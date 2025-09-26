@@ -2,12 +2,9 @@
 
 import { useMemo } from "react"
 import { usePathname } from "next/navigation"
-import { IconAdjustments, IconBell, IconPlus } from "@tabler/icons-react"
 
 import { ModeToggle } from "@/components/mode-toggle"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
@@ -15,6 +12,10 @@ const routeMeta: Record<
   string,
   { title: string; description: string; badge?: string }
 > = {
+  "/blocks": {
+    title: "Block Management",
+    description: "Manage your trading data blocks and switch between datasets.",
+  },
   "/block-stats": {
     title: "Block Stats & Analytics",
     description: "Measure the health of your active trading block at a glance.",
@@ -36,31 +37,9 @@ const routeMeta: Record<
     title: "Correlation Matrix",
     description: "Understand strategy overlap before deploying capital.",
   },
-  "/capital-blocks": {
-    title: "Capital Blocks",
-    description: "Budget capital to blocks and track how it flexes over time.",
-    badge: "Soon",
-  },
-  "/time-machine": {
-    title: "Time Machine",
-    description: "Replay your block history as if it were happening today.",
-    badge: "Soon",
-  },
-  "/trade-blocks": {
-    title: "Trade Blocks",
-    description: "Audit every block in one sortable timeline.",
-  },
-  "/uploads": {
-    title: "Upload Center",
-    description: "Manage trade logs, daily logs, and active block pairs.",
-  },
   "/settings": {
     title: "Settings",
     description: "Configure account defaults, risk tolerances, and integrations.",
-  },
-  "/support": {
-    title: "Help & Docs",
-    description: "Guides, release notes, and common workflows.",
   },
 }
 
@@ -93,23 +72,7 @@ export function SiteHeader() {
             {meta.description}
           </p>
         </div>
-        <div className="hidden max-w-sm flex-1 items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-muted-foreground md:flex">
-          <Input
-            placeholder="Search metrics, symbols, or blocks"
-            className="border-none bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-          />
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
-            <IconAdjustments className="size-4" />
-          </Button>
-        </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden sm:inline-flex">
-            <IconPlus className="size-4" />
-            New Upload
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <IconBell className="size-5" />
-          </Button>
           <ModeToggle />
         </div>
       </div>

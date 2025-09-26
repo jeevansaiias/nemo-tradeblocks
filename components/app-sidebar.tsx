@@ -1,16 +1,12 @@
 "use client";
 
 import {
-  IconBarbell,
   IconChartHistogram,
   IconGauge,
-  IconHelpSquareRounded,
   IconLayoutDashboard,
-  IconLayoutSidebarRightExpand,
   IconReportAnalytics,
   IconRouteSquare,
   IconSettings,
-  IconSparkles,
   IconStack2,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
@@ -33,6 +29,11 @@ import {
 const navData = {
   navMain: [
     {
+      title: "Block Management",
+      href: "/blocks",
+      icon: IconStack2,
+    },
+    {
       title: "Block Stats",
       href: "/block-stats",
       icon: IconLayoutDashboard,
@@ -43,46 +44,19 @@ const navData = {
       icon: IconReportAnalytics,
     },
     {
-      title: "Risk Simulator",
-      href: "/risk-simulator",
-      icon: IconRouteSquare,
-    },
-    {
       title: "Position Sizing",
       href: "/position-sizing",
       icon: IconGauge,
     },
     {
+      title: "Risk Simulator",
+      href: "/risk-simulator",
+      icon: IconRouteSquare,
+    },
+    {
       title: "Correlation Matrix",
       href: "/correlation-matrix",
       icon: IconChartHistogram,
-    },
-    {
-      title: "Trade Blocks",
-      href: "/trade-blocks",
-      icon: IconStack2,
-    },
-    {
-      title: "Capital Blocks",
-      href: "/capital-blocks",
-      icon: IconBarbell,
-      soon: true,
-    },
-    {
-      title: "Time Machine",
-      href: "/time-machine",
-      icon: IconSparkles,
-      soon: true,
-    },
-    {
-      title: "Upload Center",
-      href: "/uploads",
-      icon: IconLayoutSidebarRightExpand,
-    },
-    {
-      title: "Help & Docs",
-      href: "/support",
-      icon: IconHelpSquareRounded,
     },
     {
       title: "Settings",
