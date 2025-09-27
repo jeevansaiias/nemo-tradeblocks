@@ -29,7 +29,7 @@ interface BlockSwitchDialogProps {
 }
 
 export function BlockSwitchDialog({ open, onOpenChange }: BlockSwitchDialogProps) {
-  const { blocks, activeBlock, setActiveBlock } = useBlockStore();
+  const { blocks, setActiveBlock } = useBlockStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const router = useRouter();

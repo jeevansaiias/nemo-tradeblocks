@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock } from '../db'
+import { ProcessedBlock } from '../models/block'
 
 export interface Block {
   id: string
@@ -30,93 +32,114 @@ interface BlockStore {
   // State
   blocks: Block[]
   activeBlockId: string | null
+  isLoading: boolean
+  isInitialized: boolean
+  error: string | null
 
   // Actions
+  loadBlocks: () => Promise<void>
   setActiveBlock: (blockId: string) => void
   clearActiveBlock: () => void
-  addBlock: (block: Omit<Block, 'id' | 'created'>) => void
-  updateBlock: (id: string, updates: Partial<Block>) => void
-  deleteBlock: (id: string) => void
+  addBlock: (block: Omit<Block, 'id' | 'created'>) => Promise<void>
+  updateBlock: (id: string, updates: Partial<Block>) => Promise<void>
+  deleteBlock: (id: string) => Promise<void>
+  refreshBlock: (id: string) => Promise<void>
 }
 
-// Mock data that matches our existing structure
-const mockBlocks: Block[] = [
-  {
-    id: "2025-demo",
-    name: "2025 Over 100k Trials",
-    description: "High-volume testing with over 100k trial runs",
-    isActive: true,
-    created: new Date("2025-01-15"),
-    lastModified: new Date("2025-09-18"),
+/**
+ * Convert ProcessedBlock from DB to Block for UI
+ */
+function convertProcessedBlockToBlock(processedBlock: ProcessedBlock, tradeCount: number, dailyLogCount: number): Block {
+  return {
+    id: processedBlock.id,
+    name: processedBlock.name,
+    description: processedBlock.description,
+    isActive: false, // Will be set by active block logic
+    created: processedBlock.created,
+    lastModified: processedBlock.lastModified,
     tradeLog: {
-      fileName: "2025-Over-100k-With-Trial-Tests.csv",
-      rowCount: 749,
-      fileSize: 1.2 * 1024 * 1024
+      fileName: processedBlock.tradeLog.fileName,
+      rowCount: tradeCount,
+      fileSize: processedBlock.tradeLog.fileSize,
     },
-    dailyLog: {
-      fileName: "2025-Over-100k-With-Trial-Tests (1).csv",
-      rowCount: 178,
-      fileSize: 0.3 * 1024 * 1024
-    },
+    dailyLog: processedBlock.dailyLog ? {
+      fileName: processedBlock.dailyLog.fileName,
+      rowCount: dailyLogCount,
+      fileSize: processedBlock.dailyLog.fileSize,
+    } : undefined,
     stats: {
-      totalPnL: 12450,
-      winRate: 68.2,
-      totalTrades: 749,
-      avgWin: 245,
-      avgLoss: -156
-    }
-  },
-  {
-    id: "2024-swing",
-    name: "2024 Swing Book",
-    description: "Swing trading strategy performance for 2024",
-    isActive: false,
-    created: new Date("2024-01-01"),
-    lastModified: new Date("2025-08-02"),
-    tradeLog: {
-      fileName: "2024-Swing-Trades.csv",
-      rowCount: 553,
-      fileSize: 0.9 * 1024 * 1024
-    },
-    dailyLog: {
-      fileName: "2024-Swing-Notes.csv",
-      rowCount: 211,
-      fileSize: 0.2 * 1024 * 1024
-    },
-    stats: {
-      totalPnL: 8920,
-      winRate: 71.2,
-      totalTrades: 553,
-      avgWin: 312,
-      avgLoss: -98
-    }
-  },
-  {
-    id: "scalp-tests",
-    name: "Scalp Tests",
-    description: "Short-term scalping experiments",
-    isActive: false,
-    created: new Date("2025-03-10"),
-    lastModified: new Date("2025-07-15"),
-    tradeLog: {
-      fileName: "Scalp-Tests.csv",
-      rowCount: 234,
-      fileSize: 0.4 * 1024 * 1024
-    },
-    stats: {
-      totalPnL: 1120,
-      winRate: 62.4,
-      totalTrades: 234,
-      avgWin: 89,
-      avgLoss: -45
+      totalPnL: 0, // Will be calculated from trades
+      winRate: 0,
+      totalTrades: tradeCount,
+      avgWin: 0,
+      avgLoss: 0,
     }
   }
-]
+}
 
-export const useBlockStore = create<BlockStore>((set) => ({
-  // Initialize with mock data
-  blocks: mockBlocks,
-  activeBlockId: "2025-demo", // Set the first block as active
+
+export const useBlockStore = create<BlockStore>((set, get) => ({
+  // Initialize with empty state
+  blocks: [],
+  activeBlockId: null,
+  isLoading: false,
+  isInitialized: false,
+  error: null,
+
+  // Load blocks from IndexedDB
+  loadBlocks: async () => {
+    const state = get()
+
+    // Prevent multiple concurrent loads
+    if (state.isLoading || state.isInitialized) {
+      return
+    }
+
+    set({ isLoading: true, error: null })
+
+    try {
+      const processedBlocks = await getAllBlocks()
+      const blocks: Block[] = []
+
+      // Convert each ProcessedBlock to Block with trade/daily log counts
+      for (const processedBlock of processedBlocks) {
+        const trades = await getTradesByBlock(processedBlock.id)
+        const dailyLogs = await getDailyLogsByBlock(processedBlock.id)
+
+        // Calculate stats from trades
+        const stats = trades.length > 0 ? {
+          totalPnL: trades.reduce((sum, trade) => sum + trade.pl, 0),
+          winRate: (trades.filter(t => t.pl > 0).length / trades.length) * 100,
+          totalTrades: trades.length,
+          avgWin: trades.filter(t => t.pl > 0).length > 0
+            ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length
+            : 0,
+          avgLoss: trades.filter(t => t.pl < 0).length > 0
+            ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length
+            : 0,
+        } : {
+          totalPnL: 0,
+          winRate: 0,
+          totalTrades: 0,
+          avgWin: 0,
+          avgLoss: 0,
+        }
+
+        const block = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+        block.stats = stats
+        blocks.push(block)
+      }
+
+      set({ blocks, isLoading: false, isInitialized: true })
+    } catch (error) {
+      console.error('Failed to load blocks:', error)
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load blocks',
+        isLoading: false,
+        isInitialized: true
+      })
+    }
+  },
 
   // Actions
   setActiveBlock: (blockId: string) => {
@@ -139,47 +162,112 @@ export const useBlockStore = create<BlockStore>((set) => ({
     }))
   },
 
-  addBlock: (blockData) => {
-    const newBlock: Block = {
-      ...blockData,
-      id: crypto.randomUUID(),
-      created: new Date(),
-      lastModified: new Date(),
-    }
-
-    set(state => ({
-      blocks: [...state.blocks, newBlock],
-      // If this is marked as active, update the active block
-      ...(newBlock.isActive && {
-        activeBlockId: newBlock.id,
-        blocks: [
-          ...state.blocks.map(b => ({ ...b, isActive: false })),
-          newBlock
-        ]
-      })
-    }))
-  },
-
-  updateBlock: (id: string, updates: Partial<Block>) => {
-    set(state => ({
-      blocks: state.blocks.map(block =>
-        block.id === id
-          ? { ...block, ...updates, lastModified: new Date() }
-          : block
-      )
-    }))
-  },
-
-  deleteBlock: (id: string) => {
-    set(state => {
-      const remainingBlocks = state.blocks.filter(block => block.id !== id)
-      const wasActive = state.activeBlockId === id
-
-      return {
-        blocks: remainingBlocks,
-        // If we deleted the active block, clear the active state
-        activeBlockId: wasActive ? null : state.activeBlockId
+  addBlock: async (blockData) => {
+    try {
+      const newBlock: Block = {
+        ...blockData,
+        id: crypto.randomUUID(),
+        created: new Date(),
+        lastModified: new Date(),
       }
-    })
+
+      set(state => ({
+        blocks: [...state.blocks, newBlock],
+        // If this is marked as active, update the active block
+        ...(newBlock.isActive && {
+          activeBlockId: newBlock.id,
+          blocks: [
+            ...state.blocks.map(b => ({ ...b, isActive: false })),
+            newBlock
+          ]
+        })
+      }))
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to add block' })
+    }
+  },
+
+  updateBlock: async (id: string, updates: Partial<Block>) => {
+    try {
+      // Update in IndexedDB
+      await dbUpdateBlock(id, {
+        name: updates.name,
+        description: updates.description,
+        // Add other updatable fields as needed
+      })
+
+      // Update local state
+      set(state => ({
+        blocks: state.blocks.map(block =>
+          block.id === id
+            ? { ...block, ...updates, lastModified: new Date() }
+            : block
+        )
+      }))
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update block' })
+    }
+  },
+
+  deleteBlock: async (id: string) => {
+    try {
+      // Delete from IndexedDB
+      await dbDeleteBlock(id)
+
+      // Update local state
+      set(state => {
+        const remainingBlocks = state.blocks.filter(block => block.id !== id)
+        const wasActive = state.activeBlockId === id
+
+        return {
+          blocks: remainingBlocks,
+          // If we deleted the active block, clear the active state
+          activeBlockId: wasActive ? null : state.activeBlockId
+        }
+      })
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to delete block' })
+    }
+  },
+
+  refreshBlock: async (id: string) => {
+    try {
+      const processedBlock = await getBlock(id)
+      if (!processedBlock) return
+
+      const trades = await getTradesByBlock(id)
+      const dailyLogs = await getDailyLogsByBlock(id)
+
+      // Calculate fresh stats
+      const stats = trades.length > 0 ? {
+        totalPnL: trades.reduce((sum, trade) => sum + trade.pl, 0),
+        winRate: (trades.filter(t => t.pl > 0).length / trades.length) * 100,
+        totalTrades: trades.length,
+        avgWin: trades.filter(t => t.pl > 0).length > 0
+          ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length
+          : 0,
+        avgLoss: trades.filter(t => t.pl < 0).length > 0
+          ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length
+          : 0,
+      } : {
+        totalPnL: 0,
+        winRate: 0,
+        totalTrades: 0,
+        avgWin: 0,
+        avgLoss: 0,
+      }
+
+      const updatedBlock = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+      updatedBlock.stats = stats
+
+      // Update in store
+      set(state => ({
+        blocks: state.blocks.map(block =>
+          block.id === id ? { ...updatedBlock, isActive: block.isActive } : block
+        )
+      }))
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to refresh block' })
+    }
   }
 }))

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -35,8 +36,15 @@ import {
   Trash2,
   Upload,
   X,
+  Loader2,
+  BarChart3,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { TradeProcessor, TradeProcessingProgress, TradeProcessingResult } from "@/lib/processing/trade-processor";
+import { DailyLogProcessor, DailyLogProcessingProgress, DailyLogProcessingResult } from "@/lib/processing/daily-log-processor";
+import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
+import { createBlock, addTrades, addDailyLogEntries } from "@/lib/db";
+import { useBlockStore } from "@/lib/stores/block-store";
 
 interface Block {
   id: string;
@@ -68,10 +76,22 @@ interface Block {
 
 interface FileUploadState {
   file: File | null;
-  status: "empty" | "dragover" | "uploaded" | "error" | "existing";
+  status: "empty" | "dragover" | "uploaded" | "error" | "existing" | "processing";
   error?: string;
   existingFileName?: string;
   existingRowCount?: number;
+  progress?: number;
+  processedData?: {
+    rowCount: number;
+    dateRange?: { start: Date | null; end: Date | null };
+    strategies?: string[];
+    stats?: {
+      processingTimeMs: number;
+      strategies: string[];
+      dateRange: { start: Date | null; end: Date | null };
+      totalPL: number;
+    };
+  };
 }
 
 interface BlockDialogProps {
@@ -99,6 +119,16 @@ export function BlockDialog({
     status: "empty",
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStep, setProcessingStep] = useState<string>("");
+  const [previewData, setPreviewData] = useState<{
+    trades?: TradeProcessingResult;
+    dailyLogs?: DailyLogProcessingResult;
+    initialCapital?: number;
+  } | null>(null);
+  const [processingErrors, setProcessingErrors] = useState<string[]>([]);
+
+  const { addBlock: addBlockToStore, updateBlock, refreshBlock, deleteBlock } = useBlockStore();
 
   // Reset form when dialog opens/closes or mode changes
   useEffect(() => {
@@ -109,6 +139,10 @@ export function BlockDialog({
       setSetAsActive(true);
       setTradeLog({ file: null, status: "empty" });
       setDailyLog({ file: null, status: "empty" });
+      setIsProcessing(false);
+      setProcessingStep("");
+      setPreviewData(null);
+      setProcessingErrors([]);
       return;
     }
 
@@ -270,37 +304,310 @@ export function BlockDialog({
     return `${mb.toFixed(1)} MB`;
   };
 
+  const processFiles = async () => {
+    if (!tradeLog.file) return null;
+
+    setIsProcessing(true);
+    setProcessingErrors([]);
+    setPreviewData(null);
+
+    try {
+      // Process trade log
+      setProcessingStep("Processing trade log...");
+      setTradeLog(prev => ({ ...prev, status: "processing", progress: 0 }));
+
+      const tradeProcessor = new TradeProcessor({
+        progressCallback: (progress: TradeProcessingProgress) => {
+          setTradeLog(prev => ({
+            ...prev,
+            progress: progress.progress,
+            processedData: {
+              rowCount: progress.validTrades + progress.invalidTrades,
+            }
+          }));
+        }
+      });
+
+      const tradeResult = await tradeProcessor.processFile(tradeLog.file);
+
+      if (tradeResult.errors.length > 0) {
+        const errorMessages = tradeResult.errors.map(e => e.message);
+        setProcessingErrors(prev => [...prev, ...errorMessages]);
+      }
+
+      setTradeLog(prev => ({
+        ...prev,
+        status: "uploaded",
+        progress: 100,
+        processedData: {
+          rowCount: tradeResult.validTrades,
+          dateRange: tradeResult.stats.dateRange,
+          strategies: tradeResult.stats.strategies,
+          stats: tradeResult.stats
+        }
+      }));
+
+      // Process daily log if provided
+      let dailyResult: DailyLogProcessingResult | undefined;
+      let initialCapital: number;
+
+      if (dailyLog.file) {
+        setProcessingStep("Processing daily log...");
+        setDailyLog(prev => ({ ...prev, status: "processing", progress: 0 }));
+
+        const dailyProcessor = new DailyLogProcessor({
+          progressCallback: (progress: DailyLogProcessingProgress) => {
+            setDailyLog(prev => ({
+              ...prev,
+              progress: progress.progress,
+              processedData: {
+                rowCount: progress.validEntries + progress.invalidEntries,
+              }
+            }));
+          }
+        });
+
+        dailyResult = await dailyProcessor.processFile(dailyLog.file);
+
+        if (dailyResult && dailyResult.errors.length > 0) {
+          const errorMessages = dailyResult.errors.map(e => e.message);
+          setProcessingErrors(prev => [...prev, ...errorMessages]);
+        }
+
+        if (dailyResult) {
+          setDailyLog(prev => ({
+            ...prev,
+            status: "uploaded",
+            progress: 100,
+            processedData: {
+              rowCount: dailyResult!.validEntries,
+              dateRange: dailyResult!.stats.dateRange,
+              stats: {
+                ...dailyResult!.stats,
+                strategies: [] // Daily logs don't have strategies
+              }
+            }
+          }));
+        }
+
+        // Calculate initial capital
+        initialCapital = calculateInitialCapital(tradeResult.trades, dailyResult?.entries);
+      } else {
+        // Calculate initial capital from trades only
+        initialCapital = calculateInitialCapital(tradeResult.trades);
+      }
+
+      setProcessingStep("Calculating statistics...");
+
+      const preview = {
+        trades: tradeResult,
+        dailyLogs: dailyResult,
+        initialCapital
+      };
+
+      setPreviewData(preview);
+      setProcessingStep("");
+
+      return preview;
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setProcessingErrors([errorMessage]);
+      setTradeLog(prev => ({ ...prev, status: "error", error: errorMessage }));
+      setProcessingStep("");
+      return null;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (mode === "edit" && !block) return;
+    if (!tradeLog.file && !tradeLog.existingFileName) return;
 
-    const blockData = {
-      id: mode === "edit" ? block!.id : undefined,
-      name,
-      description,
-      setAsActive,
-      tradeLog: tradeLog.file || tradeLog.existingFileName,
-      dailyLog: dailyLog.file || dailyLog.existingFileName,
-    };
+    try {
+      setIsProcessing(true);
 
-    // TODO: Implement actual block creation/update
-    console.log(
-      mode === "edit" ? "Updating block:" : "Creating block:",
-      blockData
-    );
+      // For new blocks, process files if provided
+      let processedData = previewData;
+      if (mode === "new" && tradeLog.file) {
+        processedData = await processFiles();
+        if (!processedData) return; // Processing failed
+      }
 
-    // Close dialog
-    onOpenChange(false);
+      if (mode === "new" && processedData) {
+        // Create new block with processed data
+        setProcessingStep("Saving to database...");
+
+        // Create block metadata
+        const now = new Date();
+        const blockMetadata = {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          isActive: false,
+          tradeLog: {
+            fileName: tradeLog.file!.name,
+            fileSize: tradeLog.file!.size,
+            originalRowCount: processedData.trades?.totalRows || 0,
+            processedRowCount: processedData.trades?.trades.length || 0,
+            uploadedAt: now,
+          },
+          dailyLog: dailyLog.file ? {
+            fileName: dailyLog.file.name,
+            fileSize: dailyLog.file.size,
+            originalRowCount: processedData.dailyLogs?.totalRows || 0,
+            processedRowCount: processedData.dailyLogs?.entries.length || 0,
+            uploadedAt: now,
+          } : undefined,
+          processingStatus: 'completed' as const,
+          dataReferences: {
+            tradesStorageKey: `block_${Date.now()}_trades`,
+            dailyLogStorageKey: dailyLog.file ? `block_${Date.now()}_daily_logs` : undefined,
+          },
+          analysisConfig: {
+            riskFreeRate: 0.05,
+            useBusinessDaysOnly: false,
+            annualizationFactor: 252,
+            confidenceLevel: 0.95,
+            drawdownThreshold: 0.05,
+          },
+        };
+
+        // Save to IndexedDB
+        const newBlock = await createBlock(blockMetadata);
+
+        // Add trades
+        if (processedData.trades?.trades.length) {
+          await addTrades(newBlock.id, processedData.trades.trades);
+        }
+
+        // Add daily log entries if present
+        if (processedData.dailyLogs && processedData.dailyLogs.entries.length > 0) {
+          const entriesWithBlockId = processedData.dailyLogs.entries.map(entry => ({
+            ...entry,
+            blockId: newBlock.id
+          }));
+          await addDailyLogEntries(newBlock.id, entriesWithBlockId);
+        }
+
+        // Calculate block stats for store
+        const trades = processedData.trades?.trades || [];
+        const blockStats = {
+          totalPnL: processedData.trades?.stats.totalPL || 0,
+          winRate: trades.length > 0
+            ? (trades.filter(t => t.pl > 0).length / trades.length) * 100
+            : 0,
+          totalTrades: processedData.trades?.validTrades || 0,
+          avgWin: trades.length > 0
+            ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length || 0
+            : 0,
+          avgLoss: trades.length > 0
+            ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length || 0
+            : 0,
+        };
+
+        // Add to Zustand store
+        const blockForStore = {
+          name: blockMetadata.name,
+          description: blockMetadata.description,
+          isActive: setAsActive,
+          lastModified: new Date(),
+          tradeLog: {
+            fileName: tradeLog.file!.name,
+            rowCount: processedData.trades?.validTrades || 0,
+            fileSize: tradeLog.file!.size,
+          },
+          dailyLog: dailyLog.file ? {
+            fileName: dailyLog.file.name,
+            rowCount: processedData.dailyLogs?.validEntries || 0,
+            fileSize: dailyLog.file.size,
+          } : undefined,
+          stats: blockStats,
+        };
+
+        await addBlockToStore(blockForStore);
+
+      } else if (mode === "edit" && block) {
+        // Update existing block
+        setProcessingStep("Updating block...");
+
+        const updates: Partial<Block> = {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          lastModified: new Date(),
+        };
+
+        // If new files were uploaded, process them
+        if (tradeLog.file && processedData) {
+          updates.tradeLog = {
+            fileName: tradeLog.file.name,
+            rowCount: processedData.trades?.validTrades || 0,
+            fileSize: tradeLog.file.size,
+          };
+
+          // Update stats
+          const editTrades = processedData.trades?.trades || [];
+          updates.stats = {
+            totalPnL: processedData.trades?.stats.totalPL || 0,
+            winRate: editTrades.length > 0
+              ? (editTrades.filter(t => t.pl > 0).length / editTrades.length) * 100
+              : 0,
+            totalTrades: processedData.trades?.validTrades || 0,
+            avgWin: editTrades.length > 0
+              ? editTrades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / editTrades.filter(t => t.pl > 0).length || 0
+              : 0,
+            avgLoss: editTrades.length > 0
+              ? editTrades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / editTrades.filter(t => t.pl < 0).length || 0
+              : 0,
+          };
+        }
+
+        if (dailyLog.file && processedData?.dailyLogs) {
+          updates.dailyLog = {
+            fileName: dailyLog.file.name,
+            rowCount: processedData.dailyLogs.validEntries,
+            fileSize: dailyLog.file.size,
+          };
+        }
+
+        await updateBlock(block.id, updates);
+
+        // Refresh the block to get updated stats from IndexedDB
+        await refreshBlock(block.id);
+      }
+
+      setProcessingStep("");
+      onOpenChange(false);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setProcessingErrors([errorMessage]);
+      setProcessingStep("");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!block) return;
 
-    // TODO: Implement actual block deletion
-    console.log("Deleting block:", block.id);
+    try {
+      setIsProcessing(true);
+      setProcessingStep("Deleting block...");
 
-    // Close dialogs
-    setShowDeleteConfirm(false);
-    onOpenChange(false);
+      // Delete from IndexedDB and update store
+      await deleteBlock(block.id);
+
+      // Close dialogs
+      setShowDeleteConfirm(false);
+      onOpenChange(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete block';
+      setProcessingErrors([errorMessage]);
+    } finally {
+      setIsProcessing(false);
+      setProcessingStep("");
+    }
   };
 
   const canSubmit = name.trim() && (tradeLog.file || tradeLog.existingFileName);
@@ -380,32 +687,86 @@ export function BlockDialog({
             accept=".csv"
             className="hidden"
             onChange={(e) => handleFileSelect(e, type)}
+            aria-label={`Upload ${label} CSV file`}
+            title={`Upload ${label} CSV file`}
           />
 
-          {fileState.status === "uploaded" && fileState.file ? (
-            <div className="flex items-center justify-between">
+          {fileState.status === "processing" && fileState.file ? (
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded">
+                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="font-medium">{fileState.file.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {formatFileSize(fileState.file.size)} •{" "}
-                    {mode === "edit" ? "New file" : "CSV file"}
+                    Processing {type === "trade" ? "trades" : "daily log entries"}...
                   </p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(type);
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+              {fileState.progress !== undefined && (
+                <div className="space-y-1">
+                  <Progress value={fileState.progress} className="h-2" />
+                  <p className="text-xs text-muted-foreground text-center">
+                    {fileState.progress}% complete
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : fileState.status === "uploaded" && fileState.file ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{fileState.file.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatFileSize(fileState.file.size)} •{" "}
+                      {mode === "edit" ? "New file" : "CSV file"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(type);
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              {fileState.processedData && (
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Processed Data</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Rows:</span>
+                      <span className="ml-1 font-medium">{fileState.processedData.rowCount}</span>
+                    </div>
+                    {fileState.processedData.strategies && (
+                      <div>
+                        <span className="text-muted-foreground">Strategies:</span>
+                        <span className="ml-1 font-medium">{fileState.processedData.strategies.length}</span>
+                      </div>
+                    )}
+                  </div>
+                  {fileState.processedData.dateRange && (
+                    <div className="mt-2 text-xs">
+                      <span className="text-muted-foreground">Date Range:</span>
+                      <span className="ml-1 font-medium">
+                        {fileState.processedData.dateRange.start?.toLocaleDateString()} - {fileState.processedData.dateRange.end?.toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : fileState.status === "existing" && fileState.existingFileName ? (
             <div className="flex items-center justify-between">
@@ -464,7 +825,11 @@ export function BlockDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={(newOpen) => {
+        if (!isProcessing) {
+          onOpenChange(newOpen);
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{getDialogTitle()}</DialogTitle>
@@ -515,13 +880,54 @@ export function BlockDialog({
               {renderFileUpload("daily", dailyLog, false)}
             </div>
 
+            {/* Processing Status */}
+            {isProcessing && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                  <div>
+                    <p className="font-medium text-blue-900 dark:text-blue-100">
+                      Processing Files
+                    </p>
+                    {processingStep && (
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {processingStep}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Errors */}
+            {processingErrors.length > 0 && (
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-2">
+                    <p className="font-medium text-red-900 dark:text-red-100">
+                      Processing Errors
+                    </p>
+                    <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
+                      {processingErrors.map((error, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-red-500">•</span>
+                          <span>{error}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Options */}
             {mode === "new" && (
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="set-active"
                   checked={setAsActive}
-                  onCheckedChange={setSetAsActive}
+                  onCheckedChange={(checked) => setSetAsActive(checked === true)}
                 />
                 <Label htmlFor="set-active">
                   Set as active block after creation
@@ -538,6 +944,7 @@ export function BlockDialog({
                 <Button
                   variant="destructive"
                   onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isProcessing}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Block
@@ -546,12 +953,20 @@ export function BlockDialog({
                 <div />
               )}
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isProcessing}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={!canSubmit}>
-                  <SubmitIcon className="w-4 h-4 mr-2" />
-                  {getSubmitButtonText()}
+                <Button onClick={handleSubmit} disabled={!canSubmit || isProcessing}>
+                  {isProcessing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <SubmitIcon className="w-4 h-4 mr-2" />
+                  )}
+                  {isProcessing ? "Processing..." : getSubmitButtonText()}
                 </Button>
               </div>
             </div>
@@ -574,12 +989,20 @@ export function BlockDialog({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
+                disabled={isProcessing}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete Block
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Block"
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

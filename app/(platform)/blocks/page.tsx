@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useBlockStore, type Block } from "@/lib/stores/block-store";
 import { Activity, Calendar, Grid3X3, List, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 
 function BlockCard({
   block,
@@ -97,9 +97,14 @@ function BlockCard({
 
 export default function BlockManagementPage() {
   const blocks = useBlockStore(state => state.blocks);
+  const isInitialized = useBlockStore(state => state.isInitialized);
+  const error = useBlockStore(state => state.error);
+  const loadBlocks = useBlockStore(state => state.loadBlocks);
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"new" | "edit">("new");
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
+
+  // No need for useEffect here since AppSidebar handles loading
 
   const handleNewBlock = () => {
     setDialogMode("new");
@@ -140,15 +145,62 @@ export default function BlockManagementPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Trading Blocks</h2>
           <span className="text-sm text-muted-foreground">
-            {blocks.length} blocks
+            {!isInitialized ? "Loading..." : `${blocks.length} blocks`}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {blocks.map((block) => (
-            <BlockCard key={block.id} block={block} onEdit={handleEditBlock} />
-          ))}
-        </div>
+        {error && (
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-900 dark:text-red-100 font-medium">Error loading blocks</p>
+            <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadBlocks()}
+              className="mt-2"
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {!isInitialized ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Loading skeleton */}
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-muted rounded"></div>
+                    <div className="h-3 bg-muted rounded w-2/3"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : blocks.length === 0 ? (
+          <div className="text-center py-12">
+            <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No trading blocks yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first trading block to start analyzing your performance.
+            </p>
+            <Button onClick={handleNewBlock}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create First Block
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {blocks.map((block) => (
+              <BlockCard key={block.id} block={block} onEdit={handleEditBlock} />
+            ))}
+          </div>
+        )}
       </div>
 
       <BlockDialog

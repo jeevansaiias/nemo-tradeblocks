@@ -6,62 +6,62 @@ Implementation plan for client-side CSV processing with IndexedDB persistence fo
 ## Phase 1: Core Data Models & Types
 
 ### TypeScript Data Models (`/lib/models/`)
-- [ ] Create `Trade` interface matching legacy Trade model
-- [ ] Create `DailyLogEntry` interface for daily log data
-- [ ] Extend `Block` interface to include processed data references
-- [ ] Create `PortfolioStats` interface for calculated metrics
-- [ ] Create `StrategyStats` interface for per-strategy analysis
+- [x] Create `Trade` interface matching legacy Trade model
+- [x] Create `DailyLogEntry` interface for daily log data
+- [x] Extend `Block` interface to include processed data references
+- [x] Create `PortfolioStats` interface for calculated metrics
+- [x] Create `StrategyStats` interface for per-strategy analysis
 
 ### Validation Schemas
-- [ ] Create Zod schema for Trade validation
-- [ ] Create Zod schema for DailyLogEntry validation
-- [ ] Add error type definitions for parsing failures
+- [x] Create Zod schema for Trade validation
+- [x] Create Zod schema for DailyLogEntry validation
+- [x] Add error type definitions for parsing failures
 
 ## Phase 2: IndexedDB Infrastructure
 
 ### Database Service (`/lib/db/`)
-- [ ] Create database initialization with stores: `blocks`, `trades`, `dailyLogs`
-- [ ] Implement CRUD operations for blocks
-- [ ] Add versioning and migration strategy
-- [ ] Create indexes for querying (blockId, date, strategy)
-- [ ] Implement transaction helpers
+- [x] Create database initialization with stores: `blocks`, `trades`, `dailyLogs`
+- [x] Implement CRUD operations for blocks
+- [x] Add versioning and migration strategy
+- [x] Create indexes for querying (blockId, date, strategy)
+- [x] Implement transaction helpers
 
 ### Storage Abstraction Layer
-- [ ] Create wrapper functions for common operations
-- [ ] Add error handling and retry logic
+- [x] Create wrapper functions for common operations
+- [x] Add error handling and retry logic
 - [ ] Implement data compression for large datasets
-- [ ] Add storage quota management
+- [x] Add storage quota management
 
 ## Phase 3: CSV Processing Pipeline
 
 ### CSV Parser Service (`/lib/processing/`)
-- [ ] Implement trade log parser with column mapping
-- [ ] Implement daily log parser
-- [ ] Handle column name variations (commission aliases)
-- [ ] Add progress tracking for large files
-- [ ] Implement streaming parser for memory efficiency
+- [x] Implement trade log parser with column mapping
+- [x] Implement daily log parser
+- [x] Handle column name variations (commission aliases)
+- [x] Add progress tracking for large files
+- [x] Implement streaming parser for memory efficiency
 
 ### Data Validation & Cleaning
-- [ ] Handle missing columns (default commissions to 0)
-- [ ] Implement date/time parsing with timezone handling
-- [ ] Add numeric field validation and coercion
-- [ ] Implement strategy name normalization
-- [ ] Add data integrity checks
+- [x] Handle missing columns (default commissions to 0)
+- [x] Implement date/time parsing with timezone handling
+- [x] Add numeric field validation and coercion
+- [x] Implement strategy name normalization
+- [x] Add data integrity checks
 
 ## Phase 4: Local Calculations Engine
 
 ### Performance Calculations (`/lib/calculations/`)
-- [ ] Implement portfolio stats calculator (P/L, win rate, avg win/loss)
-- [ ] Add drawdown calculations (peak-to-trough)
-- [ ] Create cumulative P/L tracking
-- [ ] Implement strategy breakdown analysis
-- [ ] Add time-based aggregations (daily, weekly, monthly)
+- [x] Implement portfolio stats calculator (P/L, win rate, avg win/loss)
+- [x] Add drawdown calculations (peak-to-trough)
+- [x] Create cumulative P/L tracking
+- [x] Implement strategy breakdown analysis
+- [x] Add time-based aggregations (daily, weekly, monthly)
 
 ### Caching Strategy
-- [ ] Implement calculation memoization
+- [x] Implement calculation memoization
 - [ ] Store computed results in IndexedDB
-- [ ] Add cache invalidation on data changes
-- [ ] Create cache key generation strategy
+- [x] Add cache invalidation on data changes
+- [x] Create cache key generation strategy
 
 ## Phase 5: Block Management Integration
 

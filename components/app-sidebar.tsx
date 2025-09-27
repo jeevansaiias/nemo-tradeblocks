@@ -104,8 +104,17 @@ const navData = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const blocks = useBlockStore(state => state.blocks);
   const activeBlockId = useBlockStore(state => state.activeBlockId);
+  const isInitialized = useBlockStore(state => state.isInitialized);
+  const loadBlocks = useBlockStore(state => state.loadBlocks);
   const activeBlock = blocks.find(block => block.id === activeBlockId) || null;
   const hasActiveBlock = activeBlock !== null;
+
+  // Load blocks from IndexedDB on mount
+  React.useEffect(() => {
+    if (!isInitialized) {
+      loadBlocks().catch(console.error);
+    }
+  }, [isInitialized, loadBlocks]);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
