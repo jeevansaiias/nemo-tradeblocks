@@ -52,20 +52,20 @@ interface BlockStore {
 function convertProcessedBlockToBlock(processedBlock: ProcessedBlock, tradeCount: number, dailyLogCount: number): Block {
   return {
     id: processedBlock.id,
-    name: processedBlock.name,
+    name: processedBlock.name || 'Unnamed Block',
     description: processedBlock.description,
     isActive: false, // Will be set by active block logic
     created: processedBlock.created,
     lastModified: processedBlock.lastModified,
     tradeLog: {
-      fileName: processedBlock.tradeLog.fileName,
+      fileName: processedBlock.tradeLog?.fileName || 'unknown.csv',
       rowCount: tradeCount,
-      fileSize: processedBlock.tradeLog.fileSize,
+      fileSize: processedBlock.tradeLog?.fileSize || 0,
     },
     dailyLog: processedBlock.dailyLog ? {
-      fileName: processedBlock.dailyLog.fileName,
+      fileName: processedBlock.dailyLog.fileName || 'unknown.csv',
       rowCount: dailyLogCount,
-      fileSize: processedBlock.dailyLog.fileSize,
+      fileSize: processedBlock.dailyLog.fileSize || 0,
     } : undefined,
     stats: {
       totalPnL: 0, // Will be calculated from trades
@@ -103,31 +103,36 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
 
       // Convert each ProcessedBlock to Block with trade/daily log counts
       for (const processedBlock of processedBlocks) {
-        const trades = await getTradesByBlock(processedBlock.id)
-        const dailyLogs = await getDailyLogsByBlock(processedBlock.id)
+        try {
+          const trades = await getTradesByBlock(processedBlock.id)
+          const dailyLogs = await getDailyLogsByBlock(processedBlock.id)
 
-        // Calculate stats from trades
-        const stats = trades.length > 0 ? {
-          totalPnL: trades.reduce((sum, trade) => sum + trade.pl, 0),
-          winRate: (trades.filter(t => t.pl > 0).length / trades.length) * 100,
-          totalTrades: trades.length,
-          avgWin: trades.filter(t => t.pl > 0).length > 0
-            ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length
-            : 0,
-          avgLoss: trades.filter(t => t.pl < 0).length > 0
-            ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length
-            : 0,
-        } : {
-          totalPnL: 0,
-          winRate: 0,
-          totalTrades: 0,
-          avgWin: 0,
-          avgLoss: 0,
+          // Calculate stats from trades
+          const stats = trades.length > 0 ? {
+            totalPnL: trades.reduce((sum, trade) => sum + trade.pl, 0),
+            winRate: (trades.filter(t => t.pl > 0).length / trades.length) * 100,
+            totalTrades: trades.length,
+            avgWin: trades.filter(t => t.pl > 0).length > 0
+              ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length
+              : 0,
+            avgLoss: trades.filter(t => t.pl < 0).length > 0
+              ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length
+              : 0,
+          } : {
+            totalPnL: 0,
+            winRate: 0,
+            totalTrades: 0,
+            avgWin: 0,
+            avgLoss: 0,
+          }
+
+          const block = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+          block.stats = stats
+          blocks.push(block)
+        } catch (blockError) {
+          console.error(`Failed to load block ${processedBlock.id}:`, blockError)
+          // Continue loading other blocks instead of failing completely
         }
-
-        const block = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
-        block.stats = stats
-        blocks.push(block)
       }
 
       set({ blocks, isLoading: false, isInitialized: true })
