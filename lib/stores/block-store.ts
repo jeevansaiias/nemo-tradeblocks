@@ -98,6 +98,9 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
+      // Restore active block ID from localStorage
+      const savedActiveBlockId = localStorage.getItem('tradeblocks-active-block-id')
+
       const processedBlocks = await getAllBlocks()
       const blocks: Block[] = []
 
@@ -128,6 +131,10 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
 
           const block = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
           block.stats = stats
+
+          // Mark as active if this was the previously active block
+          block.isActive = block.id === savedActiveBlockId
+
           blocks.push(block)
         } catch (blockError) {
           console.error(`Failed to load block ${processedBlock.id}:`, blockError)
@@ -135,7 +142,12 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         }
       }
 
-      set({ blocks, isLoading: false, isInitialized: true })
+      // Set the active block ID if one was restored
+      const activeBlockId = savedActiveBlockId && blocks.some(b => b.id === savedActiveBlockId)
+        ? savedActiveBlockId
+        : null
+
+      set({ blocks, activeBlockId, isLoading: false, isInitialized: true })
     } catch (error) {
       console.error('Failed to load blocks:', error)
       set({
@@ -148,6 +160,9 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
 
   // Actions
   setActiveBlock: (blockId: string) => {
+    // Save to localStorage for persistence
+    localStorage.setItem('tradeblocks-active-block-id', blockId)
+
     set(state => ({
       blocks: state.blocks.map(block => ({
         ...block,
@@ -158,6 +173,9 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
   },
 
   clearActiveBlock: () => {
+    // Remove from localStorage
+    localStorage.removeItem('tradeblocks-active-block-id')
+
     set(state => ({
       blocks: state.blocks.map(block => ({
         ...block,
@@ -187,6 +205,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
           ]
         })
       }))
+
+      // Save to localStorage if this block is active
+      if (newBlock.isActive) {
+        localStorage.setItem('tradeblocks-active-block-id', newBlock.id)
+      }
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to add block' })
     }
@@ -223,6 +246,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       set(state => {
         const remainingBlocks = state.blocks.filter(block => block.id !== id)
         const wasActive = state.activeBlockId === id
+
+        // If we deleted the active block, clear localStorage
+        if (wasActive) {
+          localStorage.removeItem('tradeblocks-active-block-id')
+        }
 
         return {
           blocks: remainingBlocks,

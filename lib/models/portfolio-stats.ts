@@ -10,11 +10,22 @@ export interface PortfolioStats {
   maxWin: number
   maxLoss: number
   sharpeRatio?: number
+  sortinoRatio?: number
+  calmarRatio?: number
+  cagr?: number  // Compound Annual Growth Rate
+  kellyPercentage?: number
   maxDrawdown: number
   avgDailyPl: number
   totalCommissions: number
   netPl: number
   profitFactor: number
+  // Streak and consistency metrics
+  maxWinStreak?: number
+  maxLossStreak?: number
+  currentStreak?: number
+  timeInDrawdown?: number  // Percentage of time in drawdown
+  monthlyWinRate?: number
+  weeklyWinRate?: number
 }
 
 /**

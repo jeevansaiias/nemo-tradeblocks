@@ -311,13 +311,8 @@ export class DailyLogProcessor {
         blockId,
       }
 
-      // Convert percentage values to decimals if they appear to be percentages (> 1)
-      if (Math.abs(entry.dailyPlPct) > 1) {
-        entry.dailyPlPct = entry.dailyPlPct / 100
-      }
-      if (Math.abs(entry.drawdownPct) > 1) {
-        entry.drawdownPct = entry.drawdownPct / 100
-      }
+      // Keep percentage values as they are from CSV to match legacy behavior
+      // Legacy Python expects percentage values (e.g., -5.55), not decimals (e.g., -0.0555)
 
       // Final validation with Zod schema
       const validatedEntry = dailyLogEntrySchema.parse(entry)

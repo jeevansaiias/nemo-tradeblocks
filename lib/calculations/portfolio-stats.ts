@@ -79,6 +79,21 @@ export class PortfolioStatsCalculator {
     // Sharpe ratio (if we have daily data)
     const sharpeRatio = this.calculateSharpeRatio(trades, dailyLogEntries)
 
+    // Advanced metrics
+    const cagr = this.calculateCAGR(trades, dailyLogEntries)
+    const sortinoRatio = this.calculateSortinoRatio(trades, dailyLogEntries)
+    const calmarRatio = this.calculateCalmarRatio(trades, dailyLogEntries)
+    const kellyPercentage = this.calculateKellyPercentage(trades)
+
+    // Streak calculations
+    const streaks = this.calculateStreaks(trades)
+
+    // Time in drawdown
+    const timeInDrawdown = this.calculateTimeInDrawdown(trades, dailyLogEntries)
+
+    // Periodic win rates
+    const periodicWinRates = this.calculatePeriodicWinRates(trades)
+
     return {
       totalTrades,
       totalPl,
@@ -88,6 +103,16 @@ export class PortfolioStatsCalculator {
       maxWin,
       maxLoss,
       sharpeRatio,
+      sortinoRatio,
+      calmarRatio,
+      cagr,
+      kellyPercentage,
+      maxWinStreak: streaks.maxWinStreak,
+      maxLossStreak: streaks.maxLossStreak,
+      currentStreak: streaks.currentStreak,
+      timeInDrawdown,
+      monthlyWinRate: periodicWinRates.monthlyWinRate,
+      weeklyWinRate: periodicWinRates.weeklyWinRate,
       maxDrawdown,
       avgDailyPl,
       totalCommissions,
@@ -147,7 +172,16 @@ export class PortfolioStatsCalculator {
   private calculateMaxDrawdown(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number {
     // If we have daily log data, use it for more accurate drawdown
     if (dailyLogEntries && dailyLogEntries.length > 0) {
-      return Math.min(...dailyLogEntries.map(entry => entry.drawdownPct))
+      // Match legacy: take absolute value of each drawdown, then find maximum
+      let maxDrawdown = 0.0
+
+      for (const entry of dailyLogEntries) {
+        // Daily log contains percentage values (e.g., -5.55), same as legacy Python
+        const drawdownPct = Math.abs(entry.drawdownPct || 0)  // Make sure it's positive
+        maxDrawdown = Math.max(maxDrawdown, drawdownPct)
+      }
+
+      return maxDrawdown
     }
 
     // Otherwise calculate from trade data
@@ -290,6 +324,289 @@ export class PortfolioStatsCalculator {
   }
 
   /**
+   * Calculate Compound Annual Growth Rate (CAGR)
+   */
+  private calculateCAGR(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number | undefined {
+    if (trades.length === 0) return undefined
+
+    const sortedTrades = [...trades].sort((a, b) => {
+      const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return a.timeOpened.localeCompare(b.timeOpened)
+    })
+
+    const startDate = new Date(sortedTrades[0].dateOpened)
+    const endDate = new Date(sortedTrades[sortedTrades.length - 1].dateClosed || sortedTrades[sortedTrades.length - 1].dateOpened)
+    const totalYears = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+
+    if (totalYears <= 0) return undefined
+
+    const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(trades)
+    const finalValue = initialCapital + trades.reduce((sum, trade) => sum + trade.pl, 0)
+
+    if (initialCapital <= 0 || finalValue <= 0) return undefined
+
+    const cagr = Math.pow(finalValue / initialCapital, 1 / totalYears) - 1
+    return cagr * 100  // Return as percentage
+  }
+
+  /**
+   * Calculate Sortino Ratio
+   */
+  private calculateSortinoRatio(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number | undefined {
+    if (trades.length < 2) return undefined
+
+    const dailyReturns = this.calculateDailyReturns(trades, dailyLogEntries)
+    if (dailyReturns.length < 2) return undefined
+
+    const dailyRiskFreeRate = this.config.riskFreeRate / 100 / this.config.annualizationFactor
+
+    // Calculate excess returns (returns minus risk-free rate)
+    const excessReturns = dailyReturns.map(ret => ret - dailyRiskFreeRate)
+    const avgExcessReturn = excessReturns.reduce((sum, ret) => sum + ret, 0) / excessReturns.length
+
+    // Only consider negative excess returns for downside deviation
+    const negativeExcessReturns = excessReturns.filter(ret => ret < 0)
+    if (negativeExcessReturns.length === 0) return undefined
+
+    // Calculate downside deviation to match numpy.std behavior
+    // numpy.std calculates: sqrt(mean((x - mean(x))**2))
+    const meanNegativeReturns = negativeExcessReturns.reduce((sum, ret) => sum + ret, 0) / negativeExcessReturns.length
+    const downsideVariance = negativeExcessReturns.reduce((sum, ret) => sum + Math.pow(ret - meanNegativeReturns, 2), 0) / negativeExcessReturns.length
+    const downsideDeviation = Math.sqrt(downsideVariance)
+
+    if (downsideDeviation === 0) return undefined
+
+    const sortinoRatio = (avgExcessReturn / downsideDeviation) * Math.sqrt(this.config.annualizationFactor)
+
+    return sortinoRatio
+  }
+
+  /**
+   * Calculate Calmar Ratio
+   */
+  private calculateCalmarRatio(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number | undefined {
+    const cagr = this.calculateCAGR(trades, dailyLogEntries)
+    const maxDrawdown = Math.abs(this.calculateMaxDrawdown(trades, dailyLogEntries))
+
+    if (!cagr || maxDrawdown === 0) return undefined
+
+    return cagr / maxDrawdown
+  }
+
+  /**
+   * Calculate Kelly Criterion Percentage
+   */
+  private calculateKellyPercentage(trades: Trade[]): number | undefined {
+    if (trades.length === 0) return undefined
+
+    const winningTrades = trades.filter(trade => trade.pl > 0)
+    const losingTrades = trades.filter(trade => trade.pl < 0)
+
+    if (winningTrades.length === 0 || losingTrades.length === 0) return undefined
+
+    const winRate = winningTrades.length / trades.length
+    const avgWin = winningTrades.reduce((sum, trade) => sum + trade.pl, 0) / winningTrades.length
+    const avgLoss = Math.abs(losingTrades.reduce((sum, trade) => sum + trade.pl, 0) / losingTrades.length)
+
+    if (avgLoss === 0) return undefined
+
+    const winLossRatio = avgWin / avgLoss
+    const kellyPercentage = (winRate * winLossRatio - (1 - winRate)) / winLossRatio
+
+    return kellyPercentage * 100  // Return as percentage
+  }
+
+  /**
+   * Calculate win/loss streaks
+   */
+  private calculateStreaks(trades: Trade[]): {
+    maxWinStreak: number
+    maxLossStreak: number
+    currentStreak: number
+  } {
+    if (trades.length === 0) {
+      return { maxWinStreak: 0, maxLossStreak: 0, currentStreak: 0 }
+    }
+
+    const sortedTrades = [...trades].sort((a, b) => {
+      const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return a.timeOpened.localeCompare(b.timeOpened)
+    })
+
+    let maxWinStreak = 0
+    let maxLossStreak = 0
+    let currentWinStreak = 0
+    let currentLossStreak = 0
+
+    for (const trade of sortedTrades) {
+      if (trade.pl > 0) {
+        currentWinStreak++
+        currentLossStreak = 0
+        maxWinStreak = Math.max(maxWinStreak, currentWinStreak)
+      } else if (trade.pl < 0) {
+        currentLossStreak++
+        currentWinStreak = 0
+        maxLossStreak = Math.max(maxLossStreak, currentLossStreak)
+      }
+    }
+
+    // Current streak is the last streak (win or loss)
+    const lastTrade = sortedTrades[sortedTrades.length - 1]
+    const currentStreak = lastTrade.pl > 0 ? currentWinStreak : lastTrade.pl < 0 ? -currentLossStreak : 0
+
+    return { maxWinStreak, maxLossStreak, currentStreak }
+  }
+
+  /**
+   * Calculate time in drawdown
+   */
+  private calculateTimeInDrawdown(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number | undefined {
+    if (dailyLogEntries && dailyLogEntries.length > 0) {
+      const daysInDrawdown = dailyLogEntries.filter(entry => entry.drawdownPct < 0).length
+      return (daysInDrawdown / dailyLogEntries.length) * 100
+    }
+
+    // If no daily log, calculate from trade data
+    if (trades.length === 0) return undefined
+
+    const sortedTrades = [...trades].sort((a, b) => {
+      const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return a.timeOpened.localeCompare(b.timeOpened)
+    })
+
+    const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(trades)
+    let runningPl = 0
+    let peak = initialCapital
+    let daysInDrawdown = 0
+    let totalDays = 0
+
+    // Track portfolio value by date
+    const valuesByDate = new Map<string, number>()
+
+    for (const trade of sortedTrades) {
+      runningPl += trade.pl
+      const currentValue = initialCapital + runningPl
+      const dateKey = new Date(trade.dateOpened).toISOString().split('T')[0]
+      valuesByDate.set(dateKey, currentValue)
+    }
+
+    // Count days in drawdown
+    for (const [date, value] of valuesByDate) {
+      totalDays++
+      if (value > peak) {
+        peak = value
+      } else if (value < peak) {
+        daysInDrawdown++
+      }
+    }
+
+    return totalDays > 0 ? (daysInDrawdown / totalDays) * 100 : undefined
+  }
+
+  /**
+   * Calculate periodic win rates
+   */
+  private calculatePeriodicWinRates(trades: Trade[]): {
+    monthlyWinRate: number
+    weeklyWinRate: number
+  } {
+    if (trades.length === 0) {
+      return { monthlyWinRate: 0, weeklyWinRate: 0 }
+    }
+
+    // Group trades by month and week
+    const monthlyTrades = new Map<string, Trade[]>()
+    const weeklyTrades = new Map<string, Trade[]>()
+
+    for (const trade of trades) {
+      const date = new Date(trade.dateOpened)
+
+      // Monthly grouping (YYYY-MM)
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      if (!monthlyTrades.has(monthKey)) {
+        monthlyTrades.set(monthKey, [])
+      }
+      monthlyTrades.get(monthKey)!.push(trade)
+
+      // Weekly grouping (YYYY-WW)
+      const startOfYear = new Date(date.getFullYear(), 0, 1)
+      const weekNumber = Math.ceil(((date.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+      const weekKey = `${date.getFullYear()}-${String(weekNumber).padStart(2, '0')}`
+      if (!weeklyTrades.has(weekKey)) {
+        weeklyTrades.set(weekKey, [])
+      }
+      weeklyTrades.get(weekKey)!.push(trade)
+    }
+
+    // Calculate monthly win rate
+    let profitableMonths = 0
+    for (const [month, monthTrades] of monthlyTrades) {
+      const monthPl = monthTrades.reduce((sum, trade) => sum + trade.pl, 0)
+      if (monthPl > 0) profitableMonths++
+    }
+    const monthlyWinRate = monthlyTrades.size > 0 ? (profitableMonths / monthlyTrades.size) * 100 : 0
+
+    // Calculate weekly win rate
+    let profitableWeeks = 0
+    for (const [week, weekTrades] of weeklyTrades) {
+      const weekPl = weekTrades.reduce((sum, trade) => sum + trade.pl, 0)
+      if (weekPl > 0) profitableWeeks++
+    }
+    const weeklyWinRate = weeklyTrades.size > 0 ? (profitableWeeks / weeklyTrades.size) * 100 : 0
+
+    return { monthlyWinRate, weeklyWinRate }
+  }
+
+  /**
+   * Calculate daily returns for advanced metrics
+   */
+  private calculateDailyReturns(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number[] {
+    if (dailyLogEntries && dailyLogEntries.length > 0) {
+      return dailyLogEntries.map(entry => {
+        // Calculate previous day's portfolio value (net liquidity minus today's P/L)
+        const previousValue = entry.netLiquidity - entry.dailyPl
+        return previousValue > 0 ? entry.dailyPl / previousValue : 0
+      })
+    }
+
+    // Calculate from trade data
+    const sortedTrades = [...trades].sort((a, b) => {
+      const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return a.timeOpened.localeCompare(b.timeOpened)
+    })
+
+    const dailyReturns: number[] = []
+    const tradesByDate = new Map<string, Trade[]>()
+
+    // Group trades by date
+    for (const trade of sortedTrades) {
+      const dateKey = new Date(trade.dateOpened).toISOString().split('T')[0]
+      if (!tradesByDate.has(dateKey)) {
+        tradesByDate.set(dateKey, [])
+      }
+      tradesByDate.get(dateKey)!.push(trade)
+    }
+
+    // Calculate daily returns
+    const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(trades)
+    let portfolioValue = initialCapital
+
+    for (const [date, dayTrades] of tradesByDate) {
+      const dayPl = dayTrades.reduce((sum, trade) => sum + trade.pl, 0)
+      if (portfolioValue > 0) {
+        dailyReturns.push(dayPl / portfolioValue)
+        portfolioValue += dayPl
+      }
+    }
+
+    return dailyReturns
+  }
+
+  /**
    * Get empty statistics (for zero trades)
    */
   private getEmptyStats(): PortfolioStats {
@@ -302,6 +619,16 @@ export class PortfolioStatsCalculator {
       maxWin: 0,
       maxLoss: 0,
       sharpeRatio: undefined,
+      sortinoRatio: undefined,
+      calmarRatio: undefined,
+      cagr: undefined,
+      kellyPercentage: undefined,
+      maxWinStreak: 0,
+      maxLossStreak: 0,
+      currentStreak: 0,
+      timeInDrawdown: undefined,
+      monthlyWinRate: 0,
+      weeklyWinRate: 0,
       maxDrawdown: 0,
       avgDailyPl: 0,
       totalCommissions: 0,
