@@ -508,6 +508,7 @@ export function BlockDialog({
 
         // Add to Zustand store
         const blockForStore = {
+          id: newBlock.id, // Use the actual ID from IndexedDB
           name: blockMetadata.name,
           description: blockMetadata.description,
           isActive: setAsActive,

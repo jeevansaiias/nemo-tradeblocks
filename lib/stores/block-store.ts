@@ -40,7 +40,7 @@ interface BlockStore {
   loadBlocks: () => Promise<void>
   setActiveBlock: (blockId: string) => void
   clearActiveBlock: () => void
-  addBlock: (block: Omit<Block, 'id' | 'created'>) => Promise<void>
+  addBlock: (block: Omit<Block, 'created'> | Omit<Block, 'id' | 'created'>) => Promise<void>
   updateBlock: (id: string, updates: Partial<Block>) => Promise<void>
   deleteBlock: (id: string) => Promise<void>
   refreshBlock: (id: string) => Promise<void>
@@ -189,28 +189,53 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
     try {
       const newBlock: Block = {
         ...blockData,
-        id: crypto.randomUUID(),
+        id: 'id' in blockData ? blockData.id : crypto.randomUUID(), // Use provided ID or generate new one
         created: new Date(),
         lastModified: new Date(),
       }
 
-      set(state => ({
-        blocks: [...state.blocks, newBlock],
-        // If this is marked as active, update the active block
-        ...(newBlock.isActive && {
-          activeBlockId: newBlock.id,
-          blocks: [
-            ...state.blocks.map(b => ({ ...b, isActive: false })),
-            newBlock
-          ]
-        })
-      }))
-
-      // Save to localStorage if this block is active
+      // Debug logging
       if (newBlock.isActive) {
-        localStorage.setItem('tradeblocks-active-block-id', newBlock.id)
+        console.log('Adding new active block:', newBlock.id, newBlock.name)
+      }
+
+
+      // Update state properly handling active block logic
+      set(state => {
+        if (newBlock.isActive) {
+          // If new block is active, deactivate all others and set new one as active
+          localStorage.setItem('tradeblocks-active-block-id', newBlock.id)
+          console.log('Set active block in localStorage:', newBlock.id)
+          return {
+            blocks: [
+              ...state.blocks.map(b => ({ ...b, isActive: false })),
+              newBlock
+            ],
+            activeBlockId: newBlock.id
+          }
+        } else {
+          // If new block is not active, just add it
+          return {
+            blocks: [...state.blocks, newBlock]
+          }
+        }
+      })
+
+      // If the new block is active, refresh it to load trades/daily logs
+      if (newBlock.isActive) {
+        console.log('Refreshing active block data for:', newBlock.id)
+        // Use setTimeout to ensure the block is added to the state first
+        setTimeout(async () => {
+          try {
+            await get().refreshBlock(newBlock.id)
+            console.log('Block refreshed successfully')
+          } catch (refreshError) {
+            console.error('Failed to refresh block:', refreshError)
+          }
+        }, 100)
       }
     } catch (error) {
+      console.error('Failed to add block:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to add block' })
     }
   },
