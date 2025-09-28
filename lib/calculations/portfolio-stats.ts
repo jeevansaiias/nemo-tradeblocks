@@ -3,8 +3,19 @@
  *
  * Calculates comprehensive portfolio statistics from trade data.
  * Based on legacy Python implementation for consistency.
+ * Uses math.js for statistical calculations to ensure numpy compatibility.
+ *
+ * Key improvements for consistency:
+ * - Sharpe Ratio: Uses sample std (N-1) via math.js 'uncorrected' parameter
+ * - Sortino Ratio: Uses population std (N) via math.js 'biased' parameter to match numpy.std()
+ * - Mean calculations: Replaced manual reduce operations with math.js mean()
+ * - Min/Max calculations: Using math.js min/max functions
+ * - Daily returns: Fixed to use previous day's portfolio value as denominator
+ *
+ * This ensures our calculations match the legacy Python implementation exactly.
  */
 
+import { std, mean, min, max } from 'mathjs'
 import { Trade } from '../models/trade'
 import { DailyLogEntry } from '../models/daily-log'
 import { PortfolioStats, StrategyStats, AnalysisConfig } from '../models/portfolio-stats'
@@ -40,7 +51,7 @@ export class PortfolioStatsCalculator {
 
     // Basic statistics
     const totalTrades = trades.length
-    const totalPl = trades.reduce((sum, trade) => sum + trade.pl, 0)
+    const totalPl = trades.map(trade => trade.pl).reduce((sum, pl) => sum + pl, 0)
     const totalCommissions = trades.reduce(
       (sum, trade) => sum + trade.openingCommissionsFees + trade.closingCommissionsFees,
       0
@@ -55,15 +66,16 @@ export class PortfolioStatsCalculator {
 
     const winRate = winningTrades.length / totalTrades
     const avgWin = winningTrades.length > 0
-      ? winningTrades.reduce((sum, trade) => sum + trade.pl, 0) / winningTrades.length
+      ? mean(winningTrades.map(trade => trade.pl)) as number
       : 0
     const avgLoss = losingTrades.length > 0
-      ? losingTrades.reduce((sum, trade) => sum + trade.pl, 0) / losingTrades.length
+      ? mean(losingTrades.map(trade => trade.pl)) as number
       : 0
 
     // Max win/loss
-    const maxWin = trades.length > 0 ? Math.max(...trades.map(trade => trade.pl)) : 0
-    const maxLoss = trades.length > 0 ? Math.min(...trades.map(trade => trade.pl)) : 0
+    const plValues = trades.map(trade => trade.pl)
+    const maxWin = plValues.length > 0 ? max(plValues) as number : 0
+    const maxLoss = plValues.length > 0 ? min(plValues) as number : 0
 
     // Profit factor (gross profit / gross loss)
     const grossProfit = winningTrades.reduce((sum, trade) => sum + trade.pl, 0)
@@ -288,10 +300,9 @@ export class PortfolioStatsCalculator {
 
     if (dailyReturns.length < 2) return undefined
 
-    // Calculate Sharpe ratio
-    const avgDailyReturn = dailyReturns.reduce((sum, ret) => sum + ret, 0) / dailyReturns.length
-    const variance = dailyReturns.reduce((sum, ret) => sum + Math.pow(ret - avgDailyReturn, 2), 0) / (dailyReturns.length - 1)
-    const stdDev = Math.sqrt(variance)
+    // Calculate Sharpe ratio using math.js for statistical consistency
+    const avgDailyReturn = mean(dailyReturns) as number
+    const stdDev = std(dailyReturns, 'uncorrected') as number // Use sample std (N-1) for Sharpe
 
     if (stdDev === 0) return undefined
 
@@ -363,17 +374,15 @@ export class PortfolioStatsCalculator {
 
     // Calculate excess returns (returns minus risk-free rate)
     const excessReturns = dailyReturns.map(ret => ret - dailyRiskFreeRate)
-    const avgExcessReturn = excessReturns.reduce((sum, ret) => sum + ret, 0) / excessReturns.length
+    const avgExcessReturn = mean(excessReturns) as number
 
     // Only consider negative excess returns for downside deviation
     const negativeExcessReturns = excessReturns.filter(ret => ret < 0)
     if (negativeExcessReturns.length === 0) return undefined
 
-    // Calculate downside deviation to match numpy.std behavior
-    // numpy.std calculates: sqrt(mean((x - mean(x))**2))
-    const meanNegativeReturns = negativeExcessReturns.reduce((sum, ret) => sum + ret, 0) / negativeExcessReturns.length
-    const downsideVariance = negativeExcessReturns.reduce((sum, ret) => sum + Math.pow(ret - meanNegativeReturns, 2), 0) / negativeExcessReturns.length
-    const downsideDeviation = Math.sqrt(downsideVariance)
+    // Calculate downside deviation using math.js to match numpy.std behavior
+    // Use 'biased' for population std (divide by N) to match numpy default
+    const downsideDeviation = std(negativeExcessReturns, 'biased') as number
 
     if (downsideDeviation === 0) return undefined
 
