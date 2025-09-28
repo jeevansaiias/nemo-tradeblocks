@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock } from '../db'
 import { ProcessedBlock } from '../models/block'
+import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
 
 export interface Block {
   id: string
@@ -44,6 +45,7 @@ interface BlockStore {
   updateBlock: (id: string, updates: Partial<Block>) => Promise<void>
   deleteBlock: (id: string) => Promise<void>
   refreshBlock: (id: string) => Promise<void>
+  recalculateBlock: (id: string) => Promise<void>
 }
 
 /**
@@ -326,6 +328,69 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       }))
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to refresh block' })
+    }
+  },
+
+  recalculateBlock: async (id: string) => {
+    try {
+      console.log('Recalculating block:', id)
+      set({ error: null })
+
+      // Get the block and its data
+      const processedBlock = await getBlock(id)
+      if (!processedBlock) {
+        throw new Error('Block not found')
+      }
+
+      const [trades, dailyLogs] = await Promise.all([
+        getTradesByBlock(id),
+        getDailyLogsByBlock(id)
+      ])
+
+      console.log(`Recalculating stats for ${trades.length} trades and ${dailyLogs.length} daily logs`)
+
+      // Recalculate all stats using the current calculation engine
+      const calculator = new PortfolioStatsCalculator({
+        riskFreeRate: 2.0, // Default rate, could be made configurable
+      })
+
+      const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs)
+
+      // Calculate basic stats for the UI
+      const basicStats = trades.length > 0 ? {
+        totalPnL: trades.reduce((sum, trade) => sum + trade.pl, 0),
+        winRate: (trades.filter(t => t.pl > 0).length / trades.length) * 100,
+        totalTrades: trades.length,
+        avgWin: trades.filter(t => t.pl > 0).length > 0
+          ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length
+          : 0,
+        avgLoss: trades.filter(t => t.pl < 0).length > 0
+          ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length
+          : 0,
+      } : {
+        totalPnL: 0,
+        winRate: 0,
+        totalTrades: 0,
+        avgWin: 0,
+        avgLoss: 0,
+      }
+
+      // Create updated block for store
+      const updatedBlock = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+      updatedBlock.stats = basicStats
+      updatedBlock.lastModified = new Date()
+
+      // Update in store
+      set(state => ({
+        blocks: state.blocks.map(block =>
+          block.id === id ? { ...updatedBlock, isActive: block.isActive } : block
+        )
+      }))
+
+      console.log('Block recalculation completed successfully')
+    } catch (error) {
+      console.error('Failed to recalculate block:', error)
+      set({ error: error instanceof Error ? error.message : 'Failed to recalculate block' })
     }
   }
 }))

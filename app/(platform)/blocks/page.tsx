@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useBlockStore, type Block } from "@/lib/stores/block-store";
-import { Activity, Calendar, Grid3X3, List, Plus, Search } from "lucide-react";
+import { Activity, Calendar, Grid3X3, List, Plus, Search, RotateCcw } from "lucide-react";
 import React, { useState } from "react";
 
 function BlockCard({
@@ -17,6 +17,8 @@ function BlockCard({
   onEdit: (block: Block) => void;
 }) {
   const setActiveBlock = useBlockStore(state => state.setActiveBlock);
+  const recalculateBlock = useBlockStore(state => state.recalculateBlock);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   const formatDate = (date: Date) =>
     new Intl.DateTimeFormat("en-US", {
@@ -24,6 +26,17 @@ function BlockCard({
       day: "numeric",
       year: "numeric",
     }).format(date);
+
+  const handleRecalculate = async () => {
+    setIsRecalculating(true);
+    try {
+      await recalculateBlock(block.id);
+    } catch (error) {
+      console.error('Failed to recalculate block:', error);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
 
   return (
     <Card
@@ -88,6 +101,15 @@ function BlockCard({
             onClick={() => onEdit(block)}
           >
             Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRecalculate}
+            disabled={isRecalculating}
+            className="px-3"
+          >
+            <RotateCcw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </CardContent>
