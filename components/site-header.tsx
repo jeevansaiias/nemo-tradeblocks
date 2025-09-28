@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 
-import { ModeToggle } from "@/components/mode-toggle"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { ModeToggle } from "@/components/mode-toggle";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const routeMeta: Record<
   string,
@@ -19,7 +19,6 @@ const routeMeta: Record<
   "/block-stats": {
     title: "Block Stats & Analytics",
     description: "Measure the health of your active trading block at a glance.",
-    badge: "Live",
   },
   "/performance-blocks": {
     title: "Performance Blocks",
@@ -31,7 +30,8 @@ const routeMeta: Record<
   },
   "/position-sizing": {
     title: "Position Sizing",
-    description: "Dial in optimal size with Kelly, volatility caps, and constraints.",
+    description:
+      "Dial in optimal size with Kelly, volatility caps, and constraints.",
   },
   "/correlation-matrix": {
     title: "Correlation Matrix",
@@ -39,18 +39,19 @@ const routeMeta: Record<
   },
   "/settings": {
     title: "Settings",
-    description: "Configure account defaults, risk tolerances, and integrations.",
+    description:
+      "Configure account defaults, risk tolerances, and integrations.",
   },
-}
+};
 
 export function SiteHeader() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   const meta = useMemo(() => {
-    if (!pathname) return routeMeta["/block-stats"]
-    const base = `/${pathname.split("/")[1] ?? ""}` || "/block-stats"
-    return routeMeta[base] ?? routeMeta["/block-stats"]
-  }, [pathname])
+    if (!pathname) return routeMeta["/block-stats"];
+    const base = `/${pathname.split("/")[1] ?? ""}` || "/block-stats";
+    return routeMeta[base] ?? routeMeta["/block-stats"];
+  }, [pathname]);
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center border-b bg-background/70 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
@@ -77,5 +78,5 @@ export function SiteHeader() {
         </div>
       </div>
     </header>
-  )
+  );
 }
