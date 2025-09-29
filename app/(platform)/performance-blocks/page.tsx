@@ -194,33 +194,29 @@ export default function PerformanceBlocksPage() {
       </div>
 
       {/* Main Equity Analysis - Full Width */}
-      <div className="space-y-6">
-        <EquityCurveChart className="col-span-full" />
-      </div>
+      <EquityCurveChart />
 
-      {/* Secondary Charts - Two Column Grid */}
+      {/* Drawdown Analysis - Full Width */}
+      <DrawdownChart />
+
+      {/* Win/Loss Streaks - Full Width */}
+      <Card>
+        <CardContent className="p-6 flex items-center justify-center h-[300px]">
+          <div className="text-center text-muted-foreground">
+            <div className="text-4xl mb-2">🎯</div>
+            <div className="font-medium">Win/Loss Streaks</div>
+            <div className="text-sm">Coming soon...</div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Distribution and Pattern Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DrawdownChart />
+        <ReturnDistributionChart />
         <DayOfWeekChart />
       </div>
 
-      {/* Distribution Analysis - Two Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ReturnDistributionChart />
-
-        {/* Placeholder for additional charts */}
-        <Card>
-          <CardContent className="p-6 flex items-center justify-center h-[300px]">
-            <div className="text-center text-muted-foreground">
-              <div className="text-4xl mb-2">🎯</div>
-              <div className="font-medium">Win/Loss Streaks</div>
-              <div className="text-sm">Coming soon...</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Additional Analysis Placeholders */}
+      {/* Monthly and Trade Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-6 flex items-center justify-center h-[300px]">
@@ -243,7 +239,7 @@ export default function PerformanceBlocksPage() {
         </Card>
       </div>
 
-      {/* Rolling Analysis */}
+      {/* Rolling Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-6 flex items-center justify-center h-[300px]">
