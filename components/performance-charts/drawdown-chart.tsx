@@ -97,14 +97,16 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
     const chartLayout: Partial<Layout> = {
       ...createLineChartLayout('', 'Date', 'Drawdown (%)'),
       yaxis: {
-        title: { text: 'Drawdown (%)' },
+        title: {
+          text: 'Drawdown (%)',
+          standoff: 50 // Match equity curve chart spacing
+        },
         showgrid: true,
         zeroline: true,
         zerolinecolor: '#000',
         zerolinewidth: 1,
         tickformat: '.1f',
         range: yAxisRange, // Show from deepest drawdown to above zero
-        automargin: false, // Disable automargin to ensure our range is respected
         fixedrange: false, // Allow zoom but start with our range
         type: 'linear' // Ensure linear scaling
       },
@@ -127,7 +129,13 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
         ax: 0,
         ay: -30,
         font: { size: 10, color: theme === 'dark' ? '#f8fafc' : '#0f172a' } // White in dark mode, black in light mode
-      }]
+      }],
+      margin: {
+        l: 60, // Reduce left margin since percentage labels are shorter than dollar amounts
+        r: 30,
+        t: 60,
+        b: 50
+      }
     }
 
 
@@ -153,7 +161,7 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
       className={className}
       data={plotData}
       layout={layout}
-      style={{ height: '300px' }}
+      style={{ height: '400px' }}
     />
   )
 }
