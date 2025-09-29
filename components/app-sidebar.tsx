@@ -6,7 +6,6 @@ import {
   IconLayoutDashboard,
   IconReportAnalytics,
   IconRouteSquare,
-  IconSettings,
   IconStack2,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
@@ -60,11 +59,6 @@ const navData = {
       href: "/correlation-matrix",
       icon: IconChartHistogram,
     },
-    {
-      title: "Settings",
-      href: "/settings",
-      icon: IconSettings,
-    },
   ],
   activeSets: [
     {
@@ -102,11 +96,12 @@ const navData = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const blocks = useBlockStore(state => state.blocks);
-  const activeBlockId = useBlockStore(state => state.activeBlockId);
-  const isInitialized = useBlockStore(state => state.isInitialized);
-  const loadBlocks = useBlockStore(state => state.loadBlocks);
-  const activeBlock = blocks.find(block => block.id === activeBlockId) || null;
+  const blocks = useBlockStore((state) => state.blocks);
+  const activeBlockId = useBlockStore((state) => state.activeBlockId);
+  const isInitialized = useBlockStore((state) => state.isInitialized);
+  const loadBlocks = useBlockStore((state) => state.loadBlocks);
+  const activeBlock =
+    blocks.find((block) => block.id === activeBlockId) || null;
   const hasActiveBlock = activeBlock !== null;
 
   // Load blocks from IndexedDB on mount
