@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { ChartWrapper, createLineChartLayout } from './chart-wrapper'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
+import { useTheme } from 'next-themes'
 import type { PlotData, Layout } from 'plotly.js'
 
 interface DrawdownChartProps {
@@ -11,6 +12,7 @@ interface DrawdownChartProps {
 
 export function DrawdownChart({ className }: DrawdownChartProps) {
   const { data } = usePerformanceStore()
+  const { theme } = useTheme()
 
   const { plotData, layout } = useMemo(() => {
     if (!data?.drawdownData) {
@@ -19,20 +21,33 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
 
     const { drawdownData } = data
 
-    // Find maximum drawdown point
-    const maxDrawdownPoint = drawdownData.reduce((max, current) =>
-      current.drawdownPct < max.drawdownPct ? current : max
-    )
+    // Find maximum drawdown point (most negative value)
+    // Use explicit initial value to avoid potential reduce edge cases
+    const maxDrawdownPoint = drawdownData.length > 0
+      ? drawdownData.reduce((max, current) =>
+          current.drawdownPct < max.drawdownPct ? current : max
+        )
+      : { date: '', drawdownPct: 0 }
+
 
     // Main drawdown area
     const drawdownTrace: Partial<PlotData> = {
       x: drawdownData.map(point => point.date),
       y: drawdownData.map(point => point.drawdownPct),
       type: 'scatter' as const,
-      mode: 'lines',
+      mode: 'lines+markers', // Add markers to ensure all points are visible
       name: 'Drawdown %',
-      line: { color: '#ef4444', width: 0 },
-      fill: 'tonexty',
+      line: {
+        color: '#ef4444',
+        width: 1, // Make line visible
+        shape: 'linear' // Preserve sharp changes, no smoothing
+      },
+      marker: {
+        color: '#ef4444',
+        size: 2, // Small markers
+        opacity: 0.6
+      },
+      fill: 'tozeroy', // Fill to y=0 directly instead of tonexty
       fillcolor: 'rgba(239, 68, 68, 0.3)',
       hovertemplate:
         '<b>Date:</b> %{x}<br>' +
@@ -74,7 +89,10 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
 
     const traces: Partial<PlotData>[] = [zeroLineTrace, drawdownTrace, maxDrawdownTrace]
 
-    const minDrawdown = Math.min(...drawdownData.map(d => d.drawdownPct))
+    // Use the same max drawdown point for consistency
+    const minDrawdown = maxDrawdownPoint.drawdownPct
+
+    const yAxisRange = [minDrawdown * 1.1, 5]
 
     const chartLayout: Partial<Layout> = {
       ...createLineChartLayout('', 'Date', 'Drawdown (%)'),
@@ -85,7 +103,10 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
         zerolinecolor: '#000',
         zerolinewidth: 1,
         tickformat: '.1f',
-        range: [minDrawdown * 1.1, 5] // Show a bit above zero
+        range: yAxisRange, // Show from deepest drawdown to above zero
+        automargin: false, // Disable automargin to ensure our range is respected
+        fixedrange: false, // Allow zoom but start with our range
+        type: 'linear' // Ensure linear scaling
       },
       legend: {
         orientation: 'h',
@@ -102,15 +123,16 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
         arrowhead: 2,
         arrowsize: 1,
         arrowwidth: 2,
-        arrowcolor: '#dc2626',
+        arrowcolor: theme === 'dark' ? '#f8fafc' : '#0f172a', // White in dark mode, black in light mode
         ax: 0,
         ay: -30,
-        font: { size: 10, color: '#dc2626' }
+        font: { size: 10, color: theme === 'dark' ? '#f8fafc' : '#0f172a' } // White in dark mode, black in light mode
       }]
     }
 
+
     return { plotData: traces, layout: chartLayout }
-  }, [data])
+  }, [data, theme])
 
   if (!data) {
     return (

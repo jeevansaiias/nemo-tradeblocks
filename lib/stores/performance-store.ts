@@ -273,8 +273,13 @@ function calculateEquityCurve(trades: Trade[]) {
     runningEquity += trade.pl
     highWaterMark = Math.max(highWaterMark, runningEquity)
 
+    // Create unique timestamps for trades on the same day
+    // Add seconds/milliseconds based on trade index to ensure uniqueness
+    const baseDate = new Date(trade.dateOpened)
+    const uniqueDate = new Date(baseDate.getTime() + index * 1000) // Add seconds
+
     curve.push({
-      date: trade.dateOpened.toISOString(),
+      date: uniqueDate.toISOString(),
       equity: runningEquity,
       highWaterMark,
       tradeNumber: index + 1
