@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock } from '../db'
 import { ProcessedBlock } from '../models/block'
-import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
+// import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
 
 export interface Block {
   id: string
@@ -350,11 +350,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       console.log(`Recalculating stats for ${trades.length} trades and ${dailyLogs.length} daily logs`)
 
       // Recalculate all stats using the current calculation engine
-      const calculator = new PortfolioStatsCalculator({
-        riskFreeRate: 2.0, // Default rate, could be made configurable
-      })
+      // const calculator = new PortfolioStatsCalculator({
+      //   riskFreeRate: 2.0, // Default rate, could be made configurable
+      // })
 
-      const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs)
+      // const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs)
 
       // Calculate basic stats for the UI
       const basicStats = trades.length > 0 ? {

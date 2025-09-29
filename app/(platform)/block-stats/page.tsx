@@ -38,6 +38,7 @@ export default function BlockStatsPage() {
   const [portfolioStats, setPortfolioStats] = useState<PortfolioStats | null>(null);
   const [strategyStats, setStrategyStats] = useState<Record<string, StrategyStats>>({});
   const [isCalculating, setIsCalculating] = useState(false);
+  const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
 
   // Get active block from store
   const activeBlock = useBlockStore(state => {
@@ -92,6 +93,7 @@ export default function BlockStatsPage() {
     if (trades.length === 0) {
       setPortfolioStats(null);
       setStrategyStats({});
+      setFilteredTrades([]);
       return;
     }
 
@@ -105,16 +107,19 @@ export default function BlockStatsPage() {
         });
 
         // Filter trades if strategies are selected
-        const filteredTrades = selectedStrategies.length > 0
+        const currentFilteredTrades = selectedStrategies.length > 0
           ? trades.filter(trade => selectedStrategies.includes(trade.strategy || 'Unknown'))
           : trades;
 
-        // Calculate portfolio stats
-        const stats = calculator.calculatePortfolioStats(filteredTrades, dailyLogs);
+        setFilteredTrades(currentFilteredTrades);
+
+        // Calculate portfolio stats with strategy filtering info
+        const isStrategyFiltered = selectedStrategies.length > 0;
+        const stats = calculator.calculatePortfolioStats(currentFilteredTrades, dailyLogs, isStrategyFiltered);
         setPortfolioStats(stats);
 
         // Calculate strategy breakdown
-        const strategies = calculator.calculateStrategyStats(filteredTrades);
+        const strategies = calculator.calculateStrategyStats(currentFilteredTrades);
         setStrategyStats(strategies);
       } catch (error) {
         console.error('Failed to calculate metrics:', error);
@@ -129,9 +134,9 @@ export default function BlockStatsPage() {
 
   // Helper functions
   const getDateRange = () => {
-    if (trades.length === 0) return "No trades";
+    if (filteredTrades.length === 0) return "No trades";
 
-    const sortedTrades = [...trades].sort((a, b) =>
+    const sortedTrades = [...filteredTrades].sort((a, b) =>
       new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
     );
 
@@ -142,15 +147,15 @@ export default function BlockStatsPage() {
   };
 
   const getInitialCapital = () => {
-    if (trades.length === 0) return 0;
-    return PortfolioStatsCalculator.calculateInitialCapital(trades);
+    if (filteredTrades.length === 0) return 0;
+    return PortfolioStatsCalculator.calculateInitialCapital(filteredTrades);
   };
 
   const getAvgReturnOnMargin = () => {
     if (!portfolioStats) return 0;
 
-    // Calculate average return on margin from trades
-    const tradesWithMargin = trades.filter(trade => trade.marginReq && trade.marginReq > 0);
+    // Calculate average return on margin from filtered trades
+    const tradesWithMargin = filteredTrades.filter(trade => trade.marginReq && trade.marginReq > 0);
     if (tradesWithMargin.length === 0) return 0;
 
     const totalReturnOnMargin = tradesWithMargin.reduce((sum, trade) => {
@@ -164,7 +169,7 @@ export default function BlockStatsPage() {
   const getStdDevOfRoM = () => {
     if (!portfolioStats) return 0;
 
-    const tradesWithMargin = trades.filter(trade => trade.marginReq && trade.marginReq > 0);
+    const tradesWithMargin = filteredTrades.filter(trade => trade.marginReq && trade.marginReq > 0);
     if (tradesWithMargin.length === 0) return 0;
 
     const avgRoM = getAvgReturnOnMargin();
@@ -175,9 +180,9 @@ export default function BlockStatsPage() {
   };
 
   const getBestTrade = () => {
-    if (!portfolioStats || trades.length === 0) return 0;
+    if (!portfolioStats || filteredTrades.length === 0) return 0;
 
-    const bestTrade = Math.max(...trades.map(trade => {
+    const bestTrade = Math.max(...filteredTrades.map(trade => {
       if (!trade.marginReq || trade.marginReq <= 0) return 0;
       return (trade.pl / trade.marginReq) * 100;
     }));
@@ -186,9 +191,9 @@ export default function BlockStatsPage() {
   };
 
   const getWorstTrade = () => {
-    if (!portfolioStats || trades.length === 0) return 0;
+    if (!portfolioStats || filteredTrades.length === 0) return 0;
 
-    const worstTrade = Math.min(...trades.map(trade => {
+    const worstTrade = Math.min(...filteredTrades.map(trade => {
       if (!trade.marginReq || trade.marginReq <= 0) return 0;
       return (trade.pl / trade.marginReq) * 100;
     }));

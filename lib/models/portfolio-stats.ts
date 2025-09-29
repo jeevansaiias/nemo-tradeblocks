@@ -4,6 +4,9 @@
 export interface PortfolioStats {
   totalTrades: number
   totalPl: number
+  winningTrades: number
+  losingTrades: number
+  breakEvenTrades: number
   winRate: number  // 0-1 decimal, not percentage
   avgWin: number
   avgLoss: number

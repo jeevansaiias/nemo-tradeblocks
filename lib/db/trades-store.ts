@@ -275,14 +275,26 @@ export async function exportTradesToCSV(blockId: string): Promise<string> {
   ]
 
   // Convert trades to CSV rows
-  const rows = trades.map(trade => [
-    trade.dateOpened instanceof Date ? trade.dateOpened.toISOString().split('T')[0] : trade.dateOpened,
+  const rows = trades.map(trade => {
+    // Format dateOpened - handle both Date objects and strings
+    const dateOpened = trade.dateOpened instanceof Date
+      ? trade.dateOpened.toISOString().split('T')[0]
+      : typeof trade.dateOpened === 'string'
+        ? new Date(trade.dateOpened).toISOString().split('T')[0]
+        : trade.dateOpened;
+
+    return [
+    dateOpened,
     trade.timeOpened,
     trade.openingPrice.toString(),
     trade.legs,
     trade.premium.toString(),
     trade.closingPrice?.toString() || '',
-    trade.dateClosed instanceof Date ? trade.dateClosed.toISOString().split('T')[0] : (trade.dateClosed || ''),
+    trade.dateClosed instanceof Date
+      ? trade.dateClosed.toISOString().split('T')[0]
+      : typeof trade.dateClosed === 'string' && trade.dateClosed !== ''
+        ? new Date(trade.dateClosed).toISOString().split('T')[0]
+        : '',
     trade.timeClosed || '',
     trade.avgClosingCost?.toString() || '',
     trade.reasonForClose || '',
@@ -301,7 +313,8 @@ export async function exportTradesToCSV(blockId: string): Promise<string> {
     trade.movement?.toString() || '',
     trade.maxProfit?.toString() || '',
     trade.maxLoss?.toString() || ''
-  ])
+  ]
+  })
 
   // Combine headers and rows
   const csvContent = [headers, ...rows]

@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import {
   Table,
   TableBody,
@@ -9,23 +16,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
-  ArrowUpDown,
-  ArrowUp,
   ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   HelpCircle,
   TrendingUp,
-  TrendingDown,
 } from "lucide-react";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface StrategyData {
   strategy: string;
@@ -158,7 +157,7 @@ export function StrategyBreakdownTable({
   const SortButton = ({
     field,
     children,
-    tooltip
+    tooltip,
   }: {
     field: SortField;
     children: React.ReactNode;
@@ -180,7 +179,9 @@ export function StrategyBreakdownTable({
             <HoverCardContent className="w-80 p-0 overflow-hidden">
               <div className="space-y-3">
                 <div className="bg-primary/5 border-b px-4 py-3">
-                  <h4 className="text-sm font-semibold text-primary">{children}</h4>
+                  <h4 className="text-sm font-semibold text-primary">
+                    {children}
+                  </h4>
                 </div>
                 <div className="px-4 pb-4 space-y-3">
                   <p className="text-sm font-medium text-foreground leading-relaxed">
@@ -235,26 +236,22 @@ export function StrategyBreakdownTable({
                   <SortButton field="totalPL">Total P/L</SortButton>
                 </TableHead>
                 <TableHead className="text-right font-semibold">
-                  <SortButton field="winRate">
-                    Win Rate
-                  </SortButton>
+                  <SortButton field="winRate">Win Rate</SortButton>
                 </TableHead>
                 <TableHead className="text-right font-semibold">
-                  <SortButton field="avgWin">
-                    Avg Win
-                  </SortButton>
+                  <SortButton field="avgWin">Avg Win</SortButton>
                 </TableHead>
                 <TableHead className="text-right font-semibold">
-                  <SortButton field="avgLoss">
-                    Avg Loss
-                  </SortButton>
+                  <SortButton field="avgLoss">Avg Loss</SortButton>
                 </TableHead>
                 <TableHead className="text-right font-semibold">
                   <SortButton
                     field="profitFactor"
                     tooltip={{
-                      flavor: "Construction efficiency ratio - total building value divided by total rebuilding costs.",
-                      detailed: "Profit Factor divides total winnings by total losses. Values above 1.0 mean profits exceed losses, while below 1.0 indicates net losses. A profit factor of 2.0 means you made $2 in profits for every $1 lost. This metric helps evaluate strategy profitability independent of win rate."
+                      flavor:
+                        "Construction efficiency ratio - total building value divided by total rebuilding costs.",
+                      detailed:
+                        "Profit Factor divides total winnings by total losses. Values above 1.0 mean profits exceed losses, while below 1.0 indicates net losses. A profit factor of 2.0 means you made $2 in profits for every $1 lost. This metric helps evaluate strategy profitability independent of win rate.",
                     }}
                   >
                     Profit Factor
@@ -278,7 +275,12 @@ export function StrategyBreakdownTable({
                       {row.trades}
                     </Badge>
                   </TableCell>
-                  <TableCell className={cn("text-right font-medium", getPLColor(row.totalPL))}>
+                  <TableCell
+                    className={cn(
+                      "text-right font-medium",
+                      getPLColor(row.totalPL)
+                    )}
+                  >
                     {formatCurrency(row.totalPL)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -290,7 +292,12 @@ export function StrategyBreakdownTable({
                   <TableCell className="text-right text-red-600 dark:text-red-400">
                     {formatCurrency(row.avgLoss)}
                   </TableCell>
-                  <TableCell className={cn("text-right font-medium", getProfitFactorColor(row.profitFactor))}>
+                  <TableCell
+                    className={cn(
+                      "text-right font-medium",
+                      getProfitFactorColor(row.profitFactor)
+                    )}
+                  >
                     {row.profitFactor.toFixed(2)}
                   </TableCell>
                 </TableRow>
