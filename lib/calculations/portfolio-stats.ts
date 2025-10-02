@@ -124,7 +124,7 @@ export class PortfolioStatsCalculator {
     const sharpeRatio = this.calculateSharpeRatio(validTrades, adjustedDailyLogs)
 
     // Advanced metrics
-    const cagr = this.calculateCAGR(validTrades, adjustedDailyLogs)
+    const cagr = this.calculateCAGR(validTrades)
     const sortinoRatio = this.calculateSortinoRatio(validTrades, adjustedDailyLogs)
     const calmarRatio = this.calculateCalmarRatio(validTrades, adjustedDailyLogs)
     const kellyPercentage = this.calculateKellyPercentage(validTrades)
@@ -404,7 +404,7 @@ export class PortfolioStatsCalculator {
   /**
    * Calculate Compound Annual Growth Rate (CAGR)
    */
-  private calculateCAGR(trades: Trade[], _dailyLogEntries?: DailyLogEntry[]): number | undefined {
+  private calculateCAGR(trades: Trade[]): number | undefined {
     if (trades.length === 0) return undefined
 
     const sortedTrades = [...trades].sort((a, b) => {
@@ -463,7 +463,7 @@ export class PortfolioStatsCalculator {
    * Calculate Calmar Ratio
    */
   private calculateCalmarRatio(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number | undefined {
-    const cagr = this.calculateCAGR(trades, dailyLogEntries)
+    const cagr = this.calculateCAGR(trades)
     const maxDrawdown = Math.abs(this.calculateMaxDrawdown(trades, dailyLogEntries))
 
     if (!cagr || maxDrawdown === 0) return undefined

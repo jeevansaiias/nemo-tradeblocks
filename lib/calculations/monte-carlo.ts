@@ -526,7 +526,7 @@ export function runMonteCarloSimulation(
   const percentiles = calculatePercentiles(simulations);
 
   // Calculate statistics
-  const statistics = calculateStatistics(simulations, params.initialCapital);
+  const statistics = calculateStatistics(simulations);
 
   return {
     simulations,
@@ -606,10 +606,7 @@ function percentile(sortedData: number[], p: number): number {
  * @param initialCapital - Starting capital
  * @returns SimulationStatistics
  */
-function calculateStatistics(
-  simulations: SimulationPath[],
-  _initialCapital: number
-): SimulationStatistics {
+function calculateStatistics(simulations: SimulationPath[]): SimulationStatistics {
   const finalValues = simulations.map((s) => s.finalValue);
   const totalReturns = simulations.map((s) => s.totalReturn);
   const annualizedReturns = simulations.map((s) => s.annualizedReturn);

@@ -129,7 +129,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs, false)
 
       // Process chart data
-      const data = await processChartData(trades, dailyLogs, portfolioStats)
+      const data = await processChartData(trades)
 
       set({
         data: {
@@ -172,7 +172,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
 
     // Always recalculate chart data when filters are applied
     // This ensures that going from filtered to unfiltered state works correctly
-    processChartData(filteredTrades, data.dailyLogs, data.portfolioStats).then(chartData => {
+    processChartData(filteredTrades).then(chartData => {
       set(state => ({
         data: state.data ? {
           ...state.data,
@@ -196,9 +196,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
 
 // Helper function to process raw data into chart-ready format
 async function processChartData(
-  trades: Trade[],
-  _dailyLogs: DailyLogEntry[],
-  _portfolioStats: PortfolioStats | null
+  trades: Trade[]
 ): Promise<Omit<PerformanceData, 'trades' | 'dailyLogs' | 'portfolioStats'>> {
   // Calculate equity curve
   const equityCurve = calculateEquityCurve(trades)
