@@ -86,6 +86,7 @@ export default function BlockStatsPage() {
     };
 
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBlock?.id]);
 
   // Calculate metrics when data or risk-free rate changes

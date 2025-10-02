@@ -6,7 +6,6 @@ import {
   formatTradesWithTime,
   getDefaultSimulationPeriod,
   getDefaultResamplePercentage,
-  type TimeUnit,
 } from "@/lib/utils/time-conversions";
 
 describe("Time Conversion Utilities", () => {

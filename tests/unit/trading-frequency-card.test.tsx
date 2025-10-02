@@ -117,7 +117,7 @@ describe("TradingFrequencyCard", () => {
     const endDate = new Date("2024-01-02");
 
     // Very high frequency: 40+ trades per day
-    let trades = createMockTrades(40, startDate, endDate);
+    const trades = createMockTrades(40, startDate, endDate);
     const { rerender } = render(<TradingFrequencyCard trades={trades} tradesPerYear={14600} />);
     expect(screen.getByText(/40 trades\/day/)).toBeInTheDocument();
 

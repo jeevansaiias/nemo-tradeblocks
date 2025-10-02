@@ -608,7 +608,7 @@ function percentile(sortedData: number[], p: number): number {
  */
 function calculateStatistics(
   simulations: SimulationPath[],
-  initialCapital: number
+  _initialCapital: number
 ): SimulationStatistics {
   const finalValues = simulations.map((s) => s.finalValue);
   const totalReturns = simulations.map((s) => s.totalReturn);
