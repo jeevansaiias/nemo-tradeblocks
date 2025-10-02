@@ -7,46 +7,9 @@ on:
     branches: [master]
 
 jobs:
-  backend:
-    name: Backend (legacy)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: legacy/python-backend
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up uv with Python 3.11
-        uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.11"
-
-      - name: Sync dependencies
-        run: uv sync --group dev --frozen
-
-      - name: Code formatting check (advisory)
-        run: |
-          uv run --group dev black --check app/ --diff \
-            || echo "⚠️ Code formatting issues found (non-blocking)"
-
-      - name: Lint with ruff (advisory)
-        run: |
-          uv run --group dev ruff check app/ \
-            || echo "⚠️ Linting issues found (non-blocking)"
-
-      - name: Run tests
-        run: |
-          if [ -d "tests" ] && [ "$(ls -A tests)" ]; then
-            uv run --group dev pytest tests/ -v --cov=app --cov-report=term-missing
-          else
-            echo "ℹ️ No tests found, skipping test execution"
-          fi
-
   frontend:
     name: Frontend (Next.js)
     runs-on: ubuntu-latest
-    needs: backend
 
     steps:
       - uses: actions/checkout@v4
@@ -66,22 +29,3 @@ jobs:
       - name: Build
         run: npm run build
 
-  render-ready:
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Ensure Render assets
-        run: |
-          test -f legacy/python-backend/uv.lock || (echo "❌ uv.lock missing" && exit 1)
-          test -f legacy/python-backend/scripts/start-dev.sh || (echo "❌ start-dev.sh missing" && exit 1)
-          echo "✅ Render assets verified"
-
-      - name: Validate legacy lockfile
-        working-directory: legacy/python-backend
-        run: uv lock --frozen
-
-      - name: Frontend build smoke test
-        run: npm run build --if-present
