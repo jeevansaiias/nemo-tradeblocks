@@ -98,7 +98,7 @@ export function ReturnDistributionChart({
         showgrid: true,
       },
       yaxis2: {
-        overlaying: "y",
+        overlaying: "y" as const,
         range: [0, 1],
         showgrid: false,
         showticklabels: false,

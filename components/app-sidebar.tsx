@@ -60,39 +60,6 @@ const navData = {
       icon: IconChartHistogram,
     },
   ],
-  activeSets: [
-    {
-      id: "2025-demo",
-      title: "2025 Over 100k Trials",
-      isActive: true,
-      lastUpdated: "Sep 18, 2025",
-      tradeLog: {
-        name: "2025-Over-100k-With-Trial-Tests.csv",
-        entries: 749,
-        type: "Trade Log",
-      },
-      dailyLog: {
-        name: "2025-Over-100k-With-Trial-Tests (1).csv",
-        entries: 178,
-        type: "Daily Log",
-      },
-    },
-    {
-      id: "2024-swing",
-      title: "2024 Swing Book",
-      lastUpdated: "Aug 02, 2025",
-      tradeLog: {
-        name: "2024-Swing-Trades.csv",
-        entries: 553,
-        type: "Trade Log",
-      },
-      dailyLog: {
-        name: "2024-Swing-Notes.csv",
-        entries: 211,
-        type: "Daily Log",
-      },
-    },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
