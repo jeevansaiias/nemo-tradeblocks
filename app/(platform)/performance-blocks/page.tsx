@@ -12,6 +12,9 @@ import { DayOfWeekChart } from '@/components/performance-charts/day-of-week-char
 import { ReturnDistributionChart } from '@/components/performance-charts/return-distribution-chart'
 import { WinLossStreaksChart } from '@/components/performance-charts/win-loss-streaks-chart'
 import { MonthlyReturnsChart } from '@/components/performance-charts/monthly-returns-chart'
+import { TradeSequenceChart } from '@/components/performance-charts/trade-sequence-chart'
+import { RollingMetricsChart } from '@/components/performance-charts/rolling-metrics-chart'
+import { RiskEvolutionChart } from '@/components/performance-charts/risk-evolution-chart'
 
 // UI Components
 import { MultiSelect } from '@/components/multi-select'
@@ -213,39 +216,13 @@ export default function PerformanceBlocksPage() {
       {/* Monthly and Trade Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MonthlyReturnsChart />
-
-        <Card>
-          <CardContent className="p-6 flex items-center justify-center h-[300px]">
-            <div className="text-center text-muted-foreground">
-              <div className="text-4xl mb-2">📊</div>
-              <div className="font-medium">Trade Sequence</div>
-              <div className="text-sm">Coming soon...</div>
-            </div>
-          </CardContent>
-        </Card>
+        <TradeSequenceChart />
       </div>
 
       {/* Rolling Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardContent className="p-6 flex items-center justify-center h-[300px]">
-            <div className="text-center text-muted-foreground">
-              <div className="text-4xl mb-2">📈</div>
-              <div className="font-medium">Rolling Metrics</div>
-              <div className="text-sm">Coming soon...</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6 flex items-center justify-center h-[300px]">
-            <div className="text-center text-muted-foreground">
-              <div className="text-4xl mb-2">⚠️</div>
-              <div className="font-medium">Risk Evolution</div>
-              <div className="text-sm">Coming soon...</div>
-            </div>
-          </CardContent>
-        </Card>
+        <RollingMetricsChart />
+        <RiskEvolutionChart />
       </div>
     </div>
   )
