@@ -10,6 +10,8 @@ import { EquityCurveChart } from '@/components/performance-charts/equity-curve-c
 import { DrawdownChart } from '@/components/performance-charts/drawdown-chart'
 import { DayOfWeekChart } from '@/components/performance-charts/day-of-week-chart'
 import { ReturnDistributionChart } from '@/components/performance-charts/return-distribution-chart'
+import { WinLossStreaksChart } from '@/components/performance-charts/win-loss-streaks-chart'
+import { MonthlyReturnsChart } from '@/components/performance-charts/monthly-returns-chart'
 
 // UI Components
 import { MultiSelect } from '@/components/multi-select'
@@ -200,15 +202,7 @@ export default function PerformanceBlocksPage() {
       <DrawdownChart />
 
       {/* Win/Loss Streaks - Full Width */}
-      <Card>
-        <CardContent className="p-6 flex items-center justify-center h-[300px]">
-          <div className="text-center text-muted-foreground">
-            <div className="text-4xl mb-2">🎯</div>
-            <div className="font-medium">Win/Loss Streaks</div>
-            <div className="text-sm">Coming soon...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <WinLossStreaksChart />
 
       {/* Distribution and Pattern Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -218,15 +212,7 @@ export default function PerformanceBlocksPage() {
 
       {/* Monthly and Trade Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardContent className="p-6 flex items-center justify-center h-[300px]">
-            <div className="text-center text-muted-foreground">
-              <div className="text-4xl mb-2">📅</div>
-              <div className="font-medium">Monthly Returns</div>
-              <div className="text-sm">Coming soon...</div>
-            </div>
-          </CardContent>
-        </Card>
+        <MonthlyReturnsChart />
 
         <Card>
           <CardContent className="p-6 flex items-center justify-center h-[300px]">

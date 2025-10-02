@@ -31,6 +31,12 @@ function BlockCard({
     setIsRecalculating(true);
     try {
       await recalculateBlock(block.id);
+
+      // If this block is active, also refresh the performance store
+      if (block.isActive) {
+        const { usePerformanceStore } = await import('@/lib/stores/performance-store');
+        await usePerformanceStore.getState().fetchPerformanceData(block.id);
+      }
     } catch (error) {
       console.error('Failed to recalculate block:', error);
     } finally {
@@ -107,9 +113,10 @@ function BlockCard({
             variant="outline"
             onClick={handleRecalculate}
             disabled={isRecalculating}
-            className="px-3"
+            title="Recalculate statistics and charts"
           >
-            <RotateCcw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
+            <RotateCcw className={`h-4 w-4 mr-1.5 ${isRecalculating ? 'animate-spin' : ''}`} />
+            {isRecalculating ? 'Recalculating...' : 'Recalculate'}
           </Button>
         </div>
       </CardContent>

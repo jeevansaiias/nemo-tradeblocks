@@ -40,7 +40,7 @@ export interface PerformanceData {
       avgLossStreak: number
     }
   }
-  monthlyReturns: Record<string, number>
+  monthlyReturns: Record<number, Record<number, number>> // {year: {month: value}}
   tradeSequence: Array<{ tradeNumber: number; pl: number; date: string }>
   romTimeline: Array<{ date: string; rom: number }>
   rollingMetrics: Array<{ date: string; winRate: number; sharpeRatio: number; profitFactor: number; volatility: number }>
@@ -290,11 +290,20 @@ function calculateEquityCurve(trades: Trade[]) {
 }
 
 function calculateDayOfWeekData(trades: Trade[]) {
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  // Match Python's weekday() behavior: 0=Monday, 1=Tuesday, ... 6=Sunday
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const dayData: Record<string, { count: number; totalPl: number }> = {}
 
   trades.forEach(trade => {
-    const day = dayNames[new Date(trade.dateOpened).getDay()]
+    // Use UTC to avoid timezone issues
+    // getUTCDay() returns 0=Sunday, 1=Monday, ..., 6=Saturday
+    const tradeDate = trade.dateOpened instanceof Date ? trade.dateOpened : new Date(trade.dateOpened)
+    const jsDay = tradeDate.getUTCDay()
+
+    // Convert to Python's weekday() (0=Monday, 1=Tuesday, ..., 6=Sunday)
+    const pythonWeekday = jsDay === 0 ? 6 : jsDay - 1
+    const day = dayNames[pythonWeekday]
+
     if (!dayData[day]) {
       dayData[day] = { count: 0, totalPl: 0 }
     }
@@ -373,13 +382,35 @@ function calculateStreakData(trades: Trade[]) {
 }
 
 function calculateMonthlyReturns(trades: Trade[]) {
-  const monthlyReturns: Record<string, number> = {}
+  // Match legacy format: {year: {month: value}}
+  const monthlyData: Record<string, number> = {}
 
+  // First, aggregate by year-month key
   trades.forEach(trade => {
     const date = new Date(trade.dateOpened)
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1 // 1-12
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
 
-    monthlyReturns[monthKey] = (monthlyReturns[monthKey] || 0) + trade.pl
+    monthlyData[monthKey] = (monthlyData[monthKey] || 0) + trade.pl
+  })
+
+  // Convert to nested structure {year: {month: value}}
+  const monthlyReturns: Record<number, Record<number, number>> = {}
+  const years = new Set<number>()
+
+  // Get all unique years from trades
+  trades.forEach(trade => {
+    years.add(new Date(trade.dateOpened).getUTCFullYear())
+  })
+
+  // Initialize structure for each year
+  Array.from(years).sort().forEach(year => {
+    monthlyReturns[year] = {}
+    for (let month = 1; month <= 12; month++) {
+      const monthKey = `${year}-${String(month).padStart(2, '0')}`
+      monthlyReturns[year][month] = monthlyData[monthKey] || 0
+    }
   })
 
   return monthlyReturns
