@@ -7,8 +7,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { HelpCircle } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Config, Data, Layout } from "plotly.js";
 import React, { Suspense, useEffect, useRef } from "react";
@@ -22,9 +28,15 @@ declare global {
 // Dynamic import to optimize bundle size
 const Plot = React.lazy(() => import("react-plotly.js"));
 
+interface TooltipContent {
+  flavor: string;
+  detailed: string;
+}
+
 interface ChartWrapperProps {
   title: string;
   description?: string;
+  tooltip?: TooltipContent;
   children?: React.ReactNode;
   className?: string;
   data: Data[];
@@ -48,6 +60,7 @@ const ChartSkeleton = () => (
 export function ChartWrapper({
   title,
   description,
+  tooltip,
   children,
   className,
   data,
@@ -203,7 +216,37 @@ export function ChartWrapper({
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+              {tooltip && (
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="w-4 h-4 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      {/* Header with title */}
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">{title}</h4>
+                      </div>
+
+                      {/* Content */}
+                      <div className="px-4 pb-4 space-y-3">
+                        {/* Flavor text */}
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          {tooltip.flavor}
+                        </p>
+
+                        {/* Detailed explanation */}
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {tooltip.detailed}
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              )}
+            </div>
             {description && (
               <CardDescription className="text-sm text-muted-foreground">
                 {description}

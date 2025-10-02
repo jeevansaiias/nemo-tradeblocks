@@ -84,6 +84,11 @@ export function RollingMetricsChart({ className }: RollingMetricsChartProps) {
     return { plotData: [trace], layout: chartLayout }
   }, [data, metricType])
 
+  const tooltip = {
+    flavor: "Your building progress through a moving window - examining your last 30 blocks at each construction milestone.",
+    detailed: "Rolling calculations show how your performance metrics evolve using moving time windows, giving you a dynamic view of improvement or deterioration. This is more responsive than looking at all-time statistics and helps identify when your trading effectiveness is trending up or down."
+  }
+
   if (!data || !data.rollingMetrics || data.rollingMetrics.length === 0) {
     return (
       <ChartWrapper
@@ -93,6 +98,7 @@ export function RollingMetricsChart({ className }: RollingMetricsChartProps) {
         data={[]}
         layout={{}}
         style={{ height: '300px' }}
+        tooltip={tooltip}
       />
     )
   }
@@ -100,18 +106,19 @@ export function RollingMetricsChart({ className }: RollingMetricsChartProps) {
   return (
     <ChartWrapper
       title="📈 Rolling Metrics"
-      description="Rolling performance metrics over time (30-trade window)"
+      description="30-trade window"
       className={className}
       data={plotData}
       layout={layout}
       style={{ height: '350px' }}
+      tooltip={tooltip}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <Label htmlFor="metric-type" className="text-xs text-muted-foreground">
           Metric:
         </Label>
         <Select value={metricType} onValueChange={(val) => setMetricType(val as MetricType)}>
-          <SelectTrigger id="metric-type" className="w-[140px] h-8">
+          <SelectTrigger id="metric-type" className="w-[115px] h-7 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

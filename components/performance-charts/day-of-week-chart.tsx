@@ -72,6 +72,11 @@ export function DayOfWeekChart({ className }: DayOfWeekChartProps) {
     return { plotData: [barTrace], layout: chartLayout }
   }, [data])
 
+  const tooltip = {
+    flavor: "Building blocks of your week - are you laying stronger foundations on Mondays or Fridays?",
+    detailed: "Different weekdays often show distinct performance patterns due to market behavior, news cycles, and trader psychology. Identifying your strongest and weakest days can help you understand when your strategy works best and potentially adjust your trading schedule or position sizing."
+  }
+
   if (!data) {
     return (
       <ChartWrapper
@@ -80,6 +85,7 @@ export function DayOfWeekChart({ className }: DayOfWeekChartProps) {
         className={className}
         data={[]}
         layout={{}}
+        tooltip={tooltip}
       />
     )
   }
@@ -92,6 +98,7 @@ export function DayOfWeekChart({ className }: DayOfWeekChartProps) {
       data={plotData}
       layout={layout}
       style={{ height: '300px' }}
+      tooltip={tooltip}
     />
   )
 }

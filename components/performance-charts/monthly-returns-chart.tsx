@@ -87,6 +87,11 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
     return { plotData: [barTrace], layout: chartLayout }
   }, [data])
 
+  const tooltip = {
+    flavor: "Your trading foundation year by year - which months added strong blocks and which needed rebuilding.",
+    detailed: "Monthly performance patterns can reveal seasonal effects, consistency issues, and how your strategy performs across different market environments. Some strategies work better in certain market conditions that tend to cluster around calendar periods. This helps identify when to be more or less aggressive."
+  }
+
   if (!data || !data.monthlyReturns || Object.keys(data.monthlyReturns).length === 0) {
     return (
       <ChartWrapper
@@ -96,6 +101,7 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
         data={[]}
         layout={{}}
         style={{ height: '300px' }}
+        tooltip={tooltip}
       />
     )
   }
@@ -108,6 +114,7 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
       data={plotData}
       layout={layout}
       style={{ height: '350px' }}
+      tooltip={tooltip}
     />
   )
 }

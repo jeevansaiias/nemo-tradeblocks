@@ -108,6 +108,11 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
     return { plotData: traces, layout: chartLayout }
   }, [data, showTrend])
 
+  const tooltip = {
+    flavor: "Every building block placed in order - your complete construction timeline with all the additions and reconstructions.",
+    detailed: "This chronological view shows every trade outcome and helps identify improvement trends, clustering of similar results, and overall progression. You can spot if your wins are getting bigger, losses smaller, or if certain periods produced notably different results due to market conditions or strategy evolution."
+  }
+
   if (!data || !data.tradeSequence || data.tradeSequence.length === 0) {
     return (
       <ChartWrapper
@@ -117,6 +122,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
         data={[]}
         layout={{}}
         style={{ height: '300px' }}
+        tooltip={tooltip}
       />
     )
   }
@@ -129,6 +135,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
       data={plotData}
       layout={layout}
       style={{ height: '350px' }}
+      tooltip={tooltip}
     />
   )
 }

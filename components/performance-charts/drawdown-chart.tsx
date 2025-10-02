@@ -142,6 +142,11 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
     return { plotData: traces, layout: chartLayout }
   }, [data, theme])
 
+  const tooltip = {
+    flavor: "When your trading blocks tumbled - measuring how far you fell from your highest tower.",
+    detailed: "Drawdowns show the worst-case scenarios you've experienced - how much your account declined from peak values. This is crucial for understanding your risk tolerance and whether your strategy's downside matches what you can psychologically and financially handle. Recovery time shows resilience."
+  }
+
   if (!data) {
     return (
       <ChartWrapper
@@ -150,6 +155,7 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
         className={className}
         data={[]}
         layout={{}}
+        tooltip={tooltip}
       />
     )
   }
@@ -162,6 +168,7 @@ export function DrawdownChart({ className }: DrawdownChartProps) {
       data={plotData}
       layout={layout}
       style={{ height: '400px' }}
+      tooltip={tooltip}
     />
   )
 }

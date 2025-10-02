@@ -15,6 +15,7 @@ import { MonthlyReturnsChart } from '@/components/performance-charts/monthly-ret
 import { TradeSequenceChart } from '@/components/performance-charts/trade-sequence-chart'
 import { RollingMetricsChart } from '@/components/performance-charts/rolling-metrics-chart'
 import { RiskEvolutionChart } from '@/components/performance-charts/risk-evolution-chart'
+import { ROMTimelineChart } from '@/components/performance-charts/rom-timeline-chart'
 
 // UI Components
 import { MultiSelect } from '@/components/multi-select'
@@ -206,6 +207,9 @@ export default function PerformanceBlocksPage() {
 
       {/* Win/Loss Streaks - Full Width */}
       <WinLossStreaksChart />
+
+      {/* Return on Margin Timeline - Full Width */}
+      <ROMTimelineChart />
 
       {/* Distribution and Pattern Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

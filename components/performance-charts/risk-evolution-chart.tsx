@@ -54,6 +54,11 @@ export function RiskEvolutionChart({ className }: RiskEvolutionChartProps) {
     return { plotData: [trace], layout: chartLayout }
   }, [data])
 
+  const tooltip = {
+    flavor: "Your construction style evolution - are you building bolder structures or laying more careful foundations over time?",
+    detailed: "Risk evolution tracks how your exposure to volatility and drawdowns changes over time. Increasing risk might indicate growing confidence, larger position sizes, or changing market conditions. Decreasing risk could show improved discipline or more conservative positioning. Both trends provide insights into your trading development."
+  }
+
   if (!data || !data.rollingMetrics || data.rollingMetrics.length === 0) {
     return (
       <ChartWrapper
@@ -63,6 +68,7 @@ export function RiskEvolutionChart({ className }: RiskEvolutionChartProps) {
         data={[]}
         layout={{}}
         style={{ height: '300px' }}
+        tooltip={tooltip}
       />
     )
   }
@@ -75,6 +81,7 @@ export function RiskEvolutionChart({ className }: RiskEvolutionChartProps) {
       data={plotData}
       layout={layout}
       style={{ height: '350px' }}
+      tooltip={tooltip}
     />
   )
 }

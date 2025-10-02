@@ -53,37 +53,38 @@ export function ReturnDistributionChart({
 
     const traces: Partial<PlotData>[] = [histogramTrace];
 
-    // Add invisible traces for legend entries (matching legacy behavior)
-    // Mean line legend entry
-    traces.push({
-      x: [null],
-      y: [null],
-      type: "scatter",
-      mode: "lines",
-      line: { color: "#3b82f6", width: 2, dash: "dash" },
-      name: `Mean: ${mean.toFixed(1)}%`,
-      showlegend: true,
-      hoverinfo: "skip",
-    });
-
-    // Median line legend entry
-    traces.push({
-      x: [null],
-      y: [null],
-      type: "scatter",
-      mode: "lines",
-      line: { color: "#10b981", width: 2, dash: "dot" },
-      name: `Median: ${median.toFixed(1)}%`,
-      showlegend: true,
-      hoverinfo: "skip",
-    });
-
     // Smart x-axis range
     const minRom = Math.min(...returnDistribution);
     const maxRom = Math.max(...returnDistribution);
     const rangePadding = (maxRom - minRom) * 0.1;
     const xMin = Math.max(-100, minRom - rangePadding);
     const xMax = Math.min(200, maxRom + rangePadding);
+
+    // Add mean line as a trace (not a shape) so it can be toggled via legend
+    traces.push({
+      x: [mean, mean],
+      y: [0, 1],
+      type: "scatter",
+      mode: "lines",
+      line: { color: "#3b82f6", width: 2, dash: "dash" },
+      name: `Mean: ${mean.toFixed(1)}%`,
+      showlegend: true,
+      yaxis: "y2",
+      hovertemplate: `<b>Mean</b><br>${mean.toFixed(1)}%<extra></extra>`,
+    });
+
+    // Add median line as a trace (not a shape) so it can be toggled via legend
+    traces.push({
+      x: [median, median],
+      y: [0, 1],
+      type: "scatter",
+      mode: "lines",
+      line: { color: "#10b981", width: 2, dash: "dot" },
+      name: `Median: ${median.toFixed(1)}%`,
+      showlegend: true,
+      yaxis: "y2",
+      hovertemplate: `<b>Median</b><br>${median.toFixed(1)}%<extra></extra>`,
+    });
 
     const chartLayout = {
       ...createHistogramLayout("", "Return on Margin (%)", "Number of Trades"),
@@ -96,6 +97,12 @@ export function ReturnDistributionChart({
         title: { text: "Number of Trades" },
         showgrid: true,
       },
+      yaxis2: {
+        overlaying: "y",
+        range: [0, 1],
+        showgrid: false,
+        showticklabels: false,
+      },
       showlegend: true,
       legend: {
         orientation: "h" as const,
@@ -105,37 +112,20 @@ export function ReturnDistributionChart({
         x: 1,
       },
       margin: {
-        t: 60, // Increased top margin for legend
+        t: 100, // Increased top margin for legend
         r: 60,
         b: 60,
         l: 60,
       },
-      shapes: [
-        // Mean vertical line
-        {
-          type: "line" as const,
-          x0: mean,
-          x1: mean,
-          y0: 0,
-          y1: 1,
-          yref: "paper" as const,
-          line: { color: "#3b82f6", width: 2, dash: "dash" as const },
-        },
-        // Median vertical line
-        {
-          type: "line" as const,
-          x0: median,
-          x1: median,
-          y0: 0,
-          y1: 1,
-          yref: "paper" as const,
-          line: { color: "#10b981", width: 2, dash: "dot" as const },
-        },
-      ],
     };
 
     return { plotData: traces, layout: chartLayout };
   }, [data]);
+
+  const tooltip = {
+    flavor: "The building blocks of your trading style - are you stacking steady bricks or placing bold cornerstone moves?",
+    detailed: "The distribution of your returns reveals important characteristics about your trading style. Are you consistently hitting small wins, occasionally landing big winners, or something in between? Understanding this helps you assess whether your risk/reward profile matches your goals and personality."
+  };
 
   if (!data) {
     return (
@@ -145,6 +135,7 @@ export function ReturnDistributionChart({
         className={className}
         data={[]}
         layout={{}}
+        tooltip={tooltip}
       />
     );
   }
@@ -157,6 +148,7 @@ export function ReturnDistributionChart({
       data={plotData}
       layout={layout}
       style={{ height: "300px" }}
+      tooltip={tooltip}
     />
   );
 }

@@ -4,12 +4,6 @@ import { useMemo } from 'react'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
 import { ChartWrapper } from './chart-wrapper'
 import type { PlotData, Layout } from 'plotly.js'
-import { Info } from 'lucide-react'
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card'
 
 export function WinLossStreaksChart() {
   const data = usePerformanceStore(state => state.data)
@@ -122,11 +116,17 @@ export function WinLossStreaksChart() {
     return { plotData: traces, layout: chartLayout, statistics }
   }, [data?.streakData])
 
+  const tooltip = {
+    flavor: "Building momentum - when your blocks stack smoothly versus when they keep toppling over.",
+    detailed: "Winning and losing streaks are natural in trading, but their patterns tell important stories. Long streaks might indicate strong strategy alignment or the need for position size adjustments. Understanding your streak tendencies helps with psychological preparation and knowing when variance is normal versus when changes are needed."
+  };
+
   if (!statistics) {
     return (
       <ChartWrapper
         title="🎯 Win/Loss Streak Analysis"
         description="No streak data available"
+        tooltip={tooltip}
         data={[]}
         layout={{}}
         style={{ width: '100%', height: '400px' }}
@@ -138,29 +138,10 @@ export function WinLossStreaksChart() {
     <ChartWrapper
       title="🎯 Win/Loss Streak Analysis"
       description="Distribution of consecutive wins and losses"
+      tooltip={tooltip}
       data={plotData}
       layout={layout}
       style={{ width: '100%', height: '450px' }}
-    >
-      <HoverCard>
-        <HoverCardTrigger>
-          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-        </HoverCardTrigger>
-        <HoverCardContent className="w-80">
-          <div className="space-y-2">
-            <h4 className="font-semibold text-sm text-primary">Win/Loss Streak Analysis</h4>
-            <p className="text-sm text-muted-foreground">
-              Building momentum - when your blocks stack smoothly versus when they keep toppling over.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Winning and losing streaks are natural in trading, but their patterns tell important stories.
-              Long streaks might indicate strong strategy alignment or the need for position size adjustments.
-              Understanding your streak tendencies helps with psychological preparation and knowing when
-              variance is normal versus when changes are needed.
-            </p>
-          </div>
-        </HoverCardContent>
-      </HoverCard>
-    </ChartWrapper>
+    />
   )
 }

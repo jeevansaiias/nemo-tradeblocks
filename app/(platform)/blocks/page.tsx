@@ -71,13 +71,13 @@ function BlockCard({
 
       <CardContent className="space-y-4">
         {/* File Indicators */}
-        <div className="flex gap-2">
-          <Badge variant="secondary" className="text-xs">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary" className="text-xs whitespace-nowrap">
             <Activity className="w-3 h-3 mr-1" />
             Trade Log ({block.tradeLog.rowCount})
           </Badge>
           {block.dailyLog && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-xs whitespace-nowrap">
               <Calendar className="w-3 h-3 mr-1" />
               Daily Log ({block.dailyLog.rowCount})
             </Badge>
@@ -90,11 +90,11 @@ function BlockCard({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-wrap gap-2 pt-2">
           {!block.isActive && (
             <Button
               size="sm"
-              className="flex-1"
+              className="flex-1 min-w-[80px]"
               onClick={() => setActiveBlock(block.id)}
             >
               Activate
@@ -103,7 +103,7 @@ function BlockCard({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1"
+            className="flex-1 min-w-[80px]"
             onClick={() => onEdit(block)}
           >
             Edit
@@ -111,12 +111,13 @@ function BlockCard({
           <Button
             size="sm"
             variant="outline"
+            className="min-w-fit"
             onClick={handleRecalculate}
             disabled={isRecalculating}
             title="Recalculate statistics and charts"
           >
-            <RotateCcw className={`h-4 w-4 mr-1.5 ${isRecalculating ? 'animate-spin' : ''}`} />
-            {isRecalculating ? 'Recalculating...' : 'Recalculate'}
+            <RotateCcw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
+            <span className="ml-1.5 hidden sm:inline">{isRecalculating ? 'Recalculating...' : 'Recalculate'}</span>
           </Button>
         </div>
       </CardContent>

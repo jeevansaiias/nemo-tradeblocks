@@ -186,11 +186,17 @@ export function EquityCurveChart({ className }: EquityCurveChartProps) {
     </div>
   );
 
+  const tooltip = {
+    flavor: "Your portfolio's building blocks stacked over time - every peak, valley, and milestone along the way.",
+    detailed: "This shows your account value after each trade. Steady upward movement indicates consistent profitability, while volatility reveals periods of mixed results. The overall trend tells you if your trading approach is generating wealth over time or if adjustments might be needed."
+  };
+
   if (!data) {
     return (
       <ChartWrapper
         title="Equity Curve"
         description="Track your portfolio's value progression over time"
+        tooltip={tooltip}
         className={className}
         data={[]}
         layout={{}}
@@ -204,6 +210,7 @@ export function EquityCurveChart({ className }: EquityCurveChartProps) {
     <ChartWrapper
       title="Equity Curve"
       description="Track your portfolio's value progression over time with drawdown highlighting"
+      tooltip={tooltip}
       className={className}
       data={plotData}
       layout={layout}
