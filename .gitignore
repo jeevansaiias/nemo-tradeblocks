@@ -1,90 +1,51 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-
-# Environment variables
-.env
-.env.local
-.env.production
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# General ignores
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+*.pem
+
+# Node / Next.js
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+/.next/
+/out/
+/.turbo
+/.swc
+/.eslintcache
 
 # Logs
-*.log
-logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Database
-*.db
-*.sqlite3
+# Build artifacts
+/build
+/coverage
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Environment files (opt in when needed)
+.env*
 
-# Cache
-.cache/
-.pytest_cache/
+# Vercel
+.vercel
 
-# Coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
+# TypeScript
+*.tsbuildinfo
+samplefiles*
 
-# Temporary files
-*.tmp
-temp/
-tmp/
-
-/.mypy_cache
-/.claude
-
-# User test data - exclude personal trading data from commits
-# Only the README.md should be committed in tests/data/
-tests/data/tradelog.csv
-tests/data/dailylog.csv
+# Test data files - ignore CSV files in tests/data directory
 tests/data/*.csv
-!tests/data/README.md
+legacy/tests/data/dailylog.csv
+legacy/tests/data/tradelog.csv
+legacy/app/__pycache__/__init__.cpython-312.pyc
+legacy/app/calculations/__pycache__/__init__.cpython-312.pyc
+legacy/app/calculations/__pycache__/performance.cpython-312.pyc
+legacy/app/calculations/__pycache__/shared.cpython-312.pyc
+legacy/app/data/__pycache__/__init__.cpython-312.pyc
+legacy/app/data/__pycache__/models.cpython-312.pyc
+legacy/app/data/__pycache__/processor.cpython-312.pyc
+scripts/legacy_results.json

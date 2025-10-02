@@ -2,56 +2,16 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "TradeBlocks (Dash)",
-      "type": "python",
+      "name": "Next.js: Dev Server",
+      "type": "pwa-node",
       "request": "launch",
-      "program": "${workspaceFolder}/app/main.py",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
-      "justMyCode": false,
-      "python": "${workspaceFolder}/.venv/bin/python",
+      "skipFiles": ["<node_internals>/**"],
       "env": {
-        "PYTHONPATH": "${workspaceFolder}",
-        "DEBUG": "True",
-        "PORT": "8000"
-      },
-      "args": []
-    },
-    {
-      "name": "Python: Current File",
-      "type": "python",
-      "request": "launch",
-      "program": "${file}",
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
-    },
-    {
-      "name": "Python: Run Tests",
-      "type": "python",
-      "request": "launch",
-      "module": "pytest",
-      "args": ["${workspaceFolder}/tests", "-v", "--tb=short"],
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      }
-    },
-    {
-      "name": "Debug Single Test",
-      "type": "python",
-      "request": "launch",
-      "module": "pytest",
-      "args": ["${file}", "-v", "--tb=short"],
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
+        "NODE_OPTIONS": "--inspect --inspect-port=0"
       }
     }
   ]

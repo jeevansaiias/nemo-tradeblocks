@@ -2,213 +2,200 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Essential Development Commands
+## Project Overview
+
+TradeBlocks is a Next.js 15 application for analyzing options trading performance. It processes CSV exports of trade logs and daily portfolio logs to calculate comprehensive portfolio statistics, drawdowns, and performance metrics. The application uses IndexedDB for client-side storage of trading data.
+
+## Development Commands
 
 ### Running the Application
-```bash
-# Start development server (with hot-reload)
-PORT=8001 PYTHONPATH=/Users/davidromero/Code/tradeblocks python app/main.py
-
-# Alternative with default port (8000)
-PYTHONPATH=/Users/davidromeo/Code/tradeblocks python app/main.py
-```
+- `npm run dev` - Start development server with Turbopack
+- `npm run build` - Build production bundle with Turbopack
+- `npm start` - Start production server
 
 ### Testing
+- `npm test` - Run all tests with Jest
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Generate coverage report
+- `npm run test:portfolio` - Run portfolio stats tests specifically
+
+To run a single test file:
 ```bash
-# Run all tests
-PYTHONPATH=/Users/davidromero/Code/tradeblocks pytest tests/ -v
-
-# Run specific test modules
-PYTHONPATH=/Users/davidromero/Code/tradeblocks pytest tests/unit/test_processor.py -v
-PYTHONPATH=/Users/davidromero/Code/tradeblocks pytest tests/integration/test_api.py -v
-
-# Run with coverage and shorter traceback
-PYTHONPATH=/Users/davidromero/Code/tradeblocks pytest tests/ -v --tb=short
-
-# Run single test function
-PYTHONPATH=/Users/davidromero/Code/tradeblocks pytest tests/unit/test_processor.py::test_portfolio_stats_calculation -v
+npm test -- path/to/test-file.test.ts
 ```
 
-### Code Quality & Formatting
+To run a specific test case:
 ```bash
-# Run pre-commit hooks manually
-pre-commit run --all-files
-
-# Format code with Black (100 char line length)
-black app/ tests/
-
-# Lint with Ruff
-ruff check app/ tests/
+npm test -- path/to/test-file.test.ts -t "test name pattern"
 ```
 
-## Architecture Overview
+### Code Quality
+- `npm run lint` - Run ESLint on the codebase
 
-### Application Stack
-- **Backend**: FastAPI + Uvicorn (async Python web framework)
-- **Frontend**: Dash + Dash Mantine Components (React-based Python UI)
-- **Charts**: Plotly (interactive data visualizations)
-- **Data Processing**: Pandas + NumPy + SciPy
-- **Deployment**: Vercel (serverless Python functions)
+## Architecture
+
+### Core Data Flow
+
+1. **Data Import**: Users upload CSV files (trade logs and optional daily logs)
+2. **Processing Pipeline**:
+   - CSV parsing (`lib/processing/csv-parser.ts`)
+   - Trade/daily log processing (`lib/processing/trade-processor.ts`, `lib/processing/daily-log-processor.ts`)
+   - Data validation (`lib/models/validators.ts`)
+3. **Storage**: Data stored in IndexedDB via store modules (`lib/db/`)
+4. **Calculation**: Portfolio statistics calculated via `lib/calculations/portfolio-stats.ts`
+5. **State Management**: Zustand stores (`lib/stores/`) manage UI state and coordinate data access
 
 ### Key Architectural Patterns
 
-#### Hybrid FastAPI + Dash Integration
-The application uniquely combines REST API with interactive dashboard:
-- **FastAPI** serves stateless API endpoints at `/api/v1/*`
-- **Dash** provides the interactive UI mounted at root `/`
-- **WSGIMiddleware** bridges the two frameworks in `app/main.py`
-- Both frameworks share the same process and can access common modules
+**Block-Based Organization**: Trading data is organized into "blocks" - each block represents a trading portfolio/strategy with:
+- Trade log (required): Individual trade records
+- Daily log (optional): Daily portfolio values for enhanced performance calculations
+- Calculated statistics cached for performance
 
-#### Separation of Concerns by Layer
-```
-app/
-├── main.py              # FastAPI + Dash integration point
-├── api/                 # REST API endpoints (stateless)
-├── data/                # Data models and CSV processing
-├── calculations/        # Pure calculation functions (no state)
-├── dash_app/           # UI layer (components, callbacks, layouts)
-└── utils/              # Shared utilities
-```
+**Dual Storage Pattern**:
+- Raw trade/daily log data → IndexedDB (via `lib/db/`)
+- UI state & metadata → Zustand stores (via `lib/stores/`)
+- This separation allows efficient data handling for large datasets
 
-#### Stateless Calculation Design
-All calculations are pure functions that:
-- Take portfolio data as input parameters
-- Return structured results (no side effects)
-- Can be called from either API endpoints or Dash callbacks
-- Are located in `calculations/` modules organized by domain
+**Math.js for Statistical Calculations**: All statistics use `math.js` library to ensure consistency with legacy Python implementation:
+- Sharpe Ratio: Uses sample standard deviation (N-1) via `std(data, 'uncorrected')`
+- Sortino Ratio: Uses population standard deviation (N) via `std(data, 'biased')` to match numpy
+- This ensures exact parity with Python calculations
 
-#### Dash Component Architecture
-```
-dash_app/
-├── app.py              # Dash app factory function
-├── layouts/            # Page structure and routing
-├── components/tabs/    # Main application tabs
-├── callbacks/          # Interactive behavior and data flow
-```
+### Directory Structure
 
-### Critical Integration Points
+- `app/` - Next.js 15 app router pages and layouts
+  - `(platform)/` - Main application routes with sidebar layout
+- `components/` - React components
+  - `ui/` - shadcn/ui components (Radix UI primitives)
+  - `performance-charts/` - Recharts-based performance visualizations
+- `lib/` - Core business logic (framework-agnostic)
+  - `models/` - TypeScript interfaces and types
+  - `processing/` - CSV parsing and data processing
+  - `calculations/` - Portfolio statistics calculations
+  - `db/` - IndexedDB operations
+  - `stores/` - Zustand state management
+- `tests/` - Jest test suites
+  - `unit/` - Unit tests for calculations and processing
+  - `integration/` - Integration tests for data flow
+  - `data/` - Mock data and test fixtures
 
-#### Data Flow Pattern
-1. **CSV Upload** → `api/portfolio.py` → `data/processor.py` → Structured models
-2. **Calculations** → `calculations/*` modules → Pure functions return results
-3. **API Responses** → Stateless endpoints serve JSON to any consumer
-4. **UI Updates** → Dash callbacks call calculations → Update components
+### Critical Implementation Details
 
-#### Portfolio Processing Pipeline
-- Upload: CSV → `PortfolioProcessor` → `Trade`/`Portfolio` models
-- Storage: Dash clientside storage (`dcc.Store` components)
-- Analysis: User interactions → Callbacks → Calculation modules → UI updates
+**Date Handling**: Trades use separate `dateOpened` (Date object) and `timeOpened` (string) fields. When processing CSVs, parse dates carefully and maintain consistency with legacy format.
 
-#### Component Organization Pattern
-Each major application tab follows this structure:
-- UI component: `components/tabs/{tab_name}.py`
-- Behavior: `callbacks/{tab_name}_callbacks.py`
-- Mock data: Functions for development/testing
-- Real integration: API calls to calculation endpoints
+**Trade P&L Calculations**:
+- Always separate gross P&L (`trade.pl`) from commissions (`openingCommissionsFees` + `closingCommissionsFees`)
+- Net P&L = gross P&L - total commissions
+- Strategy filtering MUST use trade-based calculations only (not daily logs) since daily logs represent full portfolio performance
 
-### Environment Configuration
-- **Development**: `PYTHONPATH` must point to project root for imports
-- **Production**: Vercel deployment via `vercel.json` configuration
-- **Dependencies**: Poetry (`pyproject.toml`) with dev/prod separation
-- **Environment Variables**: `.env` file (gitignored) for sensitive config
+**Drawdown Calculations**:
+- Uses daily logs when available for more accurate drawdowns
+- Falls back to trade-based equity curve when daily logs are missing
+- Portfolio value tracks cumulative returns over time
+- See `lib/calculations/portfolio-stats.ts` for implementation
 
----
+**IndexedDB Data References**: The `ProcessedBlock` interface uses `dataReferences` to store keys for related data in IndexedDB. When working with blocks, always load associated trades/daily logs separately.
 
-# TradeBlocks Project Guide
+## Testing Strategy
 
-## Git Commit Policies & Best Practices
+Tests use `fake-indexeddb` for IndexedDB simulation. When writing tests:
+- Import `tests/setup.ts` is configured automatically via Jest setup
+- Use mock data from `tests/data/` when possible
+- Portfolio stats tests validate consistency with legacy Python implementation
+- Always test edge cases: empty datasets, single trade, missing daily logs
 
-### Pre-commit Hooks Configuration
-The project uses pre-commit hooks to maintain code quality:
+## Path Aliases
 
-**File**: `.pre-commit-config.yaml`
-- **Trailing whitespace removal** - Cleans up file endings
-- **End-of-file fixer** - Ensures proper file termination
-- **Merge conflict checker** - Prevents accidental conflict markers
-- **Large file checker** - Blocks files >1MB from commits
-- **Black code formatter** - Auto-formats Python code
-
-### Git Workflow Rules
-
-#### Branch Strategy
-- **Feature branches**: `feature/descriptive-name` (e.g., `feature/performanceGraphs`)
-- Always work on feature branches, never commit directly to main
-- Use pull requests for code review and merging
-
-#### Commit Message Standards
-Based on recent commits, follow this pattern:
-```
-[Action] [Component/Area]: [Description]
-
-Examples:
-- "Refactor performance charts to use mock data and enhance layout for Performance Blocks page"
-- "Add comprehensive implementation plan for Performance Blocks page with detailed calculations"
-- "Refactor API base URL retrieval to simplify logic and enhance production compatibility"
+TypeScript is configured with `@/*` pointing to repository root, allowing imports like:
+```typescript
+import { Trade } from '@/lib/models/trade'
+import { Button } from '@/components/ui/button'
 ```
 
-**Action Verbs to Use:**
-- `Add` - New features/files
-- `Refactor` - Code restructuring
-- `Update` - Modifications to existing features
-- `Fix` - Bug fixes
-- `Remove` - Deletions
-- `Merge` - Pull request merges
+## UI Component Library
 
-#### What NOT to Commit
-Per `.gitignore`:
-- `__pycache__/` and `*.pyc` files
-- Virtual environments (`venv/`, `env/`)
-- Environment files (`.env`, `.env.local`)
-- IDE files (`.vscode/`, `.idea/`)
-- OS files (`.DS_Store`)
-- Logs (`*.log`, `logs/`)
-- Cache directories (`.cache/`, `.pytest_cache/`)
-- Sample data (`/sampleData`)
-- MyPy cache (`/.mypy_cache`)
-- Claude context (`/.claude`)
+Uses shadcn/ui components built on Radix UI primitives with Tailwind CSS. Components are in `components/ui/` and follow the shadcn pattern (copy-paste, not npm installed).
 
-#### Code Quality Requirements
-1. **Pre-commit hooks must pass** - No bypassing with `--no-verify`
-2. **Black formatting applied** - Code automatically formatted
-3. **No trailing whitespace** - Cleaned automatically
-4. **No large files** - Keep commits lean
-5. **No merge conflicts** - Resolve before committing
+## State Management
 
-#### Development Workflow
-1. Create feature branch: `git checkout -b feature/your-feature`
-2. Make changes and test locally
-3. Run pre-commit: `pre-commit run --all-files` (optional, runs automatically)
-4. Commit with descriptive message
-5. Push to origin: `git push origin feature/your-feature`
-6. Create pull request for review
-7. Merge after approval
+Zustand stores manage:
+- **block-store**: Active block selection, block metadata, statistics
+- **performance-store**: Filtered performance data, chart data caching
 
-### Environment & Deployment Notes
-- Uses Vercel for deployment (`vercel.json` configuration)
-- Environment variables managed via `.env` (not committed)
-- API base URL dynamically set for production/local environments
-- Python path set via `PYTHONPATH=/Users/davidromeo/Code/tradeblocks`
+IndexedDB stores (via `lib/db/`) handle persistence of:
+- Blocks metadata
+- Trade records (can be thousands per block)
+- Daily log entries
+- Cached calculations
 
-### Testing & Validation
-- Tests can be run via pytest: `PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest tests/ -v`
-- Core logic validation recommended before UI changes
-- No need to run application for UI validation - user provides feedback
+## Legacy Application (Python/Dash)
 
-### File Organization
+The `legacy/` folder contains the original Python/Dash application that this Next.js app is migrating from. When implementing new features, reference the legacy implementation for:
+
+### Legacy Tech Stack
+- **Backend**: FastAPI + Uvicorn
+- **Frontend**: Dash + Dash Mantine Components (React-based Python UI)
+- **Charts**: Plotly (interactive visualizations)
+- **Data Processing**: Pandas + NumPy + SciPy
+
+### Legacy Architecture Patterns
+
+**Hybrid FastAPI + Dash**: The legacy app uniquely combines REST API with interactive dashboard:
+- FastAPI serves stateless API endpoints at `/api/v1/*`
+- Dash provides the interactive UI mounted at root `/`
+- WSGIMiddleware bridges the two frameworks
+
+**Data Models** (`legacy/app/data/models.py`):
+- `Trade` - Pydantic model matching CSV structure (date/time as Python date/time objects)
+- `Portfolio` - Collection of trades with metadata
+- `PortfolioStats` - Calculated statistics (matches `lib/models/portfolio-stats.ts`)
+- `StrategyStats` - Per-strategy metrics
+
+**Calculation Modules** (`legacy/app/calculations/`):
+- `performance.py` - PerformanceCalculator class with comprehensive metrics
+- `geekistics.py` - Advanced statistical analysis (geek statistics)
+- `monte_carlo.py` - Monte Carlo simulations for risk analysis
+- `position_sizing.py` - Kelly criterion and position sizing
+- `correlation.py` - Strategy correlation analysis
+- `shared.py` - Common calculation utilities
+
+**UI Components** (`legacy/app/dash_app/components/tabs/`):
+- `performance_charts.py` - Equity curves, drawdowns, returns distribution
+- `geekistics.py` - Advanced statistics visualization
+- `risk_simulator.py` - Monte Carlo simulation UI
+- `position_sizing.py` - Position sizing calculator
+- `correlation_matrix.py` - Strategy correlation heatmap
+- `trade_data.py` - Trade log data table
+
+### When to Reference Legacy Code
+
+**Calculation Consistency**: When implementing calculations in TypeScript, reference the Python implementation to ensure mathematical parity:
+- NumPy → math.js equivalents
+- Pandas operations → manual TypeScript/array operations
+- Statistical formulas (Sharpe, Sortino, drawdowns) must match exactly
+
+**Feature Implementation**: When building new features, check if they exist in legacy:
+1. Look for UI component in `legacy/app/dash_app/components/tabs/`
+2. Find corresponding calculation logic in `legacy/app/calculations/`
+3. Check callback behavior in `legacy/app/dash_app/callbacks/`
+4. Replicate the core logic in TypeScript
+
+**Data Processing**: CSV parsing and trade processing logic in `legacy/app/data/processor.py` shows the exact field mapping and validation rules used historically.
+
+### Running Legacy Application
+
+```bash
+# From repository root
+PYTHONPATH=/Users/davidromeo/Code/tradeblocks python legacy/app/main.py
+
+# Run legacy tests
+PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest legacy/tests/ -v
 ```
-app/
-├── calculations/       # Core calculation logic
-├── dash_app/          # UI components and layouts
-│   ├── components/    # Reusable UI components
-│   ├── callbacks/     # Dash callback functions
-│   └── layouts/       # Page layouts
-├── data/              # Data processing and models
-└── api/               # API endpoints
-```
 
-### Development Principles
-- **Never create files unless absolutely necessary**
-- **Always prefer editing existing files over creating new ones**
-- **Never proactively create documentation files** unless explicitly requested
-- **Follow existing code conventions** and patterns
-- **Use existing libraries and utilities** - check imports before adding new dependencies
+### Migration Notes
+
+- Legacy uses Pydantic models; Next.js uses TypeScript interfaces
+- Legacy stores data in Dash clientside storage (`dcc.Store`); Next.js uses IndexedDB
+- Legacy uses Plotly charts; Next.js uses Recharts (similar but different API)
+- Math.js in TypeScript configured to match NumPy behavior (see "Math.js for Statistical Calculations" above)
