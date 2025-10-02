@@ -253,15 +253,7 @@ export default function RiskSimulatorPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Risk Simulator</h1>
-        <p className="text-muted-foreground">
-          Monte Carlo projections using your actual trading history
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {/* Trading Frequency Card */}
       <TradingFrequencyCard
         trades={trades}
@@ -280,14 +272,22 @@ export default function RiskSimulatorPage() {
               <HoverCardContent className="w-80 p-0 overflow-hidden">
                 <div className="space-y-3">
                   <div className="bg-primary/5 border-b px-4 py-3">
-                    <h4 className="text-sm font-semibold text-primary">Monte Carlo Risk Simulator</h4>
+                    <h4 className="text-sm font-semibold text-primary">
+                      Monte Carlo Risk Simulator
+                    </h4>
                   </div>
                   <div className="px-4 pb-4 space-y-3">
                     <p className="text-sm font-medium text-foreground leading-relaxed">
-                      Build thousands of possible futures from your trading blocks by reshuffling actual trade results.
+                      Build thousands of possible futures from your trading
+                      blocks by reshuffling actual trade results.
                     </p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Each simulation randomly samples from your historical performance to project potential outcomes. This helps understand risk ranges and probability distributions, but doesn&apos;t predict actual future results. Use these projections to stress-test your strategy and understand downside scenarios.
+                      Each simulation randomly samples from your historical
+                      performance to project potential outcomes. This helps
+                      understand risk ranges and probability distributions, but
+                      doesn&apos;t predict actual future results. Use these
+                      projections to stress-test your strategy and understand
+                      downside scenarios.
                     </p>
                   </div>
                 </div>
@@ -308,14 +308,21 @@ export default function RiskSimulatorPage() {
                   <HoverCardContent className="w-80 p-0 overflow-hidden">
                     <div className="space-y-3">
                       <div className="bg-primary/5 border-b px-4 py-3">
-                        <h4 className="text-sm font-semibold text-primary">Number of Simulations</h4>
+                        <h4 className="text-sm font-semibold text-primary">
+                          Number of Simulations
+                        </h4>
                       </div>
                       <div className="px-4 pb-4 space-y-3">
                         <p className="text-sm font-medium text-foreground leading-relaxed">
-                          How many different future scenarios to generate from your trading history.
+                          How many different future scenarios to generate from
+                          your trading history.
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          More simulations produce smoother probability distributions and more reliable statistics. 1,000 simulations provide good results for most strategies. Use 5,000+ for publication-quality analysis or when you need high precision in tail risk estimates.
+                          More simulations produce smoother probability
+                          distributions and more reliable statistics. 1,000
+                          simulations provide good results for most strategies.
+                          Use 5,000+ for publication-quality analysis or when
+                          you need high precision in tail risk estimates.
                         </p>
                       </div>
                     </div>
@@ -349,14 +356,21 @@ export default function RiskSimulatorPage() {
                   <HoverCardContent className="w-80 p-0 overflow-hidden">
                     <div className="space-y-3">
                       <div className="bg-primary/5 border-b px-4 py-3">
-                        <h4 className="text-sm font-semibold text-primary">Simulation Period</h4>
+                        <h4 className="text-sm font-semibold text-primary">
+                          Simulation Period
+                        </h4>
                       </div>
                       <div className="px-4 pb-4 space-y-3">
                         <p className="text-sm font-medium text-foreground leading-relaxed">
-                          How far into the future to project your portfolio performance.
+                          How far into the future to project your portfolio
+                          performance.
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Choose a timeframe in familiar units (days, months, or years). The simulator converts this to the number of trades based on your historical trading frequency. Longer periods show a wider range of possible outcomes as uncertainty compounds over time.
+                          Choose a timeframe in familiar units (days, months, or
+                          years). The simulator converts this to the number of
+                          trades based on your historical trading frequency.
+                          Longer periods show a wider range of possible outcomes
+                          as uncertainty compounds over time.
                         </p>
                       </div>
                     </div>
@@ -406,14 +420,21 @@ export default function RiskSimulatorPage() {
                   <HoverCardContent className="w-80 p-0 overflow-hidden">
                     <div className="space-y-3">
                       <div className="bg-primary/5 border-b px-4 py-3">
-                        <h4 className="text-sm font-semibold text-primary">Trades Per Year</h4>
+                        <h4 className="text-sm font-semibold text-primary">
+                          Trades Per Year
+                        </h4>
                       </div>
                       <div className="px-4 pb-4 space-y-3">
                         <p className="text-sm font-medium text-foreground leading-relaxed">
-                          Expected annual trading frequency used to annualize returns and volatility metrics.
+                          Expected annual trading frequency used to annualize
+                          returns and volatility metrics.
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          This value is auto-detected from your historical trading pace and affects how performance metrics like CAGR and Sharpe Ratio are calculated. Higher values compound returns faster but should reflect a sustainable trading frequency.
+                          This value is auto-detected from your historical
+                          trading pace and affects how performance metrics like
+                          CAGR and Sharpe Ratio are calculated. Higher values
+                          compound returns faster but should reflect a
+                          sustainable trading frequency.
                         </p>
                       </div>
                     </div>
@@ -451,14 +472,22 @@ export default function RiskSimulatorPage() {
                   <HoverCardContent className="w-80 p-0 overflow-hidden">
                     <div className="space-y-3">
                       <div className="bg-primary/5 border-b px-4 py-3">
-                        <h4 className="text-sm font-semibold text-primary">Initial Capital</h4>
+                        <h4 className="text-sm font-semibold text-primary">
+                          Initial Capital
+                        </h4>
                       </div>
                       <div className="px-4 pb-4 space-y-3">
                         <p className="text-sm font-medium text-foreground leading-relaxed">
-                          Starting portfolio value from which all simulations begin.
+                          Starting portfolio value from which all simulations
+                          begin.
                         </p>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          This value is auto-detected from your actual starting capital when you began trading. You can adjust it to simulate different account sizes or to project how your strategy would perform with more or less capital. The simulator applies your historical return patterns to this starting balance.
+                          This value is auto-detected from your actual starting
+                          capital when you began trading. You can adjust it to
+                          simulate different account sizes or to project how
+                          your strategy would perform with more or less capital.
+                          The simulator applies your historical return patterns
+                          to this starting balance.
                         </p>
                       </div>
                     </div>
@@ -493,14 +522,21 @@ export default function RiskSimulatorPage() {
                 <HoverCardContent className="w-80 p-0 overflow-hidden">
                   <div className="space-y-3">
                     <div className="bg-primary/5 border-b px-4 py-3">
-                      <h4 className="text-sm font-semibold text-primary">Strategy Filter</h4>
+                      <h4 className="text-sm font-semibold text-primary">
+                        Strategy Filter
+                      </h4>
                     </div>
                     <div className="px-4 pb-4 space-y-3">
                       <p className="text-sm font-medium text-foreground leading-relaxed">
-                        Select which strategies to include in the Monte Carlo simulation.
+                        Select which strategies to include in the Monte Carlo
+                        simulation.
                       </p>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Leave empty to simulate using all strategies combined. Select specific strategies to analyze their isolated performance or test strategy combinations. This is useful for comparing individual strategy risk profiles or evaluating portfolio diversification effects.
+                        Leave empty to simulate using all strategies combined.
+                        Select specific strategies to analyze their isolated
+                        performance or test strategy combinations. This is
+                        useful for comparing individual strategy risk profiles
+                        or evaluating portfolio diversification effects.
                       </p>
                     </div>
                   </div>
@@ -533,14 +569,23 @@ export default function RiskSimulatorPage() {
                         <HoverCardContent className="w-80 p-0 overflow-hidden">
                           <div className="space-y-3">
                             <div className="bg-primary/5 border-b px-4 py-3">
-                              <h4 className="text-sm font-semibold text-primary">Use Recent Data</h4>
+                              <h4 className="text-sm font-semibold text-primary">
+                                Use Recent Data
+                              </h4>
                             </div>
                             <div className="px-4 pb-4 space-y-3">
                               <p className="text-sm font-medium text-foreground leading-relaxed">
-                                Weight simulations toward your most recent trading performance.
+                                Weight simulations toward your most recent
+                                trading performance.
                               </p>
                               <p className="text-xs text-muted-foreground leading-relaxed">
-                                Set to 100% to use your entire trading history, or reduce to focus on recent trades. For example, 25% uses only your most recent quarter of trades. This is useful when your strategy has evolved, market conditions have changed, or you want to stress-test against recent volatility patterns.
+                                Set to 100% to use your entire trading history,
+                                or reduce to focus on recent trades. For
+                                example, 25% uses only your most recent quarter
+                                of trades. This is useful when your strategy has
+                                evolved, market conditions have changed, or you
+                                want to stress-test against recent volatility
+                                patterns.
                               </p>
                             </div>
                           </div>
@@ -582,14 +627,24 @@ export default function RiskSimulatorPage() {
                           <HoverCardContent className="w-80 p-0 overflow-hidden">
                             <div className="space-y-3">
                               <div className="bg-primary/5 border-b px-4 py-3">
-                                <h4 className="text-sm font-semibold text-primary">Sampling Method</h4>
+                                <h4 className="text-sm font-semibold text-primary">
+                                  Sampling Method
+                                </h4>
                               </div>
                               <div className="px-4 pb-4 space-y-3">
                                 <p className="text-sm font-medium text-foreground leading-relaxed">
-                                  Choose whether to resample individual trades or daily portfolio returns.
+                                  Choose whether to resample individual trades
+                                  or daily portfolio returns.
                                 </p>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Individual Trades samples each trade P&L independently, preserving trade-level risk characteristics. Daily Returns groups trades by day and samples daily totals, which better captures correlations when you run multiple trades simultaneously. Use Individual Trades for single-position strategies, Daily Returns for portfolios with concurrent positions.
+                                  Individual Trades samples each trade P&L
+                                  independently, preserving trade-level risk
+                                  characteristics. Daily Returns groups trades
+                                  by day and samples daily totals, which better
+                                  captures correlations when you run multiple
+                                  trades simultaneously. Use Individual Trades
+                                  for single-position strategies, Daily Returns
+                                  for portfolios with concurrent positions.
                                 </p>
                               </div>
                             </div>
@@ -627,14 +682,23 @@ export default function RiskSimulatorPage() {
                           <HoverCardContent className="w-80 p-0 overflow-hidden">
                             <div className="space-y-3">
                               <div className="bg-primary/5 border-b px-4 py-3">
-                                <h4 className="text-sm font-semibold text-primary">Random Seed</h4>
+                                <h4 className="text-sm font-semibold text-primary">
+                                  Random Seed
+                                </h4>
                               </div>
                               <div className="px-4 pb-4 space-y-3">
                                 <p className="text-sm font-medium text-foreground leading-relaxed">
-                                  Control whether simulations produce identical or varied results across runs.
+                                  Control whether simulations produce identical
+                                  or varied results across runs.
                                 </p>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Enable fixed seed to get reproducible results - the same simulation parameters will always produce identical outputs. This is essential for comparing different scenarios (like various position sizes or time periods) on equal footing. Disable for truly random simulations that vary each time you run them.
+                                  Enable fixed seed to get reproducible results
+                                  - the same simulation parameters will always
+                                  produce identical outputs. This is essential
+                                  for comparing different scenarios (like
+                                  various position sizes or time periods) on
+                                  equal footing. Disable for truly random
+                                  simulations that vary each time you run them.
                                 </p>
                               </div>
                             </div>
