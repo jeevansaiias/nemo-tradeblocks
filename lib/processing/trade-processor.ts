@@ -261,6 +261,11 @@ export class TradeProcessor {
         }
       })
 
+      // OptionOmega sometimes leaves strategy blank; default to Unknown so downstream stats still work
+      if (!normalizedRow['Strategy'] || normalizedRow['Strategy'].trim() === '') {
+        normalizedRow['Strategy'] = 'Unknown'
+      }
+
       // Ensure required columns have values
       const requiredFields = ['Date Opened', 'P/L', 'Strategy']
       for (const field of requiredFields) {
