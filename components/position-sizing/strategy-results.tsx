@@ -64,24 +64,28 @@ export function StrategyResults({
             : "--";
 
         return (
-          <Card key={strategy.name} className="p-4 relative">
-            {/* Trade count badge */}
-            <div className="absolute top-3 right-3 flex gap-2">
-              <Badge variant="secondary">
-                {strategy.tradeCount} {strategy.tradeCount === 1 ? "trade" : "trades"}
-              </Badge>
-              {!hasData && (
-                <Badge variant="outline">Needs wins & losses</Badge>
-              )}
-              {hasData && strategy.kellyMetrics.percent <= 0 && (
-                <Badge variant="destructive">Negative expectancy</Badge>
-              )}
-            </div>
-
+          <Card key={strategy.name} className="p-4">
             <div className="space-y-4">
-              {/* Strategy name */}
-              <div className="min-h-16 flex items-center pr-32">
-                <h3 className="font-semibold">{strategy.name}</h3>
+              {/* Strategy name and badges */}
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <h3 className="font-semibold leading-snug min-h-[3rem] flex items-center">
+                  {strategy.name}
+                </h3>
+                <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
+                  <Badge variant="secondary">
+                    {strategy.tradeCount} {strategy.tradeCount === 1 ? "trade" : "trades"}
+                  </Badge>
+                  {!hasData && (
+                    <Badge variant="outline">
+                      Needs wins & losses
+                    </Badge>
+                  )}
+                  {hasData && strategy.kellyMetrics.percent <= 0 && (
+                    <Badge variant="destructive">
+                      Negative expectancy
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               <Separator />

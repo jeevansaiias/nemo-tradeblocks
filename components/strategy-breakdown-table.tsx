@@ -174,7 +174,9 @@ export function StrategyBreakdownTable({
         {tooltip && (
           <HoverCard>
             <HoverCardTrigger asChild>
-              <HelpCircle className="w-3 h-3 text-muted-foreground/60 cursor-help" />
+              <span className="inline-flex pointer-events-auto">
+                <HelpCircle className="w-3 h-3 text-muted-foreground/60 cursor-help" />
+              </span>
             </HoverCardTrigger>
             <HoverCardContent className="w-80 p-0 overflow-hidden">
               <div className="space-y-3">
