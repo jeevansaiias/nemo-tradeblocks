@@ -281,6 +281,21 @@ export class TradeProcessor {
       if (!normalizedRow['Closing Commissions + Fees']) {
         normalizedRow['Closing Commissions + Fees'] = '0'
       }
+      if (!normalizedRow['Opening Short/Long Ratio']) {
+        normalizedRow['Opening Short/Long Ratio'] = '0'
+      }
+
+      const optionalNumericFieldsWithDefaultZero = [
+        'Opening VIX',
+        'Closing VIX',
+        'Gap',
+        'Movement',
+      ] as const
+      optionalNumericFieldsWithDefaultZero.forEach(field => {
+        if (!normalizedRow[field] || normalizedRow[field].trim() === '') {
+          normalizedRow[field] = '0'
+        }
+      })
 
       // Basic format validation (detailed validation happens in conversion)
       rawTradeDataSchema.parse(normalizedRow)
