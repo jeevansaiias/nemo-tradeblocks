@@ -32,6 +32,12 @@ export function StatisticsCards({ result }: StatisticsCardsProps) {
       ? Math.pow(1 + statistics.meanTotalReturn, 1 / yearsSimulated) - 1
       : statistics.meanTotalReturn;
 
+  // Use the final timestep of the 95th percentile equity curve for best-case return
+  const bestCaseReturn =
+    result.percentiles.p95.length > 0
+      ? result.percentiles.p95[result.percentiles.p95.length - 1]
+      : statistics.medianTotalReturn;
+
   return (
     <div className="space-y-6">
       {/* Key Metrics - Top Row */}
@@ -367,7 +373,7 @@ export function StatisticsCards({ result }: StatisticsCardsProps) {
             </div>
             <div>
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {(statistics.valueAtRisk.p25 * 100).toFixed(1)}%
+                {(bestCaseReturn * 100).toFixed(1)}%
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 95th percentile outcome
