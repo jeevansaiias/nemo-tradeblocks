@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TradeBlocks
+
+TradeBlocks is a Next.js 15 analytics workspace for evaluating options trading performance. Upload trade and daily portfolio CSV exports to calculate portfolio statistics, visualize equity curves, run Monte Carlo risk simulations, and compare strategies in one place.
+
+## Highlights
+- **Block-based workflows:** Organize trade logs, optional daily logs, and derived statistics into named "blocks" you can activate, edit, and recalculate on demand.
+- **Performance dashboards:** Explore win rates, P&L breakdowns, and cumulative performance per block from the Block Stats and Performance Blocks views.
+- **Risk tooling:** Drive the Monte Carlo risk simulator, position sizing helpers, and correlation matrix with the same underlying block data for consistent insights.
+- **Client-side persistence:** All imported data is stored in the browser's IndexedDB so large CSVs stay fast and private. Metadata and derived metrics are cached for quick reloads.
 
 ## Getting Started
+1. **Prerequisites:** Node.js 20 LTS (18.18+ works) and npm.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+   Visit `http://localhost:3000` to open the app. The root route redirects to `/blocks` where you can manage portfolios.
 
-First, run the development server:
+### Importing Data
+1. Navigate to **Block Management** (`/blocks`) and select **New Block**.
+2. Upload your trade log CSV (required) and optional daily log CSV. Expected headers follow the OptionOmega export format:
+   - Trade logs: `Date Opened`, `Time Opened`, `P/L`, `Strategy`, `Opening Commissions + Fees`, etc.
+   - Daily logs (optional): `Date`, `Net Liquidity`, `P/L`, `P/L %`, `Drawdown %`.
+3. Save the block and activate it to see statistics populate throughout the app.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+> Tip: Locally stored data lives in IndexedDB and can be reset by clearing the browser's application storage.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Available Scripts
+- `npm run dev` – start the Turbopack-powered dev server.
+- `npm run build` / `npm start` – create and serve an optimized production build.
+- `npm run lint` – run ESLint across the project.
+- `npm test` – execute all Jest tests (uses `fake-indexeddb` to simulate browser storage).
+- `npm run test:watch`, `npm run test:coverage`, `npm run test:portfolio` – additional testing modes.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Directory Overview
+- `app/` – App Router pages (`(platform)` contains the authenticated workspace experience).
+- `components/` – UI building blocks, including shadcn/ui wrappers and analytics widgets.
+- `lib/` – Core domain logic: CSV parsing, IndexedDB access, calculations, Zustand stores, and shared models.
+- `tests/` – Unit and integration tests with fixtures under `tests/data/`.
+- `legacy/` – Original Python/Dash reference implementation for parity checks.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Developer Documentation
+- `docs/development.md` – In-depth developer guide covering architecture, data flow, and local workflows.
 
-## Learn More
+## Contributing
+1. Create a feature branch.
+2. Update or add tests when behaviour changes.
+3. Run `npm run lint` and `npm test` before opening a pull request.
 
-To learn more about Next.js, take a look at the following resources:
+TradeBlocks is actively evolving—additions should maintain parity with the legacy analytics while leaning into the block-based architecture documented above.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
