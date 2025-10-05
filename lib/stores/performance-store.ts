@@ -183,15 +183,24 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         selectedStrategies.includes(trade.strategy || 'Unknown')
       )
 
-      // Strategy filtering cannot be applied to daily logs (portfolio-level data)
       filteredDailyLogs = undefined
     }
 
-    processChartData(filteredTrades, filteredDailyLogs).then(chartData => {
+    const recomputeStats = async () => {
+      const { PortfolioStatsCalculator } = await import('@/lib/calculations/portfolio-stats')
+      const calculator = new PortfolioStatsCalculator({ riskFreeRate: 2.0 })
+      return calculator.calculatePortfolioStats(filteredTrades, filteredDailyLogs, selectedStrategies.length > 0)
+    }
+
+    Promise.all([
+      processChartData(filteredTrades, filteredDailyLogs),
+      recomputeStats()
+    ]).then(([chartData, portfolioStats]) => {
       set(state => ({
         data: state.data ? {
           ...state.data,
-          ...chartData
+          ...chartData,
+          portfolioStats
         } : null
       }))
     })
@@ -365,21 +374,67 @@ function getEquityValueFromDailyLog(entry: DailyLogEntry): number {
 }
 
 function calculateEquityCurveFromTrades(trades: Trade[]) {
-  const sortedTrades = [...trades].sort((a, b) =>
-    new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
-  )
+  const closedTrades = trades.filter(trade => trade.dateClosed).sort((a, b) => {
+    const dateA = new Date(a.dateClosed ?? a.dateOpened).getTime()
+    const dateB = new Date(b.dateClosed ?? b.dateOpened).getTime()
+    if (dateA === dateB) {
+      return (a.timeClosed || '').localeCompare(b.timeClosed || '')
+    }
+    return dateA - dateB
+  })
 
-  if (sortedTrades.length === 0) {
-    const now = new Date().toISOString()
-    return [{
-      date: now,
-      equity: 0,
-      highWaterMark: 0,
+  if (closedTrades.length === 0) {
+    // Fall back to simple cumulative approach when we have no closed trades
+    const fallbackTrades = [...trades].sort((a, b) =>
+      new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+    )
+
+    if (fallbackTrades.length === 0) {
+      const now = new Date().toISOString()
+      return [{
+        date: now,
+        equity: 0,
+        highWaterMark: 0,
+        tradeNumber: 0
+      }]
+    }
+
+    let initialCapital = calculateInitialCapital(fallbackTrades)
+    if (!isFinite(initialCapital) || initialCapital <= 0) {
+      initialCapital = 100000
+    }
+
+    let runningEquity = initialCapital
+    let highWaterMark = runningEquity
+
+    const initialDate = new Date(fallbackTrades[0].dateOpened)
+
+    const curve = [{
+      date: initialDate.toISOString(),
+      equity: runningEquity,
+      highWaterMark,
       tradeNumber: 0
     }]
+
+    fallbackTrades.forEach((trade, index) => {
+      runningEquity += trade.pl
+      highWaterMark = Math.max(highWaterMark, runningEquity)
+
+      const baseDate = new Date(trade.dateOpened)
+      const uniqueDate = new Date(baseDate.getTime() + (index + 1) * 1000)
+
+      curve.push({
+        date: uniqueDate.toISOString(),
+        equity: runningEquity,
+        highWaterMark,
+        tradeNumber: index + 1
+      })
+    })
+
+    return curve
   }
 
-  let initialCapital = calculateInitialCapital(sortedTrades)
+  let initialCapital = calculateInitialCapital(closedTrades)
   if (!isFinite(initialCapital) || initialCapital <= 0) {
     initialCapital = 100000
   }
@@ -387,9 +442,8 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
   let runningEquity = initialCapital
   let highWaterMark = runningEquity
 
-  const initialDate = sortedTrades[0]
-    ? new Date(sortedTrades[0].dateOpened)
-    : new Date()
+  const firstCloseDate = new Date(closedTrades[0].dateClosed ?? closedTrades[0].dateOpened)
+  const initialDate = new Date(firstCloseDate.getTime() - 1000)
 
   const curve = [{
     date: initialDate.toISOString(),
@@ -398,12 +452,16 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
     tradeNumber: 0
   }]
 
-  sortedTrades.forEach((trade, index) => {
-    runningEquity += trade.pl
+  closedTrades.forEach((trade, index) => {
+    const equity = typeof trade.fundsAtClose === 'number' && isFinite(trade.fundsAtClose)
+      ? trade.fundsAtClose
+      : runningEquity + trade.pl
+
+    runningEquity = equity
     highWaterMark = Math.max(highWaterMark, runningEquity)
 
-    const baseDate = new Date(trade.dateOpened)
-    const uniqueDate = new Date(baseDate.getTime() + (index + 1) * 1000)
+    const closeDate = new Date(trade.dateClosed ?? trade.dateOpened)
+    const uniqueDate = new Date(closeDate.getTime() + (index + 1) * 1000)
 
     curve.push({
       date: uniqueDate.toISOString(),

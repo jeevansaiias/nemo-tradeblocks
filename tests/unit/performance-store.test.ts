@@ -31,6 +31,40 @@ describe('performance-store chart data', () => {
 
     expect(firstPoint.equity).toBe(expectedInitialCapital)
     expect(firstPoint.highWaterMark).toBe(expectedInitialCapital)
+
+    const closedTrades = mockTrades
+      .filter(trade => trade.dateClosed)
+      .sort((a, b) =>
+        new Date(a.dateClosed ?? a.dateOpened).getTime() -
+        new Date(b.dateClosed ?? b.dateOpened).getTime()
+      )
+
+    if (closedTrades.length > 0) {
+      const lastClosedTrade = closedTrades[closedTrades.length - 1]
+      const lastPoint = result.equityCurve[result.equityCurve.length - 1]
+
+      expect(lastPoint.equity).toBe(lastClosedTrade.fundsAtClose)
+
+      let peak = expectedInitialCapital
+      let maxDrawdown = 0
+      let equity = expectedInitialCapital
+
+      closedTrades.forEach(trade => {
+        const nextEquity = typeof trade.fundsAtClose === 'number'
+          ? trade.fundsAtClose
+          : equity + trade.pl
+
+        peak = Math.max(peak, nextEquity)
+        if (peak > 0) {
+          const drawdown = (peak - nextEquity) / peak * 100
+          maxDrawdown = Math.max(maxDrawdown, drawdown)
+        }
+
+        equity = nextEquity
+      })
+
+      const chartMaxDrawdown = Math.abs(Math.min(...result.drawdownData.map(point => point.drawdownPct)))
+      expect(chartMaxDrawdown).toBeCloseTo(maxDrawdown, 6)
+    }
   })
 })
-
