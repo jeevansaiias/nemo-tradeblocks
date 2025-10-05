@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
+import { calculateInitialCapital } from '@/lib/processing/capital-calculator'
 
 export interface DateRange {
   from: Date | undefined
@@ -129,7 +130,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs, false)
 
       // Process chart data
-      const data = await processChartData(trades)
+      const data = await processChartData(trades, dailyLogs)
 
       set({
         data: {
@@ -154,25 +155,39 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     const { data, dateRange, selectedStrategies } = get()
     if (!data) return
 
-    // Apply date range filter
     let filteredTrades = data.trades
-    if (dateRange.from && dateRange.to) {
+    let filteredDailyLogs: DailyLogEntry[] | undefined = data.dailyLogs
+
+    const { from, to } = dateRange
+
+    if (from || to) {
       filteredTrades = filteredTrades.filter(trade => {
         const tradeDate = new Date(trade.dateOpened)
-        return tradeDate >= dateRange.from! && tradeDate <= dateRange.to!
+        if (from && tradeDate < from) return false
+        if (to && tradeDate > to) return false
+        return true
       })
+
+      if (filteredDailyLogs) {
+        filteredDailyLogs = filteredDailyLogs.filter(log => {
+          const logDate = new Date(log.date)
+          if (from && logDate < from) return false
+          if (to && logDate > to) return false
+          return true
+        })
+      }
     }
 
-    // Apply strategy filter
     if (selectedStrategies.length > 0) {
       filteredTrades = filteredTrades.filter(trade =>
         selectedStrategies.includes(trade.strategy || 'Unknown')
       )
+
+      // Strategy filtering cannot be applied to daily logs (portfolio-level data)
+      filteredDailyLogs = undefined
     }
 
-    // Always recalculate chart data when filters are applied
-    // This ensures that going from filtered to unfiltered state works correctly
-    processChartData(filteredTrades).then(chartData => {
+    processChartData(filteredTrades, filteredDailyLogs).then(chartData => {
       set(state => ({
         data: state.data ? {
           ...state.data,
@@ -195,17 +210,11 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
 }))
 
 // Helper function to process raw data into chart-ready format
-async function processChartData(
-  trades: Trade[]
+export async function processChartData(
+  trades: Trade[],
+  dailyLogs?: DailyLogEntry[]
 ): Promise<Omit<PerformanceData, 'trades' | 'dailyLogs' | 'portfolioStats'>> {
-  // Calculate equity curve
-  const equityCurve = calculateEquityCurve(trades)
-
-  // Calculate drawdown data
-  const drawdownData = equityCurve.map(point => ({
-    date: point.date,
-    drawdownPct: ((point.equity - point.highWaterMark) / point.highWaterMark) * 100
-  }))
+  const { equityCurve, drawdownData } = buildEquityAndDrawdown(trades, dailyLogs)
 
   // Day of week analysis
   const dayOfWeekData = calculateDayOfWeekData(trades)
@@ -225,14 +234,14 @@ async function processChartData(
   const tradeSequence = trades.map((trade, index) => ({
     tradeNumber: index + 1,
     pl: trade.pl,
-    date: trade.dateOpened.toISOString()
+    date: new Date(trade.dateOpened).toISOString()
   }))
 
   // Return on margin timeline
   const romTimeline = trades
     .filter(trade => trade.marginReq && trade.marginReq > 0)
     .map(trade => ({
-      date: trade.dateOpened.toISOString(),
+      date: new Date(trade.dateOpened).toISOString(),
       rom: (trade.pl / trade.marginReq!) * 100
     }))
 
@@ -252,16 +261,138 @@ async function processChartData(
   }
 }
 
-function calculateEquityCurve(trades: Trade[]) {
+function buildEquityAndDrawdown(
+  trades: Trade[],
+  dailyLogs?: DailyLogEntry[]
+) {
+  if (dailyLogs && dailyLogs.length > 0) {
+    return buildEquityAndDrawdownFromDailyLogs(trades, dailyLogs)
+  }
+
+  const equityCurve = calculateEquityCurveFromTrades(trades)
+
+  const drawdownData = equityCurve.map(point => {
+    const { equity, highWaterMark, date } = point
+    if (!isFinite(highWaterMark) || highWaterMark === 0) {
+      return { date, drawdownPct: 0 }
+    }
+
+    const drawdownPct = ((equity - highWaterMark) / highWaterMark) * 100
+    return { date, drawdownPct }
+  })
+
+  return { equityCurve, drawdownData }
+}
+
+function buildEquityAndDrawdownFromDailyLogs(
+  trades: Trade[],
+  dailyLogs: DailyLogEntry[]
+) {
+  const sortedLogs = [...dailyLogs].sort((a, b) =>
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+
+  if (sortedLogs.length === 0) {
+    return { equityCurve: [], drawdownData: [] }
+  }
+
+  const tradesSortedByClose = trades
+    .filter(trade => trade.dateClosed)
+    .sort((a, b) =>
+      new Date(a.dateClosed ?? a.dateOpened).getTime() -
+      new Date(b.dateClosed ?? b.dateOpened).getTime()
+    )
+
+  let closedTradeCount = 0
+  let highWaterMark = Number.NEGATIVE_INFINITY
+
+  const equityCurve: PerformanceData['equityCurve'] = []
+  const drawdownData: PerformanceData['drawdownData'] = []
+
+  sortedLogs.forEach(entry => {
+    const entryDate = new Date(entry.date)
+
+    while (
+      closedTradeCount < tradesSortedByClose.length &&
+      new Date(
+        tradesSortedByClose[closedTradeCount].dateClosed ?? tradesSortedByClose[closedTradeCount].dateOpened
+      ).getTime() <= entryDate.getTime()
+    ) {
+      closedTradeCount += 1
+    }
+
+    const equity = getEquityValueFromDailyLog(entry)
+    if (!isFinite(equity)) {
+      return
+    }
+
+    if (!isFinite(highWaterMark) || equity > highWaterMark) {
+      highWaterMark = equity
+    }
+
+    const drawdownPct = typeof entry.drawdownPct === 'number' && !Number.isNaN(entry.drawdownPct)
+      ? entry.drawdownPct
+      : highWaterMark > 0
+        ? ((equity - highWaterMark) / highWaterMark) * 100
+        : 0
+
+    const isoDate = entryDate.toISOString()
+
+    equityCurve.push({
+      date: isoDate,
+      equity,
+      highWaterMark,
+      tradeNumber: closedTradeCount
+    })
+
+    drawdownData.push({
+      date: isoDate,
+      drawdownPct
+    })
+  })
+
+  return { equityCurve, drawdownData }
+}
+
+function getEquityValueFromDailyLog(entry: DailyLogEntry): number {
+  const candidates = [entry.netLiquidity, entry.currentFunds, entry.tradingFunds]
+  for (const value of candidates) {
+    if (typeof value === 'number' && isFinite(value)) {
+      return value
+    }
+  }
+  return 0
+}
+
+function calculateEquityCurveFromTrades(trades: Trade[]) {
   const sortedTrades = [...trades].sort((a, b) =>
     new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
   )
 
-  let runningEquity = 100000 // Starting capital
+  if (sortedTrades.length === 0) {
+    const now = new Date().toISOString()
+    return [{
+      date: now,
+      equity: 0,
+      highWaterMark: 0,
+      tradeNumber: 0
+    }]
+  }
+
+  let initialCapital = calculateInitialCapital(sortedTrades)
+  if (!isFinite(initialCapital) || initialCapital <= 0) {
+    initialCapital = 100000
+  }
+
+  let runningEquity = initialCapital
   let highWaterMark = runningEquity
 
+  const initialDate = sortedTrades[0]
+    ? new Date(sortedTrades[0].dateOpened)
+    : new Date()
+
   const curve = [{
-    date: sortedTrades[0]?.dateOpened.toISOString() || new Date().toISOString(),
+    date: initialDate.toISOString(),
     equity: runningEquity,
     highWaterMark,
     tradeNumber: 0
@@ -271,10 +402,8 @@ function calculateEquityCurve(trades: Trade[]) {
     runningEquity += trade.pl
     highWaterMark = Math.max(highWaterMark, runningEquity)
 
-    // Create unique timestamps for trades on the same day
-    // Add seconds/milliseconds based on trade index to ensure uniqueness
     const baseDate = new Date(trade.dateOpened)
-    const uniqueDate = new Date(baseDate.getTime() + index * 1000) // Add seconds
+    const uniqueDate = new Date(baseDate.getTime() + (index + 1) * 1000)
 
     curve.push({
       date: uniqueDate.toISOString(),
