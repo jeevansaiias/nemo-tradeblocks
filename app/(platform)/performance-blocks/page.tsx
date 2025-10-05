@@ -83,9 +83,9 @@ export default function PerformanceBlocksPage() {
   }
 
   const getStrategyOptions = () => {
-    if (!data || data.trades.length === 0) return []
+    if (!data || data.allTrades.length === 0) return []
 
-    const uniqueStrategies = [...new Set(data.trades.map(trade => trade.strategy || 'Unknown'))]
+    const uniqueStrategies = [...new Set(data.allTrades.map(trade => trade.strategy || 'Unknown'))]
     return uniqueStrategies.map(strategy => ({
       label: strategy,
       value: strategy,
@@ -145,7 +145,7 @@ export default function PerformanceBlocksPage() {
   }
 
   // Show empty state if no data
-  if (!data || !data.trades.length) {
+  if (!data || data.allTrades.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center max-w-md">

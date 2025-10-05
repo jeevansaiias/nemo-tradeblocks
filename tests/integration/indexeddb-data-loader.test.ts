@@ -1,3 +1,5 @@
+/** @jest-environment node */
+
 /**
  * IndexedDB Integration Tests with Data Loader
  *

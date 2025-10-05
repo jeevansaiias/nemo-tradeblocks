@@ -65,19 +65,25 @@ export function TradingFrequencyCard({ trades, tradesPerYear }: TradingFrequency
 
   // Format the trading rate nicely
   const formatTradingRate = () => {
+    const TRADING_DAYS_PER_YEAR = 260;
+    const TRADING_WEEKS_PER_YEAR = 52;
+    const TRADING_MONTHS_PER_YEAR = 12;
+
     if (tradesPerYear >= 10000) {
-      // High frequency trader
-      return `${Math.round(stats.tradesPerDay)} trades/day`;
-    } else if (tradesPerYear >= 1000) {
-      // Active trader
-      return `${Math.round(tradesPerYear / 52)} trades/week`;
-    } else if (tradesPerYear >= 100) {
-      // Regular trader
-      return `${Math.round(stats.tradesPerMonth)} trades/month`;
-    } else {
-      // Occasional trader
-      return `${tradesPerYear} trades/year`;
+      const estimatedDaily = tradesPerYear / TRADING_DAYS_PER_YEAR;
+      const dailyRate = Math.max(stats.tradesPerDay, estimatedDaily);
+      return `${Math.round(dailyRate)} trades/day`;
     }
+
+    if (tradesPerYear >= 1000) {
+      return `${Math.round(tradesPerYear / TRADING_WEEKS_PER_YEAR)} trades/week`;
+    }
+
+    if (tradesPerYear >= 100) {
+      return `${Math.round(tradesPerYear / TRADING_MONTHS_PER_YEAR)} trades/month`;
+    }
+
+    return `${tradesPerYear} trades/year`;
   };
 
   return (
@@ -94,7 +100,7 @@ export function TradingFrequencyCard({ trades, tradesPerYear }: TradingFrequency
               <span className="text-2xl font-bold">{tradesPerYear.toLocaleString()}</span>
               <span className="text-lg text-muted-foreground">trades/year</span>
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground" data-testid="frequency-rate">
               ({formatTradingRate()})
             </div>
           </div>
@@ -104,9 +110,10 @@ export function TradingFrequencyCard({ trades, tradesPerYear }: TradingFrequency
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Based on</p>
           </div>
-          <p className="text-sm">
-            <span className="font-semibold">{stats.totalTrades.toLocaleString()}</span> trades
-            over <span className="font-semibold">{formatTimePeriod()}</span>
+          <p className="text-sm" data-testid="frequency-summary">
+            <span className="font-semibold">{stats.totalTrades.toLocaleString()}</span>{' '}
+            {stats.totalTrades === 1 ? 'trade' : 'trades'} over{' '}
+            <span className="font-semibold">{formatTimePeriod()}</span>
           </p>
         </div>
       </div>

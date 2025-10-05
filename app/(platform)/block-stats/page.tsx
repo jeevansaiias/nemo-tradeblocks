@@ -20,6 +20,7 @@ import { getTradesByBlock, getDailyLogsByBlock } from "@/lib/db";
 import { Trade } from "@/lib/models/trade";
 import { DailyLogEntry } from "@/lib/models/daily-log";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
+import { buildPerformanceSnapshot } from "@/lib/services/performance-snapshot";
 import { PortfolioStats, StrategyStats } from "@/lib/models/portfolio-stats";
 
 // Strategy options will be dynamically generated from trades
@@ -102,25 +103,19 @@ export default function BlockStatsPage() {
       setIsCalculating(true);
 
       try {
-        // Create calculator with current risk-free rate
-        const calculator = new PortfolioStatsCalculator({
-          riskFreeRate: parseFloat(riskFreeRate) || 2.0,
+        const riskFree = parseFloat(riskFreeRate) || 2.0;
+        const snapshot = await buildPerformanceSnapshot({
+          trades,
+          dailyLogs,
+          filters: selectedStrategies.length > 0 ? { strategies: selectedStrategies } : undefined,
+          riskFreeRate: riskFree
         });
 
-        // Filter trades if strategies are selected
-        const currentFilteredTrades = selectedStrategies.length > 0
-          ? trades.filter(trade => selectedStrategies.includes(trade.strategy || 'Unknown'))
-          : trades;
+        setFilteredTrades(snapshot.filteredTrades);
+        setPortfolioStats(snapshot.portfolioStats);
 
-        setFilteredTrades(currentFilteredTrades);
-
-        // Calculate portfolio stats with strategy filtering info
-        const isStrategyFiltered = selectedStrategies.length > 0;
-        const stats = calculator.calculatePortfolioStats(currentFilteredTrades, dailyLogs, isStrategyFiltered);
-        setPortfolioStats(stats);
-
-        // Calculate strategy breakdown
-        const strategies = calculator.calculateStrategyStats(currentFilteredTrades);
+        const calculator = new PortfolioStatsCalculator({ riskFreeRate: riskFree });
+        const strategies = calculator.calculateStrategyStats(snapshot.filteredTrades);
         setStrategyStats(strategies);
       } catch (error) {
         console.error('Failed to calculate metrics:', error);
