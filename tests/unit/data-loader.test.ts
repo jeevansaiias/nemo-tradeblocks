@@ -1,3 +1,7 @@
+
+
+/** @jest-environment node */
+
 /**
  * Tests for Data Loader
  */

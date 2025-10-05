@@ -124,12 +124,18 @@ export function getDefaultSimulationPeriod(tradesPerYear: number): {
   value: number;
   unit: TimeUnit;
 } {
-  if (tradesPerYear >= 50) {
-    // Default to a full trading year to avoid inflated projections
+  if (tradesPerYear >= 10000) {
+    return { value: 3, unit: "months" };
+  }
+
+  if (tradesPerYear >= 1000) {
+    return { value: 6, unit: "months" };
+  }
+
+  if (tradesPerYear >= 100) {
     return { value: 1, unit: "years" };
   }
 
-  // For very infrequent traders, give a bit more history by default
   return { value: 2, unit: "years" };
 }
 

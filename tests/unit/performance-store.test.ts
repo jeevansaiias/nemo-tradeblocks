@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals'
 
-import { processChartData } from '../../lib/stores/performance-store'
+import { processChartData, buildPerformanceSnapshot } from '../../lib/services/performance-snapshot'
 import { calculateInitialCapital } from '../../lib/processing/capital-calculator'
 import { mockTrades } from '../data/mock-trades'
 import { mockDailyLogs } from '../data/mock-daily-logs'
@@ -66,5 +66,18 @@ describe('performance-store chart data', () => {
       const chartMaxDrawdown = Math.abs(Math.min(...result.drawdownData.map(point => point.drawdownPct)))
       expect(chartMaxDrawdown).toBeCloseTo(maxDrawdown, 6)
     }
+  })
+
+  it('builds snapshots that respect strategy filters', async () => {
+    const unfiltered = await buildPerformanceSnapshot({ trades: mockTrades, dailyLogs: mockDailyLogs })
+    const snapshot = await buildPerformanceSnapshot({
+      trades: mockTrades,
+      dailyLogs: mockDailyLogs,
+      filters: { strategies: ['Long Call'] },
+      riskFreeRate: 2
+    })
+
+    expect(snapshot.filteredTrades.every(trade => (trade.strategy || 'Unknown') === 'Long Call')).toBe(true)
+    expect(snapshot.portfolioStats.totalTrades).toBeLessThan(unfiltered.portfolioStats.totalTrades)
   })
 })

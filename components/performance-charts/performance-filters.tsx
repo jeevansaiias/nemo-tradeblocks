@@ -32,9 +32,9 @@ export function PerformanceFilters({ className }: PerformanceFiltersProps) {
 
   // Generate strategy options from trade data
   const strategyOptions = useMemo(() => {
-    if (!data?.trades) return []
+    if (!data?.allTrades) return []
 
-    const uniqueStrategies = [...new Set(data.trades.map(trade => trade.strategy || 'Unknown'))]
+    const uniqueStrategies = [...new Set(data.allTrades.map(trade => trade.strategy || 'Unknown'))]
     return uniqueStrategies.map(strategy => ({
       label: strategy,
       value: strategy

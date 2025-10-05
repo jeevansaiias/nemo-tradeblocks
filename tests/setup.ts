@@ -1,5 +1,6 @@
 // Global test setup
 import { jest } from '@jest/globals';
+import '@testing-library/jest-dom';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 
