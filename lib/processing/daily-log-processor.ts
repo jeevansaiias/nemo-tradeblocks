@@ -10,6 +10,7 @@ import { DailyLogEntry, REQUIRED_DAILY_LOG_COLUMNS } from '../models/daily-log'
 import { ValidationError, ProcessingError } from '../models'
 import { rawDailyLogDataSchema, dailyLogEntrySchema } from '../models/validators'
 import { CSVParser, ParseProgress } from './csv-parser'
+import { findMissingHeaders } from '../utils/csv-headers'
 // import { CSVParseResult } from './csv-parser'
 
 /**
@@ -113,7 +114,7 @@ export class DailyLogProcessor {
       warnings.push(...parseResult.warnings)
 
       // Check for required columns
-      const missingColumns = REQUIRED_DAILY_LOG_COLUMNS.filter(col => !parseResult.headers.includes(col))
+      const missingColumns = findMissingHeaders(parseResult.headers, REQUIRED_DAILY_LOG_COLUMNS)
       if (missingColumns.length > 0) {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`)
       }

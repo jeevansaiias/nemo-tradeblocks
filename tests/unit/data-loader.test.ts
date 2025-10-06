@@ -213,6 +213,17 @@ describe('Data Loader', () => {
       expect(result.stats.invalidRows).toBeGreaterThanOrEqual(0);
     });
 
+    test('should surface missing required trade headers', async () => {
+      const loader = DataLoader.createForTesting();
+      const csvContent = '"Date Opened","P/L"\n"2024-01-01",100';
+
+      const result = await loader.loadTrades(csvContent);
+
+      expect(result.data).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain('Missing required trade log columns');
+    });
+
     test('should return null when no storage adapter', async () => {
       const loader = DataLoader.createForTesting({ useMemoryStorage: false });
       const data = await loader.getBlockData('any-block');

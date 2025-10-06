@@ -62,5 +62,9 @@ export const DAILY_LOG_COLUMN_MAPPING = {
 export const REQUIRED_DAILY_LOG_COLUMNS = [
   "Date",
   "Net Liquidity",
+  "Current Funds",
+  "Trading Funds",
   "P/L",
+  "P/L %",
+  "Drawdown %",
 ] as const

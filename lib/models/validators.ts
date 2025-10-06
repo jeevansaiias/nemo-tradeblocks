@@ -21,7 +21,7 @@ export const rawTradeDataSchema = z.object({
   "Strategy": z.string().min(1, "Strategy is required"),
   "Opening Commissions + Fees": z.string().default("0"),
   "Closing Commissions + Fees": z.string().optional(),
-  "Opening Short/Long Ratio": z.string().min(1, "Opening Short/Long Ratio is required"),
+  "Opening Short/Long Ratio": z.string().default("0"),
   "Closing Short/Long Ratio": z.string().optional(),
   "Opening VIX": z.string().optional(),
   "Closing VIX": z.string().optional(),

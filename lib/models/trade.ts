@@ -112,3 +112,24 @@ export const TRADE_COLUMN_ALIASES = {
   "Closing comms & fees": "Closing Commissions + Fees",
   "Closing Commissions & Fees": "Closing Commissions + Fees",
 } as const
+
+/**
+ * Minimum required columns for a valid trade log
+ */
+export const REQUIRED_TRADE_COLUMNS = [
+  "Date Opened",
+  "Time Opened",
+  "Opening Price",
+  "Legs",
+  "Premium",
+  "Closing Price",
+  "Date Closed",
+  "Time Closed",
+  "Avg. Closing Cost",
+  "Reason For Close",
+  "P/L",
+  "No. of Contracts",
+  "Funds at Close",
+  "Margin Req.",
+  "Strategy",
+] as const

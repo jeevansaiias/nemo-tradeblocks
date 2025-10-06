@@ -6,8 +6,9 @@
  * Supports optional IndexedDB storage
  */
 
-import { Trade } from '../models/trade'
+import { Trade, TRADE_COLUMN_ALIASES, REQUIRED_TRADE_COLUMNS } from '../models/trade'
 import { DailyLogEntry } from '../models/daily-log'
+import { assertRequiredHeaders, normalizeHeaders, parseCsvLine } from '../utils/csv-headers'
 // import { ProcessedBlock } from '../models/block'
 
 /**
@@ -476,15 +477,18 @@ export class DataLoader {
     const lines = csvContent.split('\n').filter(line => line.trim())
     if (lines.length < 2) return []
 
-    const headers = this.parseCSVLine(lines[0])
+    const rawHeaders = parseCsvLine(lines[0])
+    const normalizedHeaders = normalizeHeaders(rawHeaders, TRADE_COLUMN_ALIASES)
+    assertRequiredHeaders(normalizedHeaders, REQUIRED_TRADE_COLUMNS, { contextLabel: 'trade log' })
+
     const trades: Trade[] = []
 
     for (let i = 1; i < lines.length; i++) {
-      const values = this.parseCSVLine(lines[i])
-      if (values.length !== headers.length) continue
+      const values = parseCsvLine(lines[i])
+      if (values.length !== normalizedHeaders.length) continue
 
       const row: Record<string, string> = {}
-      headers.forEach((header, index) => {
+      normalizedHeaders.forEach((header, index) => {
         row[header] = values[index]
       })
 
@@ -523,31 +527,6 @@ export class DataLoader {
     }
 
     return trades
-  }
-
-  /**
-   * Parse a single CSV line, handling quoted values
-   */
-  private parseCSVLine(line: string): string[] {
-    const result: string[] = []
-    let current = ''
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-
-      if (char === '"') {
-        inQuotes = !inQuotes
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
-    }
-
-    result.push(current.trim())
-    return result
   }
 
   /**

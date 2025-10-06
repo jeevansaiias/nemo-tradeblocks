@@ -294,6 +294,7 @@ export default function BlockStatsPage() {
           <MultiSelect
             options={getStrategyOptions()}
             onValueChange={setSelectedStrategies}
+            defaultValue={selectedStrategies}
             placeholder="All strategies"
             maxCount={3}
             className="w-full"
