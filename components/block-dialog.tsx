@@ -45,6 +45,10 @@ import { DailyLogProcessor, DailyLogProcessingProgress, DailyLogProcessingResult
 import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
 import { createBlock, addTrades, addDailyLogEntries } from "@/lib/db";
 import { useBlockStore } from "@/lib/stores/block-store";
+import { REQUIRED_TRADE_COLUMNS, TRADE_COLUMN_ALIASES } from "@/lib/models/trade";
+import { REQUIRED_DAILY_LOG_COLUMNS } from "@/lib/models/daily-log";
+import { findMissingHeaders, normalizeHeaders, parseCsvLine } from "@/lib/utils/csv-headers";
+import { toast } from "sonner";
 
 interface Block {
   id: string;
@@ -211,8 +215,46 @@ export function BlockDialog({
     []
   );
 
+  const validateCsvHeaders = useCallback(async (file: File, type: "trade" | "daily") => {
+    try {
+      const previewChunk = await file.slice(0, 256 * 1024).text();
+      const headerLine = previewChunk
+        .split(/\r?\n/)
+        .find((line) => line.trim().length > 0);
+
+      if (!headerLine) {
+        return "The selected file appears to be empty.";
+      }
+
+      const parsedHeaders = parseCsvLine(headerLine);
+      if (parsedHeaders.length === 0) {
+        return "No headers were detected in the uploaded file.";
+      }
+
+      const normalizedHeaders =
+        type === "trade"
+          ? normalizeHeaders(parsedHeaders, TRADE_COLUMN_ALIASES)
+          : normalizeHeaders(parsedHeaders);
+
+      const requiredHeaders =
+        type === "trade" ? REQUIRED_TRADE_COLUMNS : REQUIRED_DAILY_LOG_COLUMNS;
+      const missingHeaders = findMissingHeaders(normalizedHeaders, requiredHeaders);
+
+      if (missingHeaders.length > 0) {
+        const label = type === "trade" ? "trade log" : "daily log";
+        return `Missing required ${label} columns: ${missingHeaders.join(", ")}`;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Failed to read CSV headers", error);
+      const label = type === "trade" ? "trade log" : "daily log";
+      return `Unable to read ${label} file. Please try again.`;
+    }
+  }, []);
+
   const handleDrop = useCallback(
-    (e: React.DragEvent, type: "trade" | "daily") => {
+    async (e: React.DragEvent, type: "trade" | "daily") => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -231,11 +273,26 @@ export function BlockDialog({
 
       // Validate file type
       if (!file.name.toLowerCase().endsWith(".csv")) {
+        toast.error("Please upload a CSV file");
         setState((prev) => ({
           ...prev,
           file: null,
           status: "error",
           error: "Please upload a CSV file",
+        }));
+        return;
+      }
+
+      const headerError = await validateCsvHeaders(file, type);
+      if (headerError) {
+        toast.error(headerError);
+        setState((prev) => ({
+          ...prev,
+          file: null,
+          status: "error",
+          error: headerError,
+          existingFileName: undefined,
+          existingRowCount: undefined,
         }));
         return;
       }
@@ -247,12 +304,15 @@ export function BlockDialog({
         existingFileName: undefined,
         existingRowCount: undefined,
       });
+
+      const label = type === "trade" ? "Trade log" : "Daily log";
+      toast.success(`${label} headers look good.`);
     },
-    []
+    [validateCsvHeaders]
   );
 
   const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>, type: "trade" | "daily") => {
+    async (e: React.ChangeEvent<HTMLInputElement>, type: "trade" | "daily") => {
       const file = e.target.files?.[0];
       const setState = type === "trade" ? setTradeLog : setDailyLog;
 
@@ -265,12 +325,29 @@ export function BlockDialog({
       }
 
       if (!file.name.toLowerCase().endsWith(".csv")) {
+        toast.error("Please upload a CSV file");
         setState((prev) => ({
           ...prev,
           file: null,
           status: "error",
           error: "Please upload a CSV file",
         }));
+        e.target.value = "";
+        return;
+      }
+
+      const headerError = await validateCsvHeaders(file, type);
+      if (headerError) {
+        toast.error(headerError);
+        setState((prev) => ({
+          ...prev,
+          file: null,
+          status: "error",
+          error: headerError,
+          existingFileName: undefined,
+          existingRowCount: undefined,
+        }));
+        e.target.value = "";
         return;
       }
 
@@ -282,10 +359,13 @@ export function BlockDialog({
         existingRowCount: undefined,
       });
 
+      const label = type === "trade" ? "Trade log" : "Daily log";
+      toast.success(`${label} headers look good.`);
+
       // Reset the input
       e.target.value = "";
     },
-    []
+    [validateCsvHeaders]
   );
 
   const removeFile = useCallback((type: "trade" | "daily") => {

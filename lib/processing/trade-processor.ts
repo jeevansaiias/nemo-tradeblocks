@@ -5,11 +5,12 @@
  * Converts raw CSV data to validated Trade objects.
  */
 
-import { Trade, TRADE_COLUMN_ALIASES } from '../models/trade'
+import { Trade, TRADE_COLUMN_ALIASES, REQUIRED_TRADE_COLUMNS } from '../models/trade'
 // import { TRADE_COLUMN_MAPPING } from '../models/trade'
 import { ValidationError, ProcessingError } from '../models'
 import { rawTradeDataSchema, tradeSchema } from '../models/validators'
 import { CSVParser, ParseProgress } from './csv-parser'
+import { findMissingHeaders, normalizeHeaders } from '../utils/csv-headers'
 // import { CSVParseResult } from './csv-parser'
 
 /**
@@ -112,8 +113,8 @@ export class TradeProcessor {
       warnings.push(...parseResult.warnings)
 
       // Check for required columns
-      const requiredColumns = ['Date Opened', 'P/L', 'Strategy']
-      const missingColumns = requiredColumns.filter(col => !parseResult.headers.includes(col))
+      const normalizedHeaders = normalizeHeaders(parseResult.headers, TRADE_COLUMN_ALIASES)
+      const missingColumns = findMissingHeaders(normalizedHeaders, REQUIRED_TRADE_COLUMNS)
       if (missingColumns.length > 0) {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`)
       }
@@ -365,7 +366,7 @@ export class TradeProcessor {
         strategy,
         openingCommissionsFees: parseNumber(rawData['Opening Commissions + Fees'], 'Opening Commissions', 0),
         closingCommissionsFees: parseNumber(rawData['Closing Commissions + Fees'], 'Closing Commissions', 0),
-        openingShortLongRatio: parseNumber(rawData['Opening Short/Long Ratio'], 'Opening Short/Long Ratio'),
+        openingShortLongRatio: parseNumber(rawData['Opening Short/Long Ratio'], 'Opening Short/Long Ratio', 0),
         closingShortLongRatio: rawData['Closing Short/Long Ratio'] ? parseNumber(rawData['Closing Short/Long Ratio'], 'Closing Short/Long Ratio') : undefined,
         openingVix: rawData['Opening VIX'] ? parseNumber(rawData['Opening VIX'], 'Opening VIX') : undefined,
         closingVix: rawData['Closing VIX'] ? parseNumber(rawData['Closing VIX'], 'Closing VIX') : undefined,
