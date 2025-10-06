@@ -27,30 +27,49 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { addDailyLogEntries, addTrades, createBlock } from "@/lib/db";
+import { REQUIRED_DAILY_LOG_COLUMNS } from "@/lib/models/daily-log";
+import {
+  REQUIRED_TRADE_COLUMNS,
+  TRADE_COLUMN_ALIASES,
+} from "@/lib/models/trade";
+import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
+import {
+  DailyLogProcessingProgress,
+  DailyLogProcessingResult,
+  DailyLogProcessor,
+} from "@/lib/processing/daily-log-processor";
+import {
+  TradeProcessingProgress,
+  TradeProcessingResult,
+  TradeProcessor,
+} from "@/lib/processing/trade-processor";
+import { useBlockStore } from "@/lib/stores/block-store";
+import {
+  findMissingHeaders,
+  normalizeHeaders,
+  parseCsvLine,
+} from "@/lib/utils/csv-headers";
+import {
   Activity,
   AlertCircle,
+  BarChart3,
   Calendar,
   CheckCircle,
   Info,
+  Loader2,
   Plus,
   Save,
   Trash2,
   Upload,
   X,
-  Loader2,
-  BarChart3,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { TradeProcessor, TradeProcessingProgress, TradeProcessingResult } from "@/lib/processing/trade-processor";
-import { DailyLogProcessor, DailyLogProcessingProgress, DailyLogProcessingResult } from "@/lib/processing/daily-log-processor";
-import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
-import { createBlock, addTrades, addDailyLogEntries } from "@/lib/db";
-import { useBlockStore } from "@/lib/stores/block-store";
-import { REQUIRED_TRADE_COLUMNS, TRADE_COLUMN_ALIASES } from "@/lib/models/trade";
-import { REQUIRED_DAILY_LOG_COLUMNS } from "@/lib/models/daily-log";
-import { findMissingHeaders, normalizeHeaders, parseCsvLine } from "@/lib/utils/csv-headers";
 import { toast } from "sonner";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface Block {
   id: string;
@@ -82,7 +101,13 @@ interface Block {
 
 interface FileUploadState {
   file: File | null;
-  status: "empty" | "dragover" | "uploaded" | "error" | "existing" | "processing";
+  status:
+    | "empty"
+    | "dragover"
+    | "uploaded"
+    | "error"
+    | "existing"
+    | "processing";
   error?: string;
   existingFileName?: string;
   existingRowCount?: number;
@@ -98,6 +123,7 @@ interface FileUploadState {
       totalPL: number;
     };
   };
+  requiresStrategyName?: boolean;
 }
 
 interface BlockDialogProps {
@@ -127,14 +153,30 @@ export function BlockDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState<string>("");
-  const [previewData, setPreviewData] = useState<{
+  type PreviewData = {
     trades?: TradeProcessingResult;
     dailyLogs?: DailyLogProcessingResult;
     initialCapital?: number;
-  } | null>(null);
-  const [processingErrors, setProcessingErrors] = useState<string[]>([]);
+  };
 
-  const { addBlock: addBlockToStore, updateBlock, refreshBlock, deleteBlock } = useBlockStore();
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [processingErrors, setProcessingErrors] = useState<string[]>([]);
+  const [missingStrategyCount, setMissingStrategyCount] = useState(0);
+  const [strategyOverride, setStrategyOverride] = useState("");
+  const [pendingTradeResult, setPendingTradeResult] =
+    useState<TradeProcessingResult | null>(null);
+
+  interface ProcessFilesResult {
+    preview: PreviewData;
+    missingStrategies: number;
+  }
+
+  const {
+    addBlock: addBlockToStore,
+    updateBlock,
+    refreshBlock,
+    deleteBlock,
+  } = useBlockStore();
 
   // Reset form when dialog opens/closes or mode changes
   useEffect(() => {
@@ -149,6 +191,9 @@ export function BlockDialog({
       setProcessingStep("");
       setPreviewData(null);
       setProcessingErrors([]);
+      setMissingStrategyCount(0);
+      setStrategyOverride("");
+      setPendingTradeResult(null);
       return;
     }
 
@@ -186,6 +231,9 @@ export function BlockDialog({
       setTradeLog({ file: null, status: "empty" });
       setDailyLog({ file: null, status: "empty" });
     }
+    setMissingStrategyCount(0);
+    setStrategyOverride("");
+    setPendingTradeResult(null);
   }, [open, mode, block]);
 
   const handleDragOver = useCallback(
@@ -197,6 +245,84 @@ export function BlockDialog({
       setState((prev) => ({ ...prev, status: "dragover" }));
     },
     []
+  );
+
+  const resetStrategyOverrideState = useCallback(() => {
+    setMissingStrategyCount(0);
+    setStrategyOverride("");
+    setPendingTradeResult(null);
+  }, []);
+
+  const applyStrategyOverrideToResult = useCallback(
+    (
+      result: TradeProcessingResult,
+      override: string
+    ): TradeProcessingResult => {
+      const trimmed = override.trim();
+      if (!trimmed) return result;
+
+      const updatedTrades = result.trades.map((trade) =>
+        trade.strategy === "Unknown" || trade.strategy.trim() === ""
+          ? { ...trade, strategy: trimmed }
+          : trade
+      );
+
+      const strategies = Array.from(
+        new Set(updatedTrades.map((trade) => trade.strategy))
+      ).sort();
+
+      return {
+        ...result,
+        trades: updatedTrades,
+        stats: {
+          ...result.stats,
+          strategies,
+        },
+      };
+    },
+    []
+  );
+
+  const updateTradeProcessingState = useCallback(
+    (result: TradeProcessingResult, requiresOverride: boolean) => {
+      setTradeLog((prev) => ({
+        ...prev,
+        processedData: {
+          rowCount: result.validTrades,
+          dateRange: result.stats.dateRange,
+          strategies: result.stats.strategies,
+          stats: result.stats,
+        },
+        requiresStrategyName: requiresOverride,
+      }));
+
+      setPreviewData((prev) => (prev ? { ...prev, trades: result } : prev));
+    },
+    []
+  );
+
+  const handleStrategyOverrideInputChange = useCallback(
+    (value: string) => {
+      setStrategyOverride(value);
+
+      if (!pendingTradeResult) {
+        return;
+      }
+
+      const trimmed = value.trim();
+      const adjusted = trimmed
+        ? applyStrategyOverrideToResult(pendingTradeResult, trimmed)
+        : pendingTradeResult;
+
+      const requiresOverride = missingStrategyCount > 0 && trimmed === "";
+      updateTradeProcessingState(adjusted, requiresOverride);
+    },
+    [
+      pendingTradeResult,
+      missingStrategyCount,
+      applyStrategyOverrideToResult,
+      updateTradeProcessingState,
+    ]
   );
 
   const handleDragLeave = useCallback(
@@ -217,43 +343,53 @@ export function BlockDialog({
     []
   );
 
-  const validateCsvHeaders = useCallback(async (file: File, type: "trade" | "daily") => {
-    try {
-      const previewChunk = await file.slice(0, 256 * 1024).text();
-      const headerLine = previewChunk
-        .split(/\r?\n/)
-        .find((line) => line.trim().length > 0);
+  const validateCsvHeaders = useCallback(
+    async (file: File, type: "trade" | "daily") => {
+      try {
+        const previewChunk = await file.slice(0, 256 * 1024).text();
+        const headerLine = previewChunk
+          .split(/\r?\n/)
+          .find((line) => line.trim().length > 0);
 
-      if (!headerLine) {
-        return "The selected file appears to be empty.";
-      }
+        if (!headerLine) {
+          return "The selected file appears to be empty.";
+        }
 
-      const parsedHeaders = parseCsvLine(headerLine);
-      if (parsedHeaders.length === 0) {
-        return "No headers were detected in the uploaded file.";
-      }
+        const parsedHeaders = parseCsvLine(headerLine);
+        if (parsedHeaders.length === 0) {
+          return "No headers were detected in the uploaded file.";
+        }
 
-      const normalizedHeaders =
-        type === "trade"
-          ? normalizeHeaders(parsedHeaders, TRADE_COLUMN_ALIASES)
-          : normalizeHeaders(parsedHeaders);
+        const normalizedHeaders =
+          type === "trade"
+            ? normalizeHeaders(parsedHeaders, TRADE_COLUMN_ALIASES)
+            : normalizeHeaders(parsedHeaders);
 
-      const requiredHeaders =
-        type === "trade" ? REQUIRED_TRADE_COLUMNS : REQUIRED_DAILY_LOG_COLUMNS;
-      const missingHeaders = findMissingHeaders(normalizedHeaders, requiredHeaders);
+        const requiredHeaders =
+          type === "trade"
+            ? REQUIRED_TRADE_COLUMNS
+            : REQUIRED_DAILY_LOG_COLUMNS;
+        const missingHeaders = findMissingHeaders(
+          normalizedHeaders,
+          requiredHeaders
+        );
 
-      if (missingHeaders.length > 0) {
+        if (missingHeaders.length > 0) {
+          const label = type === "trade" ? "trade log" : "daily log";
+          return `Missing required ${label} columns: ${missingHeaders.join(
+            ", "
+          )}`;
+        }
+
+        return null;
+      } catch (error) {
+        console.error("Failed to read CSV headers", error);
         const label = type === "trade" ? "trade log" : "daily log";
-        return `Missing required ${label} columns: ${missingHeaders.join(", ")}`;
+        return `Unable to read ${label} file. Please try again.`;
       }
-
-      return null;
-    } catch (error) {
-      console.error("Failed to read CSV headers", error);
-      const label = type === "trade" ? "trade log" : "daily log";
-      return `Unable to read ${label} file. Please try again.`;
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleDrop = useCallback(
     async (e: React.DragEvent, type: "trade" | "daily") => {
@@ -265,10 +401,15 @@ export function BlockDialog({
 
       const setState = type === "trade" ? setTradeLog : setDailyLog;
 
+      if (type === "trade") {
+        resetStrategyOverrideState();
+      }
+
       if (!file) {
         setState((prev) => ({
           ...prev,
           status: prev.existingFileName ? "existing" : "empty",
+          requiresStrategyName: false,
         }));
         return;
       }
@@ -281,6 +422,7 @@ export function BlockDialog({
           file: null,
           status: "error",
           error: "Please upload a CSV file",
+          requiresStrategyName: false,
         }));
         return;
       }
@@ -295,6 +437,7 @@ export function BlockDialog({
           error: headerError,
           existingFileName: undefined,
           existingRowCount: undefined,
+          requiresStrategyName: false,
         }));
         return;
       }
@@ -305,12 +448,13 @@ export function BlockDialog({
         error: undefined,
         existingFileName: undefined,
         existingRowCount: undefined,
+        requiresStrategyName: false,
       });
 
       const label = type === "trade" ? "Trade log" : "Daily log";
       toast.success(`${label} headers look good.`);
     },
-    [validateCsvHeaders]
+    [validateCsvHeaders, resetStrategyOverrideState]
   );
 
   const handleFileSelect = useCallback(
@@ -318,10 +462,15 @@ export function BlockDialog({
       const file = e.target.files?.[0];
       const setState = type === "trade" ? setTradeLog : setDailyLog;
 
+      if (type === "trade") {
+        resetStrategyOverrideState();
+      }
+
       if (!file) {
         setState((prev) => ({
           ...prev,
           status: prev.existingFileName ? "existing" : "empty",
+          requiresStrategyName: false,
         }));
         return;
       }
@@ -333,6 +482,7 @@ export function BlockDialog({
           file: null,
           status: "error",
           error: "Please upload a CSV file",
+          requiresStrategyName: false,
         }));
         e.target.value = "";
         return;
@@ -348,6 +498,7 @@ export function BlockDialog({
           error: headerError,
           existingFileName: undefined,
           existingRowCount: undefined,
+          requiresStrategyName: false,
         }));
         e.target.value = "";
         return;
@@ -359,6 +510,7 @@ export function BlockDialog({
         error: undefined,
         existingFileName: undefined,
         existingRowCount: undefined,
+        requiresStrategyName: false,
       });
 
       const label = type === "trade" ? "Trade log" : "Daily log";
@@ -367,7 +519,7 @@ export function BlockDialog({
       // Reset the input
       e.target.value = "";
     },
-    [validateCsvHeaders]
+    [validateCsvHeaders, resetStrategyOverrideState]
   );
 
   const removeFile = useCallback((type: "trade" | "daily") => {
@@ -378,15 +530,19 @@ export function BlockDialog({
       error: undefined,
       existingFileName: undefined,
       existingRowCount: undefined,
+      requiresStrategyName: false,
     });
-  }, []);
+    if (type === "trade") {
+      resetStrategyOverrideState();
+    }
+  }, [resetStrategyOverrideState]);
 
   const formatFileSize = (bytes: number) => {
     const mb = bytes / (1024 * 1024);
     return `${mb.toFixed(1)} MB`;
   };
 
-  const processFiles = async () => {
+  const processFiles = async (): Promise<ProcessFilesResult | null> => {
     if (!tradeLog.file) return null;
 
     setIsProcessing(true);
@@ -396,37 +552,56 @@ export function BlockDialog({
     try {
       // Process trade log
       setProcessingStep("Processing trade log...");
-      setTradeLog(prev => ({ ...prev, status: "processing", progress: 0 }));
+      setTradeLog((prev) => ({
+        ...prev,
+        status: "processing",
+        progress: 0,
+        requiresStrategyName: false,
+      }));
 
       const tradeProcessor = new TradeProcessor({
         progressCallback: (progress: TradeProcessingProgress) => {
-          setTradeLog(prev => ({
+          setTradeLog((prev) => ({
             ...prev,
             progress: progress.progress,
             processedData: {
               rowCount: progress.validTrades + progress.invalidTrades,
-            }
+            },
           }));
-        }
+        },
       });
 
-      const tradeResult = await tradeProcessor.processFile(tradeLog.file);
+      const rawTradeResult = await tradeProcessor.processFile(tradeLog.file);
 
-      if (tradeResult.errors.length > 0) {
-        const errorMessages = tradeResult.errors.map(e => e.message);
-        setProcessingErrors(prev => [...prev, ...errorMessages]);
+      if (rawTradeResult.errors.length > 0) {
+        const errorMessages = rawTradeResult.errors.map((e) => e.message);
+        setProcessingErrors((prev) => [...prev, ...errorMessages]);
       }
 
-      setTradeLog(prev => ({
+      const missingCount = rawTradeResult.trades.filter(
+        (trade) => trade.strategy === "Unknown"
+      ).length;
+      setMissingStrategyCount(missingCount);
+      setPendingTradeResult(missingCount > 0 ? rawTradeResult : null);
+
+      const trimmedOverride = strategyOverride.trim();
+      const adjustedTradeResult =
+        missingCount > 0 && trimmedOverride
+          ? applyStrategyOverrideToResult(rawTradeResult, trimmedOverride)
+          : rawTradeResult;
+      const requiresOverride = missingCount > 0 && !trimmedOverride;
+
+      setTradeLog((prev) => ({
         ...prev,
         status: "uploaded",
         progress: 100,
         processedData: {
-          rowCount: tradeResult.validTrades,
-          dateRange: tradeResult.stats.dateRange,
-          strategies: tradeResult.stats.strategies,
-          stats: tradeResult.stats
-        }
+          rowCount: adjustedTradeResult.validTrades,
+          dateRange: adjustedTradeResult.stats.dateRange,
+          strategies: adjustedTradeResult.stats.strategies,
+          stats: adjustedTradeResult.stats,
+        },
+        requiresStrategyName: requiresOverride,
       }));
 
       // Process daily log if provided
@@ -435,29 +610,29 @@ export function BlockDialog({
 
       if (dailyLog.file) {
         setProcessingStep("Processing daily log...");
-        setDailyLog(prev => ({ ...prev, status: "processing", progress: 0 }));
+        setDailyLog((prev) => ({ ...prev, status: "processing", progress: 0 }));
 
         const dailyProcessor = new DailyLogProcessor({
           progressCallback: (progress: DailyLogProcessingProgress) => {
-            setDailyLog(prev => ({
+            setDailyLog((prev) => ({
               ...prev,
               progress: progress.progress,
               processedData: {
                 rowCount: progress.validEntries + progress.invalidEntries,
-              }
+              },
             }));
-          }
+          },
         });
 
         dailyResult = await dailyProcessor.processFile(dailyLog.file);
 
         if (dailyResult && dailyResult.errors.length > 0) {
-          const errorMessages = dailyResult.errors.map(e => e.message);
-          setProcessingErrors(prev => [...prev, ...errorMessages]);
+          const errorMessages = dailyResult.errors.map((e) => e.message);
+          setProcessingErrors((prev) => [...prev, ...errorMessages]);
         }
 
         if (dailyResult) {
-          setDailyLog(prev => ({
+          setDailyLog((prev) => ({
             ...prev,
             status: "uploaded",
             progress: 100,
@@ -466,36 +641,43 @@ export function BlockDialog({
               dateRange: dailyResult!.stats.dateRange,
               stats: {
                 ...dailyResult!.stats,
-                strategies: [] // Daily logs don't have strategies
-              }
-            }
+                strategies: [], // Daily logs don't have strategies
+              },
+            },
           }));
         }
 
         // Calculate initial capital
-        initialCapital = calculateInitialCapital(tradeResult.trades, dailyResult?.entries);
+        initialCapital = calculateInitialCapital(
+          adjustedTradeResult.trades,
+          dailyResult?.entries
+        );
       } else {
         // Calculate initial capital from trades only
-        initialCapital = calculateInitialCapital(tradeResult.trades);
+        initialCapital = calculateInitialCapital(adjustedTradeResult.trades);
       }
 
       setProcessingStep("Calculating statistics...");
 
       const preview = {
-        trades: tradeResult,
+        trades: adjustedTradeResult,
         dailyLogs: dailyResult,
-        initialCapital
+        initialCapital,
       };
 
       setPreviewData(preview);
       setProcessingStep("");
 
-      return preview;
-
+      return { preview, missingStrategies: missingCount };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       setProcessingErrors([errorMessage]);
-      setTradeLog(prev => ({ ...prev, status: "error", error: errorMessage }));
+      setTradeLog((prev) => ({
+        ...prev,
+        status: "error",
+        error: errorMessage,
+      }));
       setProcessingStep("");
       return null;
     } finally {
@@ -511,13 +693,24 @@ export function BlockDialog({
       setIsProcessing(true);
 
       // For new blocks, process files if provided
-      let processedData = previewData;
+      let processedPreview = previewData;
+      let missingStrategies = missingStrategyCount;
       if (mode === "new" && tradeLog.file) {
-        processedData = await processFiles();
-        if (!processedData) return; // Processing failed
+        const result = await processFiles();
+        if (!result) return; // Processing failed
+        processedPreview = result.preview;
+        missingStrategies = result.missingStrategies;
+        if (missingStrategies > 0 && strategyOverride.trim() === "") {
+          toast.error(
+            "Please provide a strategy name for unlabeled trades before creating the block."
+          );
+          setIsProcessing(false);
+          setProcessingStep("");
+          return;
+        }
       }
 
-      if (mode === "new" && processedData) {
+      if (mode === "new" && processedPreview) {
         // Create new block with processed data
         setProcessingStep("Saving to database...");
 
@@ -530,21 +723,27 @@ export function BlockDialog({
           tradeLog: {
             fileName: tradeLog.file!.name,
             fileSize: tradeLog.file!.size,
-            originalRowCount: processedData.trades?.totalRows || 0,
-            processedRowCount: processedData.trades?.trades.length || 0,
+            originalRowCount: processedPreview.trades?.totalRows || 0,
+            processedRowCount:
+              processedPreview.trades?.trades.length || 0,
             uploadedAt: now,
           },
-          dailyLog: dailyLog.file ? {
-            fileName: dailyLog.file.name,
-            fileSize: dailyLog.file.size,
-            originalRowCount: processedData.dailyLogs?.totalRows || 0,
-            processedRowCount: processedData.dailyLogs?.entries.length || 0,
-            uploadedAt: now,
-          } : undefined,
-          processingStatus: 'completed' as const,
+          dailyLog: dailyLog.file
+            ? {
+                fileName: dailyLog.file.name,
+                fileSize: dailyLog.file.size,
+                originalRowCount: processedPreview.dailyLogs?.totalRows || 0,
+                processedRowCount:
+                  processedPreview.dailyLogs?.entries.length || 0,
+                uploadedAt: now,
+              }
+            : undefined,
+          processingStatus: "completed" as const,
           dataReferences: {
             tradesStorageKey: `block_${Date.now()}_trades`,
-            dailyLogStorageKey: dailyLog.file ? `block_${Date.now()}_daily_logs` : undefined,
+            dailyLogStorageKey: dailyLog.file
+              ? `block_${Date.now()}_daily_logs`
+              : undefined,
           },
           analysisConfig: {
             riskFreeRate: 0.05,
@@ -559,33 +758,47 @@ export function BlockDialog({
         const newBlock = await createBlock(blockMetadata);
 
         // Add trades
-        if (processedData.trades?.trades.length) {
-          await addTrades(newBlock.id, processedData.trades.trades);
+        if (processedPreview.trades?.trades.length) {
+          await addTrades(newBlock.id, processedPreview.trades.trades);
         }
 
         // Add daily log entries if present
-        if (processedData.dailyLogs && processedData.dailyLogs.entries.length > 0) {
-          const entriesWithBlockId = processedData.dailyLogs.entries.map(entry => ({
-            ...entry,
-            blockId: newBlock.id
-          }));
+        if (
+          processedPreview.dailyLogs &&
+          processedPreview.dailyLogs.entries.length > 0
+        ) {
+          const entriesWithBlockId = processedPreview.dailyLogs.entries.map(
+            (entry) => ({
+              ...entry,
+              blockId: newBlock.id,
+            })
+          );
           await addDailyLogEntries(newBlock.id, entriesWithBlockId);
         }
 
         // Calculate block stats for store
-        const trades = processedData.trades?.trades || [];
+        const trades = processedPreview.trades?.trades || [];
         const blockStats = {
-          totalPnL: processedData.trades?.stats.totalPL || 0,
-          winRate: trades.length > 0
-            ? (trades.filter(t => t.pl > 0).length / trades.length) * 100
-            : 0,
-          totalTrades: processedData.trades?.validTrades || 0,
-          avgWin: trades.length > 0
-            ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length || 0
-            : 0,
-          avgLoss: trades.length > 0
-            ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length || 0
-            : 0,
+          totalPnL: processedPreview.trades?.stats.totalPL || 0,
+          winRate:
+            trades.length > 0
+              ? (trades.filter((t) => t.pl > 0).length / trades.length) * 100
+              : 0,
+          totalTrades: processedPreview.trades?.validTrades || 0,
+          avgWin:
+            trades.length > 0
+              ? trades
+                  .filter((t) => t.pl > 0)
+                  .reduce((sum, t) => sum + t.pl, 0) /
+                  trades.filter((t) => t.pl > 0).length || 0
+              : 0,
+          avgLoss:
+            trades.length > 0
+              ? trades
+                  .filter((t) => t.pl < 0)
+                  .reduce((sum, t) => sum + t.pl, 0) /
+                  trades.filter((t) => t.pl < 0).length || 0
+              : 0,
         };
 
         // Add to Zustand store
@@ -597,22 +810,26 @@ export function BlockDialog({
           lastModified: new Date(),
           tradeLog: {
             fileName: tradeLog.file!.name,
-            rowCount: processedData.trades?.validTrades || 0,
+            rowCount: processedPreview.trades?.validTrades || 0,
             fileSize: tradeLog.file!.size,
           },
-          dailyLog: dailyLog.file ? {
-            fileName: dailyLog.file.name,
-            rowCount: processedData.dailyLogs?.validEntries || 0,
-            fileSize: dailyLog.file.size,
-          } : undefined,
+          dailyLog: dailyLog.file
+            ? {
+                fileName: dailyLog.file.name,
+                rowCount:
+                  processedPreview.dailyLogs?.validEntries || 0,
+                fileSize: dailyLog.file.size,
+              }
+            : undefined,
           stats: blockStats,
         };
 
         await addBlockToStore(blockForStore);
-
       } else if (mode === "edit" && block) {
         // Update existing block
         setProcessingStep("Updating block...");
+
+        const processedData = previewData;
 
         const updates: Partial<Block> = {
           name: name.trim(),
@@ -632,16 +849,27 @@ export function BlockDialog({
           const editTrades = processedData.trades?.trades || [];
           updates.stats = {
             totalPnL: processedData.trades?.stats.totalPL || 0,
-            winRate: editTrades.length > 0
-              ? (editTrades.filter(t => t.pl > 0).length / editTrades.length) * 100
-              : 0,
+            winRate:
+              editTrades.length > 0
+                ? (editTrades.filter((t) => t.pl > 0).length /
+                    editTrades.length) *
+                  100
+                : 0,
             totalTrades: processedData.trades?.validTrades || 0,
-            avgWin: editTrades.length > 0
-              ? editTrades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / editTrades.filter(t => t.pl > 0).length || 0
-              : 0,
-            avgLoss: editTrades.length > 0
-              ? editTrades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / editTrades.filter(t => t.pl < 0).length || 0
-              : 0,
+            avgWin:
+              editTrades.length > 0
+                ? editTrades
+                    .filter((t) => t.pl > 0)
+                    .reduce((sum, t) => sum + t.pl, 0) /
+                    editTrades.filter((t) => t.pl > 0).length || 0
+                : 0,
+            avgLoss:
+              editTrades.length > 0
+                ? editTrades
+                    .filter((t) => t.pl < 0)
+                    .reduce((sum, t) => sum + t.pl, 0) /
+                    editTrades.filter((t) => t.pl < 0).length || 0
+                : 0,
           };
         }
 
@@ -661,9 +889,9 @@ export function BlockDialog({
 
       setProcessingStep("");
       onOpenChange(false);
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       setProcessingErrors([errorMessage]);
       setProcessingStep("");
     } finally {
@@ -685,7 +913,8 @@ export function BlockDialog({
       setShowDeleteConfirm(false);
       onOpenChange(false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete block';
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete block";
       setProcessingErrors([errorMessage]);
     } finally {
       setIsProcessing(false);
@@ -693,7 +922,12 @@ export function BlockDialog({
     }
   };
 
-  const canSubmit = name.trim() && (tradeLog.file || tradeLog.existingFileName);
+  const strategyInputRequired =
+    missingStrategyCount > 0 && strategyOverride.trim() === "";
+  const canSubmit =
+    name.trim() &&
+    (tradeLog.file || tradeLog.existingFileName) &&
+    !strategyInputRequired;
 
   const getDialogTitle = () =>
     mode === "edit" ? "Edit Trading Block" : "Create New Trading Block";
@@ -717,7 +951,8 @@ export function BlockDialog({
     const Icon = isTradeLog ? Activity : Calendar;
     const label = isTradeLog ? "Trade Log" : "Daily Log";
     const inputId = `${mode}-${type}-file-input`;
-    const isMissingColumnsError = fileState.error?.startsWith("Missing required");
+    const isMissingColumnsError =
+      fileState.error?.startsWith("Missing required");
     const errorHeading = isMissingColumnsError
       ? isTradeLog
         ? "Missing trade log columns"
@@ -739,7 +974,7 @@ export function BlockDialog({
           <a
             href="https://docs.optionomega.com/backtesting/backtest-results#export-to-csv"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="font-medium underline underline-offset-2"
           >
             View OptionOmega export guide ↗
@@ -834,7 +1069,8 @@ export function BlockDialog({
                 <div className="flex-1">
                   <p className="font-medium">{fileState.file.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    Processing {type === "trade" ? "trades" : "daily log entries"}...
+                    Processing{" "}
+                    {type === "trade" ? "trades" : "daily log entries"}...
                   </p>
                 </div>
               </div>
@@ -882,12 +1118,18 @@ export function BlockDialog({
                   <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
                       <span className="text-muted-foreground">Rows:</span>
-                      <span className="ml-1 font-medium">{fileState.processedData.rowCount}</span>
+                      <span className="ml-1 font-medium">
+                        {fileState.processedData.rowCount}
+                      </span>
                     </div>
                     {fileState.processedData.strategies && (
                       <div>
-                        <span className="text-muted-foreground">Strategies:</span>
-                        <span className="ml-1 font-medium">{fileState.processedData.strategies.length}</span>
+                        <span className="text-muted-foreground">
+                          Strategies:
+                        </span>
+                        <span className="ml-1 font-medium">
+                          {fileState.processedData.strategies.length}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -895,7 +1137,9 @@ export function BlockDialog({
                     <div className="mt-2 text-xs">
                       <span className="text-muted-foreground">Date Range:</span>
                       <span className="ml-1 font-medium">
-                        {fileState.processedData.dateRange.start?.toLocaleDateString()} - {fileState.processedData.dateRange.end?.toLocaleDateString()}
+                        {fileState.processedData.dateRange.start?.toLocaleDateString()}{" "}
+                        -{" "}
+                        {fileState.processedData.dateRange.end?.toLocaleDateString()}
                       </span>
                     </div>
                   )}
@@ -937,7 +1181,9 @@ export function BlockDialog({
                 <p className="text-sm text-red-600 dark:text-red-300 leading-snug">
                   {errorMessage || fileState.error}
                 </p>
-                <p className="text-xs text-muted-foreground">Click to try again</p>
+                <p className="text-xs text-muted-foreground">
+                  Click to try again
+                </p>
               </div>
             </div>
           ) : (
@@ -958,17 +1204,70 @@ export function BlockDialog({
             </div>
           )}
         </div>
+
+        {isTradeLog && missingStrategyCount > 0 && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200 space-y-2">
+            <div className="font-medium flex items-center justify-between gap-2">
+              <span>Strategy name required</span>
+              <Badge
+                variant="outline"
+                className="text-xs text-amber-900 dark:text-amber-200 border-amber-400/70"
+              >
+                {missingStrategyCount} trade
+                {missingStrategyCount === 1 ? "" : "s"}
+              </Badge>
+            </div>
+            <p className="leading-snug">
+              We detected trades without a strategy label. Enter a name and
+              we’ll apply it to every blank entry before saving.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={strategyOverride}
+                onChange={(e) =>
+                  handleStrategyOverrideInputChange(e.target.value)
+                }
+                placeholder="e.g., Custom Strategy"
+                aria-label="Strategy name for unlabeled trades"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleStrategyOverrideInputChange("")}
+                disabled={!strategyOverride}
+                className="sm:w-auto"
+              >
+                Clear
+              </Button>
+            </div>
+            {!strategyOverride.trim() && (
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Entry required before you can create the block.
+              </p>
+            )}
+            {strategyOverride.trim() && (
+              <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                Applying &quot;{strategyOverride.trim()}&quot; to{" "}
+                {missingStrategyCount} trade
+                {missingStrategyCount === 1 ? "" : "s"}.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(newOpen) => {
-        if (!isProcessing) {
-          onOpenChange(newOpen);
-        }
-      }}>
+      <Dialog
+        open={open}
+        onOpenChange={(newOpen) => {
+          if (!isProcessing) {
+            onOpenChange(newOpen);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl lg:max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{getDialogTitle()}</DialogTitle>
@@ -1066,7 +1365,9 @@ export function BlockDialog({
                 <Checkbox
                   id="set-active"
                   checked={setAsActive}
-                  onCheckedChange={(checked) => setSetAsActive(checked === true)}
+                  onCheckedChange={(checked) =>
+                    setSetAsActive(checked === true)
+                  }
                 />
                 <Label htmlFor="set-active">
                   Set as active block after creation
@@ -1099,7 +1400,10 @@ export function BlockDialog({
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={!canSubmit || isProcessing}>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!canSubmit || isProcessing}
+                >
                   {isProcessing ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
@@ -1128,7 +1432,9 @@ export function BlockDialog({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isProcessing}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDelete}
                 disabled={isProcessing}
