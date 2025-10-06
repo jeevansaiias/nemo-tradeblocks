@@ -31,6 +31,7 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle,
+  Info,
   Plus,
   Save,
   Trash2,
@@ -49,6 +50,7 @@ import { REQUIRED_TRADE_COLUMNS, TRADE_COLUMN_ALIASES } from "@/lib/models/trade
 import { REQUIRED_DAILY_LOG_COLUMNS } from "@/lib/models/daily-log";
 import { findMissingHeaders, normalizeHeaders, parseCsvLine } from "@/lib/utils/csv-headers";
 import { toast } from "sonner";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface Block {
   id: string;
@@ -715,11 +717,62 @@ export function BlockDialog({
     const Icon = isTradeLog ? Activity : Calendar;
     const label = isTradeLog ? "Trade Log" : "Daily Log";
     const inputId = `${mode}-${type}-file-input`;
+    const isMissingColumnsError = fileState.error?.startsWith("Missing required");
+    const errorHeading = isMissingColumnsError
+      ? isTradeLog
+        ? "Missing trade log columns"
+        : "Missing daily log columns"
+      : "Upload error";
+    const errorMessage = fileState.error
+      ? fileState.error.replace(
+          /^Missing required (?:trade|daily) log columns:\s*/i,
+          ""
+        )
+      : "";
+
+    const tooltipContent = isTradeLog ? (
+      <div className="max-w-xs space-y-2">
+        <p className="text-sm leading-snug">
+          Works with OptionOmega portfolio or individual backtest CSV exports.
+        </p>
+        <p className="text-sm leading-snug">
+          <a
+            href="https://docs.optionomega.com/backtesting/backtest-results#export-to-csv"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium underline underline-offset-2"
+          >
+            View OptionOmega export guide ↗
+          </a>
+        </p>
+      </div>
+    ) : (
+      <div className="max-w-xs text-sm leading-snug">
+        Supports OptionOmega portfolio backtest daily logs. Individual backtests
+        don’t include the daily performance CSV.
+      </div>
+    );
 
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Label>{label}</Label>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor={inputId}>{label}</Label>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-muted-foreground/40 text-muted-foreground hover:border-muted-foreground hover:text-foreground"
+                  aria-label={`${label} requirements`}
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-left">
+                {tooltipContent}
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <Badge
             variant={isRequired ? "destructive" : "secondary"}
             className="text-xs"
@@ -730,7 +783,7 @@ export function BlockDialog({
 
         <div
           className={`
-            relative border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer
+            relative border-2 border-dashed rounded-lg p-4 sm:p-5 transition-all cursor-pointer
             ${
               fileState.status === "dragover"
                 ? "border-primary bg-primary/5"
@@ -873,14 +926,19 @@ export function BlockDialog({
               </div>
             </div>
           ) : fileState.status === "error" ? (
-            <div className="text-center">
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <p className="font-medium text-red-700 dark:text-red-400">
-                {fileState.error}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Click to try again
-              </p>
+            <div className="flex items-start gap-3 text-left">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                  {errorHeading}
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-300 leading-snug">
+                  {errorMessage || fileState.error}
+                </p>
+                <p className="text-xs text-muted-foreground">Click to try again</p>
+              </div>
             </div>
           ) : (
             <div className="text-center">
@@ -911,7 +969,7 @@ export function BlockDialog({
           onOpenChange(newOpen);
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl lg:max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{getDialogTitle()}</DialogTitle>
             <DialogDescription>{getDialogDescription()}</DialogDescription>
