@@ -1196,24 +1196,34 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                   ) : (
                     <div className="space-y-2">
                       <table className="w-full text-sm">
-                        <thead className="border-b">
-                          <tr>
-                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
+                        <thead>
+                          <tr className="border-b bg-muted/30">
+                            <th colSpan={6} className="py-3 text-center text-xs font-semibold uppercase tracking-wider text-foreground">
+                              Backtested Trades
+                            </th>
+                            <th className="w-4 bg-border"></th>
+                            <th colSpan={6} className="py-3 text-center text-xs font-semibold uppercase tracking-wider text-foreground">
+                              Reported Trades
+                            </th>
+                          </tr>
+                          <tr className="border-b">
+                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
                               <span className="sr-only">Select</span>
                             </th>
-                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">Time</th>
-                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Contracts</th>
-                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Premium</th>
-                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">P/L</th>
-                            <th className="pb-3 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">Auto</th>
-                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
+                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">Time</th>
+                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Contracts</th>
+                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Premium</th>
+                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">P/L</th>
+                            <th className="pb-3 pt-2 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">Auto</th>
+                            <th className="w-4 bg-border"></th>
+                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
                               <span className="sr-only">Select</span>
                             </th>
-                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">Time</th>
-                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Contracts</th>
-                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Premium</th>
-                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">P/L</th>
-                            <th className="pb-3 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">Auto</th>
+                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">Time</th>
+                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Contracts</th>
+                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Premium</th>
+                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">P/L</th>
+                            <th className="pb-3 pt-2 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">Auto</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1228,13 +1238,13 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                               <tr
                                 key={`${activeSession}-${index}`}
                                 className={cn(
-                                  "border-b transition-colors",
+                                  "border-b transition-colors hover:bg-muted/30",
                                   isMatched && (backtestedSelected || reportedSelected) &&
-                                    "bg-green-50 dark:bg-green-900/20",
+                                    "bg-primary/5",
                                 )}
                               >
-                                <td className="py-3 pr-3 align-middle">
-                                  {item.backtested && (
+                                <td className="py-4 pl-3 pr-3 align-middle">
+                                  {item.backtested && item.reported && (
                                     <Checkbox
                                       checked={Boolean(backtestedSelected)}
                                       onCheckedChange={(checked) =>
@@ -1244,28 +1254,28 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                                     />
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 align-middle">
+                                <td className="py-4 pr-4 align-middle">
                                   {item.backtested ? (
                                     <span className="font-medium whitespace-nowrap">{formatDateTime(item.backtested.dateOpened)}</span>
                                   ) : (
                                     <span className="text-xs text-muted-foreground italic">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 text-right align-middle">
+                                <td className="py-4 pr-4 text-right align-middle">
                                   {item.backtested ? (
                                     <span className="font-medium tabular-nums">{item.backtested.contracts}</span>
                                   ) : (
                                     <span className="text-xs text-muted-foreground">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 text-right align-middle">
+                                <td className="py-4 pr-4 text-right align-middle">
                                   {item.backtested ? (
                                     <span className="font-medium tabular-nums">{formatCurrency(item.backtested.totalPremium)}</span>
                                   ) : (
                                     <span className="text-xs text-muted-foreground">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 text-right align-middle">
+                                <td className="py-4 pr-4 text-right align-middle">
                                   {item.backtested ? (
                                     <span className={cn("font-semibold tabular-nums", item.backtested.pl >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500")}>
                                       {formatCurrency(item.backtested.pl)}
@@ -1274,15 +1284,14 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                                     <span className="text-xs text-muted-foreground">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-6 text-center align-middle">
+                                <td className="py-4 pr-4 text-center align-middle">
                                   {item.backtested && item.autoBacktested && (
-                                    <Badge variant="outline" className="text-[10px] uppercase">
-                                      Auto
-                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">AUTO</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-3 align-middle">
-                                  {item.reported && (
+                                <td className="w-4 bg-border"></td>
+                                <td className="py-4 pl-3 pr-3 align-middle">
+                                  {item.reported && item.backtested && (
                                     <Checkbox
                                       checked={Boolean(reportedSelected)}
                                       onCheckedChange={(checked) =>
@@ -1292,28 +1301,28 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                                     />
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 align-middle">
+                                <td className="py-4 pr-4 align-middle">
                                   {item.reported ? (
                                     <span className="font-medium whitespace-nowrap">{formatDateTime(item.reported.dateOpened)}</span>
                                   ) : (
                                     <span className="text-xs text-muted-foreground italic">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 text-right align-middle">
+                                <td className="py-4 pr-4 text-right align-middle">
                                   {item.reported ? (
                                     <span className="font-medium tabular-nums">{item.reported.contracts}</span>
                                   ) : (
                                     <span className="text-xs text-muted-foreground">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 text-right align-middle">
+                                <td className="py-4 pr-4 text-right align-middle">
                                   {item.reported ? (
                                     <span className="font-medium tabular-nums">{formatCurrency(item.reported.totalPremium)}</span>
                                   ) : (
                                     <span className="text-xs text-muted-foreground">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 pr-4 text-right align-middle">
+                                <td className="py-4 pr-4 text-right align-middle">
                                   {item.reported ? (
                                     <span className={cn("font-semibold tabular-nums", item.reported.pl >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500")}>
                                       {formatCurrency(item.reported.pl)}
@@ -1322,11 +1331,9 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                                     <span className="text-xs text-muted-foreground">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 text-center align-middle">
+                                <td className="py-4 text-center align-middle">
                                   {item.reported && item.autoReported && (
-                                    <Badge variant="outline" className="text-[10px] uppercase">
-                                      Auto
-                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">AUTO</span>
                                   )}
                                 </td>
                               </tr>
