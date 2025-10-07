@@ -38,6 +38,9 @@ export interface MonteCarloParams {
 
   /** Random seed for reproducibility (optional) */
   randomSeed?: number;
+
+  /** Normalize trades to 1-lot by scaling P&L by numContracts (optional) */
+  normalizeTo1Lot?: boolean;
 }
 
 /**
@@ -159,6 +162,19 @@ export interface MonteCarloResult {
  */
 
 /**
+ * Scale trade P&L to 1-lot equivalent
+ *
+ * @param trade - Trade to scale
+ * @returns Scaled P&L value (P&L per contract)
+ */
+export function scaleTradeToOneLot(trade: Trade): number {
+  if (trade.numContracts <= 0) {
+    return trade.pl;
+  }
+  return trade.pl / trade.numContracts;
+}
+
+/**
  * Resample from an array with replacement
  *
  * @param data - Array of values to sample from
@@ -253,10 +269,12 @@ export function resampleTradePLs(
  * Groups trades by date and sums P&L for each day
  *
  * @param trades - Trades to aggregate
+ * @param normalizeTo1Lot - Whether to scale P&L to 1-lot
  * @returns Array of { date, dailyPL } objects sorted by date
  */
 export function calculateDailyReturns(
-  trades: Trade[]
+  trades: Trade[],
+  normalizeTo1Lot?: boolean
 ): Array<{ date: string; dailyPL: number }> {
   // Group trades by date
   const dailyPLMap = new Map<string, number>();
@@ -265,7 +283,8 @@ export function calculateDailyReturns(
     // Use ISO date string as key (YYYY-MM-DD)
     const dateKey = trade.dateOpened.toISOString().split("T")[0];
     const currentPL = dailyPLMap.get(dateKey) || 0;
-    dailyPLMap.set(dateKey, currentPL + trade.pl);
+    const pl = normalizeTo1Lot ? scaleTradeToOneLot(trade) : trade.pl;
+    dailyPLMap.set(dateKey, currentPL + pl);
   }
 
   // Convert to sorted array
@@ -474,7 +493,10 @@ export function runMonteCarloSimulation(
       params.strategy
     );
     actualResamplePoolSize = tradePool.length;
-    resamplePool = tradePool.map((t) => t.pl);
+    // Extract P&L values, optionally scaling to 1-lot
+    resamplePool = tradePool.map((t) =>
+      params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl
+    );
   } else {
     // Daily returns resampling
     const filteredTrades =
@@ -482,7 +504,10 @@ export function runMonteCarloSimulation(
         ? trades.filter((t) => t.strategy === params.strategy)
         : trades;
 
-    const dailyReturns = calculateDailyReturns(filteredTrades);
+    const dailyReturns = calculateDailyReturns(
+      filteredTrades,
+      params.normalizeTo1Lot
+    );
     const dailyPLs = getDailyResamplePool(
       dailyReturns,
       params.resampleWindow
