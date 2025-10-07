@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock } from '../db'
+import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock, getReportingTradesByBlock } from '../db'
 import { ProcessedBlock } from '../models/block'
+import { StrategyAlignment } from '../models/strategy-alignment'
 // import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
 
 export interface Block {
@@ -20,12 +21,21 @@ export interface Block {
     rowCount: number
     fileSize: number
   }
+  reportingLog?: {
+    fileName: string
+    rowCount: number
+    fileSize: number
+  }
   stats: {
     totalPnL: number
     winRate: number
     totalTrades: number
     avgWin: number
     avgLoss: number
+  }
+  strategyAlignment?: {
+    mappings: StrategyAlignment[]
+    updatedAt: Date
   }
 }
 
@@ -51,7 +61,12 @@ interface BlockStore {
 /**
  * Convert ProcessedBlock from DB to Block for UI
  */
-function convertProcessedBlockToBlock(processedBlock: ProcessedBlock, tradeCount: number, dailyLogCount: number): Block {
+function convertProcessedBlockToBlock(
+  processedBlock: ProcessedBlock,
+  tradeCount: number,
+  dailyLogCount: number,
+  reportingLogCount: number
+): Block {
   return {
     id: processedBlock.id,
     name: processedBlock.name || 'Unnamed Block',
@@ -68,6 +83,15 @@ function convertProcessedBlockToBlock(processedBlock: ProcessedBlock, tradeCount
       fileName: processedBlock.dailyLog.fileName || 'unknown.csv',
       rowCount: dailyLogCount,
       fileSize: processedBlock.dailyLog.fileSize || 0,
+    } : undefined,
+    reportingLog: processedBlock.reportingLog ? {
+      fileName: processedBlock.reportingLog.fileName || 'unknown.csv',
+      rowCount: reportingLogCount,
+      fileSize: processedBlock.reportingLog.fileSize || 0,
+    } : undefined,
+    strategyAlignment: processedBlock.strategyAlignment ? {
+      mappings: processedBlock.strategyAlignment.mappings ?? [],
+      updatedAt: new Date(processedBlock.strategyAlignment.updatedAt),
     } : undefined,
     stats: {
       totalPnL: 0, // Will be calculated from trades
@@ -109,8 +133,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       // Convert each ProcessedBlock to Block with trade/daily log counts
       for (const processedBlock of processedBlocks) {
         try {
-          const trades = await getTradesByBlock(processedBlock.id)
-          const dailyLogs = await getDailyLogsByBlock(processedBlock.id)
+          const [trades, dailyLogs, reportingTrades] = await Promise.all([
+            getTradesByBlock(processedBlock.id),
+            getDailyLogsByBlock(processedBlock.id),
+            getReportingTradesByBlock(processedBlock.id)
+          ])
 
           // Calculate stats from trades
           const stats = trades.length > 0 ? {
@@ -131,7 +158,12 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
             avgLoss: 0,
           }
 
-          const block = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+          const block = convertProcessedBlockToBlock(
+            processedBlock,
+            trades.length,
+            dailyLogs.length,
+            reportingTrades.length
+          )
           block.stats = stats
 
           // Mark as active if this was the previously active block
@@ -295,8 +327,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       const processedBlock = await getBlock(id)
       if (!processedBlock) return
 
-      const trades = await getTradesByBlock(id)
-      const dailyLogs = await getDailyLogsByBlock(id)
+      const [trades, dailyLogs, reportingTrades] = await Promise.all([
+        getTradesByBlock(id),
+        getDailyLogsByBlock(id),
+        getReportingTradesByBlock(id)
+      ])
 
       // Calculate fresh stats
       const stats = trades.length > 0 ? {
@@ -317,7 +352,12 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         avgLoss: 0,
       }
 
-      const updatedBlock = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+      const updatedBlock = convertProcessedBlockToBlock(
+        processedBlock,
+        trades.length,
+        dailyLogs.length,
+        reportingTrades.length
+      )
       updatedBlock.stats = stats
 
       // Update in store
@@ -342,9 +382,10 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         throw new Error('Block not found')
       }
 
-      const [trades, dailyLogs] = await Promise.all([
+      const [trades, dailyLogs, reportingTrades] = await Promise.all([
         getTradesByBlock(id),
-        getDailyLogsByBlock(id)
+        getDailyLogsByBlock(id),
+        getReportingTradesByBlock(id)
       ])
 
       console.log(`Recalculating stats for ${trades.length} trades and ${dailyLogs.length} daily logs`)
@@ -376,7 +417,12 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       }
 
       // Create updated block for store
-      const updatedBlock = convertProcessedBlockToBlock(processedBlock, trades.length, dailyLogs.length)
+      const updatedBlock = convertProcessedBlockToBlock(
+        processedBlock,
+        trades.length,
+        dailyLogs.length,
+        reportingTrades.length
+      )
       updatedBlock.stats = basicStats
       updatedBlock.lastModified = new Date()
 

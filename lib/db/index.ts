@@ -13,7 +13,7 @@
 
 // Database configuration
 export const DB_NAME = 'TradeBlocksDB'
-export const DB_VERSION = 1
+export const DB_VERSION = 2
 
 // Object store names
 export const STORES = {
@@ -21,6 +21,7 @@ export const STORES = {
   TRADES: 'trades',
   DAILY_LOGS: 'dailyLogs',
   CALCULATIONS: 'calculations',
+  REPORTING_LOGS: 'reportingLogs',
 } as const
 
 // Index names
@@ -31,6 +32,8 @@ export const INDEXES = {
   DAILY_LOGS_BY_BLOCK: 'blockId',
   DAILY_LOGS_BY_DATE: 'date',
   CALCULATIONS_BY_BLOCK: 'blockId',
+  REPORTING_LOGS_BY_BLOCK: 'blockId',
+  REPORTING_LOGS_BY_STRATEGY: 'strategy',
 } as const
 
 /**
@@ -88,6 +91,14 @@ export async function initializeDatabase(): Promise<IDBDatabase> {
         dailyLogsStore.createIndex(INDEXES.DAILY_LOGS_BY_BLOCK, 'blockId', { unique: false })
         dailyLogsStore.createIndex(INDEXES.DAILY_LOGS_BY_DATE, 'date', { unique: false })
         dailyLogsStore.createIndex('composite_block_date', ['blockId', 'date'], { unique: false })
+      }
+
+      // Create reporting logs store
+      if (!db.objectStoreNames.contains(STORES.REPORTING_LOGS)) {
+        const reportingStore = db.createObjectStore(STORES.REPORTING_LOGS, { autoIncrement: true })
+        reportingStore.createIndex(INDEXES.REPORTING_LOGS_BY_BLOCK, 'blockId', { unique: false })
+        reportingStore.createIndex(INDEXES.REPORTING_LOGS_BY_STRATEGY, 'strategy', { unique: false })
+        reportingStore.createIndex('composite_block_date', ['blockId', 'dateOpened'], { unique: false })
       }
 
       // Create calculations store (for cached computations)
@@ -257,3 +268,11 @@ export class TransactionError extends DatabaseError {
 export { createBlock, getBlock, getAllBlocks, updateBlock, deleteBlock, getActiveBlock } from './blocks-store'
 export { addTrades, getTradesByBlock, getTradeCountByBlock, deleteTradesByBlock } from './trades-store'
 export { addDailyLogEntries, getDailyLogsByBlock, getDailyLogCountByBlock, deleteDailyLogsByBlock } from './daily-logs-store'
+export {
+  addReportingTrades,
+  getReportingTradesByBlock,
+  getReportingTradeCountByBlock,
+  deleteReportingTradesByBlock,
+  getReportingStrategiesByBlock,
+  updateReportingTradesForBlock,
+} from './reporting-logs-store'

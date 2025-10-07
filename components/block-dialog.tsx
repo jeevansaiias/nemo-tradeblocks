@@ -31,12 +31,24 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { addDailyLogEntries, addTrades, createBlock } from "@/lib/db";
+import {
+  addDailyLogEntries,
+  addReportingTrades,
+  addTrades,
+  createBlock,
+  deleteReportingTradesByBlock,
+  updateReportingTradesForBlock,
+  updateBlock as updateProcessedBlock,
+} from "@/lib/db";
 import { REQUIRED_DAILY_LOG_COLUMNS } from "@/lib/models/daily-log";
 import {
   REQUIRED_TRADE_COLUMNS,
   TRADE_COLUMN_ALIASES,
 } from "@/lib/models/trade";
+import {
+  REQUIRED_REPORTING_TRADE_COLUMNS,
+  REPORTING_TRADE_COLUMN_ALIASES,
+} from "@/lib/models/reporting-trade";
 import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
 import {
   DailyLogProcessingProgress,
@@ -48,6 +60,11 @@ import {
   TradeProcessingResult,
   TradeProcessor,
 } from "@/lib/processing/trade-processor";
+import {
+  ReportingTradeProcessingProgress,
+  ReportingTradeProcessingResult,
+  ReportingTradeProcessor,
+} from "@/lib/processing/reporting-trade-processor";
 import { useBlockStore } from "@/lib/stores/block-store";
 import {
   findMissingHeaders,
@@ -61,6 +78,7 @@ import {
   Calendar,
   CheckCircle,
   Info,
+  List,
   Loader2,
   Plus,
   Save,
@@ -84,6 +102,11 @@ interface Block {
     fileSize: number;
   };
   dailyLog?: {
+    fileName: string;
+    rowCount: number;
+    fileSize: number;
+  };
+  reportingLog?: {
     fileName: string;
     rowCount: number;
     fileSize: number;
@@ -126,6 +149,8 @@ interface FileUploadState {
   requiresStrategyName?: boolean;
 }
 
+type UploadType = "trade" | "daily" | "reporting";
+
 interface BlockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -150,12 +175,17 @@ export function BlockDialog({
     file: null,
     status: "empty",
   });
+  const [reportingLog, setReportingLog] = useState<FileUploadState>({
+    file: null,
+    status: "empty",
+  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState<string>("");
   type PreviewData = {
     trades?: TradeProcessingResult;
     dailyLogs?: DailyLogProcessingResult;
+    reporting?: ReportingTradeProcessingResult;
     initialCapital?: number;
   };
 
@@ -187,6 +217,7 @@ export function BlockDialog({
       setSetAsActive(true);
       setTradeLog({ file: null, status: "empty" });
       setDailyLog({ file: null, status: "empty" });
+      setReportingLog({ file: null, status: "empty" });
       setIsProcessing(false);
       setProcessingStep("");
       setPreviewData(null);
@@ -223,6 +254,17 @@ export function BlockDialog({
           status: "empty",
         });
       }
+
+      if (block.reportingLog) {
+        setReportingLog({
+          file: null,
+          status: "existing",
+          existingFileName: block.reportingLog.fileName,
+          existingRowCount: block.reportingLog.rowCount,
+        });
+      } else {
+        setReportingLog({ file: null, status: "empty" });
+      }
     } else {
       // Reset for new mode
       setName("");
@@ -230,21 +272,36 @@ export function BlockDialog({
       setSetAsActive(true);
       setTradeLog({ file: null, status: "empty" });
       setDailyLog({ file: null, status: "empty" });
+      setReportingLog({ file: null, status: "empty" });
     }
     setMissingStrategyCount(0);
     setStrategyOverride("");
     setPendingTradeResult(null);
   }, [open, mode, block]);
 
+  const getUploadStateSetter = useCallback(
+    (type: UploadType) => {
+      switch (type) {
+        case "trade":
+          return setTradeLog;
+        case "daily":
+          return setDailyLog;
+        default:
+          return setReportingLog;
+      }
+    },
+    []
+  );
+
   const handleDragOver = useCallback(
-    (e: React.DragEvent, type: "trade" | "daily") => {
+    (e: React.DragEvent, type: UploadType) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const setState = type === "trade" ? setTradeLog : setDailyLog;
+      const setState = getUploadStateSetter(type);
       setState((prev) => ({ ...prev, status: "dragover" }));
     },
-    []
+    [getUploadStateSetter]
   );
 
   const resetStrategyOverrideState = useCallback(() => {
@@ -326,11 +383,11 @@ export function BlockDialog({
   );
 
   const handleDragLeave = useCallback(
-    (e: React.DragEvent, type: "trade" | "daily") => {
+    (e: React.DragEvent, type: UploadType) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const setState = type === "trade" ? setTradeLog : setDailyLog;
+      const setState = getUploadStateSetter(type);
       setState((prev) => ({
         ...prev,
         status: prev.file
@@ -340,11 +397,11 @@ export function BlockDialog({
           : "empty",
       }));
     },
-    []
+    [getUploadStateSetter]
   );
 
   const validateCsvHeaders = useCallback(
-    async (file: File, type: "trade" | "daily") => {
+    async (file: File, type: UploadType) => {
       try {
         const previewChunk = await file.slice(0, 256 * 1024).text();
         const headerLine = previewChunk
@@ -360,22 +417,42 @@ export function BlockDialog({
           return "No headers were detected in the uploaded file.";
         }
 
-        const normalizedHeaders =
-          type === "trade"
-            ? normalizeHeaders(parsedHeaders, TRADE_COLUMN_ALIASES)
-            : normalizeHeaders(parsedHeaders);
+        let normalizedHeaders: string[];
+        let requiredHeaders: readonly string[];
 
-        const requiredHeaders =
-          type === "trade"
-            ? REQUIRED_TRADE_COLUMNS
-            : REQUIRED_DAILY_LOG_COLUMNS;
+        switch (type) {
+          case "trade":
+            normalizedHeaders = normalizeHeaders(
+              parsedHeaders,
+              TRADE_COLUMN_ALIASES
+            );
+            requiredHeaders = REQUIRED_TRADE_COLUMNS;
+            break;
+          case "daily":
+            normalizedHeaders = normalizeHeaders(parsedHeaders);
+            requiredHeaders = REQUIRED_DAILY_LOG_COLUMNS;
+            break;
+          case "reporting":
+            normalizedHeaders = normalizeHeaders(
+              parsedHeaders,
+              REPORTING_TRADE_COLUMN_ALIASES
+            );
+            requiredHeaders = REQUIRED_REPORTING_TRADE_COLUMNS;
+            break;
+        }
+
         const missingHeaders = findMissingHeaders(
           normalizedHeaders,
           requiredHeaders
         );
 
         if (missingHeaders.length > 0) {
-          const label = type === "trade" ? "trade log" : "daily log";
+          const label =
+            type === "trade"
+              ? "trade log"
+              : type === "daily"
+              ? "daily log"
+              : "reporting log";
           return `Missing required ${label} columns: ${missingHeaders.join(
             ", "
           )}`;
@@ -384,7 +461,12 @@ export function BlockDialog({
         return null;
       } catch (error) {
         console.error("Failed to read CSV headers", error);
-        const label = type === "trade" ? "trade log" : "daily log";
+        const label =
+          type === "trade"
+            ? "trade log"
+            : type === "daily"
+            ? "daily log"
+            : "reporting log";
         return `Unable to read ${label} file. Please try again.`;
       }
     },
@@ -392,14 +474,14 @@ export function BlockDialog({
   );
 
   const handleDrop = useCallback(
-    async (e: React.DragEvent, type: "trade" | "daily") => {
+    async (e: React.DragEvent, type: UploadType) => {
       e.preventDefault();
       e.stopPropagation();
 
       const files = Array.from(e.dataTransfer.files);
       const file = files[0];
 
-      const setState = type === "trade" ? setTradeLog : setDailyLog;
+      const setState = getUploadStateSetter(type);
 
       if (type === "trade") {
         resetStrategyOverrideState();
@@ -451,16 +533,21 @@ export function BlockDialog({
         requiresStrategyName: false,
       });
 
-      const label = type === "trade" ? "Trade log" : "Daily log";
+      const label =
+        type === "trade"
+          ? "Trade log"
+          : type === "daily"
+          ? "Daily log"
+          : "Reporting log";
       toast.success(`${label} headers look good.`);
     },
-    [validateCsvHeaders, resetStrategyOverrideState]
+    [getUploadStateSetter, validateCsvHeaders, resetStrategyOverrideState]
   );
 
   const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>, type: "trade" | "daily") => {
+    async (e: React.ChangeEvent<HTMLInputElement>, type: UploadType) => {
       const file = e.target.files?.[0];
-      const setState = type === "trade" ? setTradeLog : setDailyLog;
+      const setState = getUploadStateSetter(type);
 
       if (type === "trade") {
         resetStrategyOverrideState();
@@ -513,17 +600,22 @@ export function BlockDialog({
         requiresStrategyName: false,
       });
 
-      const label = type === "trade" ? "Trade log" : "Daily log";
+      const label =
+        type === "trade"
+          ? "Trade log"
+          : type === "daily"
+          ? "Daily log"
+          : "Reporting log";
       toast.success(`${label} headers look good.`);
 
       // Reset the input
       e.target.value = "";
     },
-    [validateCsvHeaders, resetStrategyOverrideState]
+    [getUploadStateSetter, validateCsvHeaders, resetStrategyOverrideState]
   );
 
-  const removeFile = useCallback((type: "trade" | "daily") => {
-    const setState = type === "trade" ? setTradeLog : setDailyLog;
+  const removeFile = useCallback((type: UploadType) => {
+    const setState = getUploadStateSetter(type);
     setState({
       file: null,
       status: "empty",
@@ -535,7 +627,7 @@ export function BlockDialog({
     if (type === "trade") {
       resetStrategyOverrideState();
     }
-  }, [resetStrategyOverrideState]);
+  }, [getUploadStateSetter, resetStrategyOverrideState]);
 
   const formatFileSize = (bytes: number) => {
     const mb = bytes / (1024 * 1024);
@@ -606,6 +698,7 @@ export function BlockDialog({
 
       // Process daily log if provided
       let dailyResult: DailyLogProcessingResult | undefined;
+      let reportingResult: ReportingTradeProcessingResult | undefined;
       let initialCapital: number;
 
       if (dailyLog.file) {
@@ -657,11 +750,52 @@ export function BlockDialog({
         initialCapital = calculateInitialCapital(adjustedTradeResult.trades);
       }
 
+      if (reportingLog.file) {
+        setProcessingStep("Processing reporting log...");
+        setReportingLog((prev) => ({
+          ...prev,
+          status: "processing",
+          progress: 0,
+        }));
+
+        const reportingProcessor = new ReportingTradeProcessor({
+          progressCallback: (progress: ReportingTradeProcessingProgress) => {
+            setReportingLog((prev) => ({
+              ...prev,
+              progress: progress.progress,
+              processedData: {
+                rowCount: progress.validTrades + progress.invalidTrades,
+              },
+            }));
+          },
+        });
+
+        reportingResult = await reportingProcessor.processFile(reportingLog.file);
+
+        if (reportingResult.errors.length > 0) {
+          const reportingErrors = reportingResult.errors.map((e) => e.message);
+          setProcessingErrors((prev) => [...prev, ...reportingErrors]);
+        }
+
+        setReportingLog((prev) => ({
+          ...prev,
+          status: "uploaded",
+          progress: 100,
+          processedData: {
+            rowCount: reportingResult!.validTrades,
+            dateRange: reportingResult!.stats.dateRange,
+            strategies: reportingResult!.stats.strategies,
+            stats: reportingResult!.stats,
+          },
+        }));
+      }
+
       setProcessingStep("Calculating statistics...");
 
       const preview = {
         trades: adjustedTradeResult,
         dailyLogs: dailyResult,
+        reporting: reportingResult,
         initialCapital,
       };
 
@@ -716,6 +850,7 @@ export function BlockDialog({
 
         // Create block metadata
         const now = new Date();
+        const timestamp = Date.now();
         const blockMetadata = {
           name: name.trim(),
           description: description.trim() || undefined,
@@ -738,11 +873,24 @@ export function BlockDialog({
                 uploadedAt: now,
               }
             : undefined,
+          reportingLog: reportingLog.file
+            ? {
+                fileName: reportingLog.file.name,
+                fileSize: reportingLog.file.size,
+                originalRowCount: processedPreview.reporting?.totalRows || 0,
+                processedRowCount:
+                  processedPreview.reporting?.trades.length || 0,
+                uploadedAt: now,
+              }
+            : undefined,
           processingStatus: "completed" as const,
           dataReferences: {
-            tradesStorageKey: `block_${Date.now()}_trades`,
+            tradesStorageKey: `block_${timestamp}_trades`,
             dailyLogStorageKey: dailyLog.file
-              ? `block_${Date.now()}_daily_logs`
+              ? `block_${timestamp}_daily_logs`
+              : undefined,
+            reportingLogStorageKey: reportingLog.file
+              ? `block_${timestamp}_reporting_logs`
               : undefined,
           },
           analysisConfig: {
@@ -774,6 +922,10 @@ export function BlockDialog({
             })
           );
           await addDailyLogEntries(newBlock.id, entriesWithBlockId);
+        }
+
+        if (processedPreview.reporting?.trades.length) {
+          await addReportingTrades(newBlock.id, processedPreview.reporting.trades);
         }
 
         // Calculate block stats for store
@@ -821,6 +973,13 @@ export function BlockDialog({
                 fileSize: dailyLog.file.size,
               }
             : undefined,
+          reportingLog: reportingLog.file
+            ? {
+                fileName: reportingLog.file.name,
+                rowCount: processedPreview.reporting?.validTrades || 0,
+                fileSize: reportingLog.file.size,
+              }
+            : undefined,
           stats: blockStats,
         };
 
@@ -829,7 +988,49 @@ export function BlockDialog({
         // Update existing block
         setProcessingStep("Updating block...");
 
-        const processedData = previewData;
+        let processedData = previewData;
+
+        // Ensure we process the reporting log if it was uploaded without running the full pipeline
+        if (reportingLog.file && (!processedData || !processedData.reporting)) {
+          setProcessingStep("Processing reporting log...");
+          setReportingLog((prev) => ({ ...prev, status: "processing", progress: 0 }));
+
+          const reportingProcessor = new ReportingTradeProcessor({
+            progressCallback: (progress: ReportingTradeProcessingProgress) => {
+              setReportingLog((prev) => ({
+                ...prev,
+                progress: progress.progress,
+                processedData: {
+                  rowCount: progress.validTrades + progress.invalidTrades,
+                },
+              }));
+            },
+          });
+
+          const reportingResult = await reportingProcessor.processFile(reportingLog.file);
+
+          if (reportingResult.errors.length > 0) {
+            const reportingErrors = reportingResult.errors.map((e) => e.message);
+            setProcessingErrors((prev) => [...prev, ...reportingErrors]);
+          }
+
+          setReportingLog((prev) => ({
+            ...prev,
+            status: "uploaded",
+            progress: 100,
+            processedData: {
+              rowCount: reportingResult.validTrades,
+              dateRange: reportingResult.stats.dateRange,
+              strategies: reportingResult.stats.strategies,
+              stats: reportingResult.stats,
+            },
+          }));
+
+          processedData = {
+            ...processedData,
+            reporting: reportingResult,
+          } as PreviewData;
+        }
 
         const updates: Partial<Block> = {
           name: name.trim(),
@@ -837,25 +1038,27 @@ export function BlockDialog({
           lastModified: new Date(),
         };
 
-        // If new files were uploaded, process them
-        if (tradeLog.file && processedData) {
+        const metadataUpdates: Record<string, unknown> = {
+          lastModified: new Date(),
+        };
+
+        if (tradeLog.file && processedData?.trades) {
           updates.tradeLog = {
             fileName: tradeLog.file.name,
-            rowCount: processedData.trades?.validTrades || 0,
+            rowCount: processedData.trades.validTrades,
             fileSize: tradeLog.file.size,
           };
 
-          // Update stats
-          const editTrades = processedData.trades?.trades || [];
+          const editTrades = processedData.trades.trades;
           updates.stats = {
-            totalPnL: processedData.trades?.stats.totalPL || 0,
+            totalPnL: processedData.trades.stats.totalPL || 0,
             winRate:
               editTrades.length > 0
                 ? (editTrades.filter((t) => t.pl > 0).length /
                     editTrades.length) *
                   100
                 : 0,
-            totalTrades: processedData.trades?.validTrades || 0,
+            totalTrades: processedData.trades.validTrades || 0,
             avgWin:
               editTrades.length > 0
                 ? editTrades
@@ -871,6 +1074,14 @@ export function BlockDialog({
                     editTrades.filter((t) => t.pl < 0).length || 0
                 : 0,
           };
+
+          metadataUpdates.tradeLog = {
+            fileName: tradeLog.file.name,
+            fileSize: tradeLog.file.size,
+            originalRowCount: processedData.trades.totalRows,
+            processedRowCount: processedData.trades.trades.length,
+            uploadedAt: new Date(),
+          };
         }
 
         if (dailyLog.file && processedData?.dailyLogs) {
@@ -879,6 +1090,43 @@ export function BlockDialog({
             rowCount: processedData.dailyLogs.validEntries,
             fileSize: dailyLog.file.size,
           };
+
+          metadataUpdates.dailyLog = {
+            fileName: dailyLog.file.name,
+            fileSize: dailyLog.file.size,
+            originalRowCount: processedData.dailyLogs.totalRows,
+            processedRowCount: processedData.dailyLogs.entries.length,
+            uploadedAt: new Date(),
+          };
+        }
+
+        if (reportingLog.file && processedData?.reporting) {
+          updates.reportingLog = {
+            fileName: reportingLog.file.name,
+            rowCount: processedData.reporting.validTrades,
+            fileSize: reportingLog.file.size,
+          };
+
+          metadataUpdates.reportingLog = {
+            fileName: reportingLog.file.name,
+            fileSize: reportingLog.file.size,
+            originalRowCount: processedData.reporting.totalRows,
+            processedRowCount: processedData.reporting.trades.length,
+            uploadedAt: new Date(),
+          };
+
+          await updateReportingTradesForBlock(
+            block.id,
+            processedData.reporting.trades
+          );
+        } else if (!reportingLog.file && reportingLog.status === "empty" && block.reportingLog) {
+          updates.reportingLog = undefined;
+          metadataUpdates.reportingLog = undefined;
+          await deleteReportingTradesByBlock(block.id);
+        }
+
+        if (Object.keys(metadataUpdates).length > 1) {
+          await updateProcessedBlock(block.id, metadataUpdates);
         }
 
         await updateBlock(block.id, updates);
@@ -943,24 +1191,31 @@ export function BlockDialog({
   const SubmitIcon = getSubmitButtonIcon();
 
   const renderFileUpload = (
-    type: "trade" | "daily",
+    type: UploadType,
     fileState: FileUploadState,
     isRequired: boolean
   ) => {
     const isTradeLog = type === "trade";
-    const Icon = isTradeLog ? Activity : Calendar;
-    const label = isTradeLog ? "Trade Log" : "Daily Log";
+    const isDailyLog = type === "daily";
+    const Icon = isTradeLog ? Activity : isDailyLog ? Calendar : List;
+    const label = isTradeLog
+      ? "Trade Log"
+      : isDailyLog
+      ? "Daily Log"
+      : "Reporting Log";
     const inputId = `${mode}-${type}-file-input`;
     const isMissingColumnsError =
       fileState.error?.startsWith("Missing required");
     const errorHeading = isMissingColumnsError
       ? isTradeLog
         ? "Missing trade log columns"
-        : "Missing daily log columns"
+        : isDailyLog
+        ? "Missing daily log columns"
+        : "Missing reporting log columns"
       : "Upload error";
     const errorMessage = fileState.error
       ? fileState.error.replace(
-          /^Missing required (?:trade|daily) log columns:\s*/i,
+          /^Missing required (?:trade|daily|reporting) log columns:\s*/i,
           ""
         )
       : "";
@@ -981,10 +1236,15 @@ export function BlockDialog({
           </a>
         </p>
       </div>
-    ) : (
+    ) : isDailyLog ? (
       <div className="max-w-xs text-sm leading-snug">
         Supports OptionOmega portfolio backtest daily logs. Individual backtests
         don’t include the daily performance CSV.
+      </div>
+    ) : (
+      <div className="max-w-xs text-sm leading-snug">
+        Upload strategy reporting exports (e.g., strategy-trade-log.csv) to
+        compare modeled results with the live portfolio.
       </div>
     );
 
@@ -1316,6 +1576,7 @@ export function BlockDialog({
 
               {renderFileUpload("trade", tradeLog, true)}
               {renderFileUpload("daily", dailyLog, false)}
+              {renderFileUpload("reporting", reportingLog, false)}
             </div>
 
             {/* Processing Status */}
