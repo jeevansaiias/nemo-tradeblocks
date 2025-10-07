@@ -37,7 +37,9 @@ import {
   addTrades,
   createBlock,
   deleteReportingTradesByBlock,
+  updateDailyLogsForBlock,
   updateReportingTradesForBlock,
+  updateTradesForBlock,
   updateBlock as updateProcessedBlock,
 } from "@/lib/db";
 import { REQUIRED_DAILY_LOG_COLUMNS } from "@/lib/models/daily-log";
@@ -49,6 +51,7 @@ import {
   REQUIRED_REPORTING_TRADE_COLUMNS,
   REPORTING_TRADE_COLUMN_ALIASES,
 } from "@/lib/models/reporting-trade";
+import type { StrategyAlignment } from "@/lib/models/strategy-alignment";
 import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
 import {
   DailyLogProcessingProgress,
@@ -66,6 +69,8 @@ import {
   ReportingTradeProcessor,
 } from "@/lib/processing/reporting-trade-processor";
 import { useBlockStore } from "@/lib/stores/block-store";
+import { useComparisonStore } from "@/lib/stores/comparison-store";
+import { calculationOrchestrator } from "@/lib/calculations";
 import {
   findMissingHeaders,
   normalizeHeaders,
@@ -117,6 +122,10 @@ interface Block {
     totalTrades: number;
     avgWin: number;
     avgLoss: number;
+  };
+  strategyAlignment?: {
+    mappings: StrategyAlignment[];
+    updatedAt: Date;
   };
   tags?: string[];
   color?: string;
@@ -207,6 +216,7 @@ export function BlockDialog({
     refreshBlock,
     deleteBlock,
   } = useBlockStore();
+  const resetComparison = useComparisonStore((state) => state.reset);
 
   // Reset form when dialog opens/closes or mode changes
   useEffect(() => {
@@ -559,6 +569,8 @@ export function BlockDialog({
           status: prev.existingFileName ? "existing" : "empty",
           requiresStrategyName: false,
         }));
+        // Reset the input value to allow re-selecting the same file
+        e.target.value = "";
         return;
       }
 
@@ -608,7 +620,7 @@ export function BlockDialog({
           : "Reporting log";
       toast.success(`${label} headers look good.`);
 
-      // Reset the input
+      // Reset the input value to allow re-selecting the same file
       e.target.value = "";
     },
     [getUploadStateSetter, validateCsvHeaders, resetStrategyOverrideState]
@@ -990,6 +1002,50 @@ export function BlockDialog({
 
         let processedData = previewData;
 
+        // Ensure we process the daily log if it was uploaded without running the full pipeline
+        if (dailyLog.file && (!processedData || !processedData.dailyLogs)) {
+          setProcessingStep("Processing daily log...");
+          setDailyLog((prev) => ({ ...prev, status: "processing", progress: 0 }));
+
+          const dailyProcessor = new DailyLogProcessor({
+            progressCallback: (progress: DailyLogProcessingProgress) => {
+              setDailyLog((prev) => ({
+                ...prev,
+                progress: progress.progress,
+                processedData: {
+                  rowCount: progress.validEntries + progress.invalidEntries,
+                },
+              }));
+            },
+          });
+
+          const dailyResult = await dailyProcessor.processFile(dailyLog.file);
+
+          if (dailyResult.errors.length > 0) {
+            const dailyErrors = dailyResult.errors.map((e) => e.message);
+            setProcessingErrors((prev) => [...prev, ...dailyErrors]);
+          }
+
+          setDailyLog((prev) => ({
+            ...prev,
+            status: "uploaded",
+            progress: 100,
+            processedData: {
+              rowCount: dailyResult.validEntries,
+              dateRange: dailyResult.stats.dateRange,
+              stats: {
+                ...dailyResult.stats,
+                strategies: [],
+              },
+            },
+          }));
+
+          processedData = {
+            ...processedData,
+            dailyLogs: dailyResult,
+          } as PreviewData;
+        }
+
         // Ensure we process the reporting log if it was uploaded without running the full pipeline
         if (reportingLog.file && (!processedData || !processedData.reporting)) {
           setProcessingStep("Processing reporting log...");
@@ -1042,7 +1098,11 @@ export function BlockDialog({
           lastModified: new Date(),
         };
 
+        // Track if we need to clear caches/comparison data
+        let filesChanged = false;
+
         if (tradeLog.file && processedData?.trades) {
+          filesChanged = true;
           updates.tradeLog = {
             fileName: tradeLog.file.name,
             rowCount: processedData.trades.validTrades,
@@ -1082,9 +1142,13 @@ export function BlockDialog({
             processedRowCount: processedData.trades.trades.length,
             uploadedAt: new Date(),
           };
+
+          // Save trades to IndexedDB (replace all existing trades)
+          await updateTradesForBlock(block.id, processedData.trades.trades);
         }
 
         if (dailyLog.file && processedData?.dailyLogs) {
+          filesChanged = true;
           updates.dailyLog = {
             fileName: dailyLog.file.name,
             rowCount: processedData.dailyLogs.validEntries,
@@ -1098,9 +1162,24 @@ export function BlockDialog({
             processedRowCount: processedData.dailyLogs.entries.length,
             uploadedAt: new Date(),
           };
+
+          // Save daily log entries to IndexedDB (replace all existing entries)
+          const entriesWithBlockId = processedData.dailyLogs.entries.map(
+            (entry) => ({
+              ...entry,
+              blockId: block.id,
+            })
+          );
+          await updateDailyLogsForBlock(block.id, entriesWithBlockId);
+        } else if (!dailyLog.file && dailyLog.status === "empty" && block.dailyLog) {
+          // User cleared the daily log
+          filesChanged = true;
+          updates.dailyLog = undefined;
+          metadataUpdates.dailyLog = undefined;
         }
 
         if (reportingLog.file && processedData?.reporting) {
+          filesChanged = true;
           updates.reportingLog = {
             fileName: reportingLog.file.name,
             rowCount: processedData.reporting.validTrades,
@@ -1119,10 +1198,19 @@ export function BlockDialog({
             block.id,
             processedData.reporting.trades
           );
+
+          // Clear comparison data since reporting trades changed
+          resetComparison();
         } else if (!reportingLog.file && reportingLog.status === "empty" && block.reportingLog) {
+          filesChanged = true;
           updates.reportingLog = undefined;
+          updates.strategyAlignment = undefined;
           metadataUpdates.reportingLog = undefined;
+          metadataUpdates.strategyAlignment = undefined;
           await deleteReportingTradesByBlock(block.id);
+
+          // Clear comparison data since reporting log was removed
+          resetComparison();
         }
 
         if (Object.keys(metadataUpdates).length > 1) {
@@ -1130,6 +1218,11 @@ export function BlockDialog({
         }
 
         await updateBlock(block.id, updates);
+
+        // Clear calculation cache when any files are replaced or removed
+        if (filesChanged) {
+          calculationOrchestrator.clearCache(block.id);
+        }
 
         // Refresh the block to get updated stats from IndexedDB
         await refreshBlock(block.id);
@@ -1426,6 +1519,19 @@ export function BlockDialog({
                 <Badge variant="outline" className="text-xs">
                   Current
                 </Badge>
+                {!isRequired && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(type);
+                    }}
+                    title="Remove this file"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
                 <Upload className="w-4 h-4 text-muted-foreground" />
               </div>
             </div>

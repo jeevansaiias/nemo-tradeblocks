@@ -765,64 +765,84 @@ export default function ComparisonBlocksPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[640px] table-fixed text-sm">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="pb-2 text-left">Strategy Mapping</th>
-                  <th className="pb-2 text-right">Backtested P/L</th>
-                  <th className="pb-2 text-right">Reported P/L</th>
-                  <th className="pb-2 text-right">P/L Variance</th>
-                  <th className="pb-2 text-right">Review Trades</th>
-                  <th className="pb-2 text-right">Fill Match</th>
-                  <th className="pb-2 text-right">Slippage / Contract</th>
-                  <th className="pb-2 text-right">Sizing Drift</th>
-                  <th className="pb-2 text-right">Δ Fees</th>
+                <tr className="border-b">
+                  <th className="pb-3 pt-2 pr-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Strategy<br />Mapping
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Backtested<br />P/L
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Reported<br />P/L
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    P/L<br />Variance
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Trade<br />Comparison
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Fill<br />Match
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Slippage /<br />Contract
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Sizing<br />Drift
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Δ Fees
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {summaryRows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="py-2 pr-3">
-                      <div className="font-medium text-foreground">
+                  <tr key={row.id} className="hover:bg-muted/50 transition-colors">
+                    <td className="py-3 pr-4">
+                      <div className="font-semibold text-foreground">
                         {row.backtestedStrategy}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        ↳ Reported: {row.reportedStrategy}
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        ↳ {row.reportedStrategy}
                       </div>
                     </td>
-                    <td className="py-2 text-right font-medium">
+                    <td className="py-3 px-3 text-right font-semibold tabular-nums">
                       {formatCurrency(row.backtested.totalPl)}
                     </td>
-                    <td className="py-2 text-right font-medium">
+                    <td className="py-3 px-3 text-right font-semibold tabular-nums">
                       {formatCurrency(row.reported.totalPl)}
                     </td>
-                    <td className={cn("py-2 text-right", getDeltaClass(row.delta.totalPl))}>
+                    <td className={cn("py-3 px-3 text-right font-bold tabular-nums", getDeltaClass(row.delta.totalPl))}>
                       {formatCurrency(row.delta.totalPl)}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-3 px-3 text-center">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="ml-auto flex items-center gap-2 px-3 py-1.5 text-xs"
+                        className="mx-auto"
                         onClick={() => handleOpenMatchDialog(row.id)}
                       >
-                        <span className="text-sm font-medium">Review</span>
-                        <span className="inline-flex items-center rounded-full bg-muted/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {formatTradeCount(row.selectedBacktestedCount, row.totalBacktestedCount)} backtested · {formatTradeCount(row.selectedReportedCount, row.totalReportedCount)} reported
-                        </span>
+                        <span className="font-medium">Review</span>
                       </Button>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <span className="font-medium">{row.totalBacktestedCount}</span> vs <span className="font-medium">{row.totalReportedCount}</span> trades
+                      </div>
                     </td>
-                    <td className="py-2 text-right text-xs font-medium">
-                      {formatPercent(row.matchRate)}
+                    <td className="py-3 px-3 text-center">
+                      <Badge variant={row.matchRate >= 0.9 ? "default" : row.matchRate >= 0.7 ? "secondary" : "destructive"} className="tabular-nums">
+                        {formatPercent(row.matchRate)}
+                      </Badge>
                     </td>
-                    <td className={cn("py-2 text-right text-xs", getDeltaClass(row.slippagePerContract))}>
+                    <td className={cn("py-3 px-3 text-right tabular-nums", getDeltaClass(row.slippagePerContract))}>
                       {formatCurrency(row.slippagePerContract)}
                     </td>
-                    <td className={cn("py-2 text-right text-xs", getDeltaClass(row.sizeVariance))}>
+                    <td className={cn("py-3 px-3 text-right tabular-nums", getDeltaClass(row.sizeVariance))}>
                       {formatPercent(row.sizeVariance)}
                     </td>
-                    <td className={cn("py-2 text-right text-xs", getDeltaClass(row.delta.totalFees))}>
+                    <td className={cn("py-3 px-3 text-right tabular-nums", getDeltaClass(row.delta.totalFees))}>
                       {formatCurrency(row.delta.totalFees)}
                     </td>
                   </tr>
@@ -830,43 +850,34 @@ export default function ComparisonBlocksPage() {
               </tbody>
               {aggregateSummary && (
                 <tfoot>
-                  <tr className="border-t font-semibold">
-                    <td className="py-2">Totals</td>
-                    <td className="py-2 text-right">
+                  <tr className="border-t-2 bg-muted/30">
+                    <td className="py-3 pr-4 font-bold">Totals</td>
+                    <td className="py-3 px-3 text-right font-bold tabular-nums">
                       {formatCurrency(aggregateSummary.backtested.totalPl)}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-3 px-3 text-right font-bold tabular-nums">
                       {formatCurrency(aggregateSummary.reported.totalPl)}
                     </td>
-                    <td className={cn("py-2 text-right", getDeltaClass(aggregateSummary.delta.totalPl))}>
+                    <td className={cn("py-3 px-3 text-right font-bold tabular-nums", getDeltaClass(aggregateSummary.delta.totalPl))}>
                       {formatCurrency(aggregateSummary.delta.totalPl)}
                     </td>
-                    <td className="py-2 text-right text-xs text-muted-foreground">
-                      <div className="flex flex-col items-end leading-tight">
-                        <span>
-                          {formatTradeCount(
-                            aggregateTradeCounts.backtested.selected,
-                            aggregateTradeCounts.backtested.total,
-                          )} backtested
-                        </span>
-                        <span>
-                          {formatTradeCount(
-                            aggregateTradeCounts.reported.selected,
-                            aggregateTradeCounts.reported.total,
-                          )} reported
-                        </span>
+                    <td className="py-3 px-3 text-center">
+                      <div className="text-xs text-muted-foreground">
+                        <span className="font-medium">{aggregateTradeCounts.backtested.total}</span> vs <span className="font-medium">{aggregateTradeCounts.reported.total}</span> trades
                       </div>
                     </td>
-                    <td className="py-2 text-right text-xs font-medium">
-                      {formatPercent(aggregateMatchRate)}
+                    <td className="py-3 px-3 text-center">
+                      <Badge variant={aggregateMatchRate >= 0.9 ? "default" : aggregateMatchRate >= 0.7 ? "secondary" : "destructive"} className="tabular-nums">
+                        {formatPercent(aggregateMatchRate)}
+                      </Badge>
                     </td>
-                    <td className={cn("py-2 text-right text-xs", getDeltaClass(aggregateSlippagePerContract))}>
+                    <td className={cn("py-3 px-3 text-right font-semibold tabular-nums", getDeltaClass(aggregateSlippagePerContract))}>
                       {formatCurrency(aggregateSlippagePerContract)}
                     </td>
-                    <td className={cn("py-2 text-right text-xs", getDeltaClass(aggregateSizeVariance))}>
+                    <td className={cn("py-3 px-3 text-right font-semibold tabular-nums", getDeltaClass(aggregateSizeVariance))}>
                       {formatPercent(aggregateSizeVariance)}
                     </td>
-                    <td className={cn("py-2 text-right text-xs", getDeltaClass(aggregateSummary.delta.totalFees))}>
+                    <td className={cn("py-3 px-3 text-right font-semibold tabular-nums", getDeltaClass(aggregateSummary.delta.totalFees))}>
                       {formatCurrency(aggregateSummary.delta.totalFees)}
                     </td>
                   </tr>
@@ -1069,9 +1080,21 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="h-[80vh] w-[95vw] max-w-[1200px]">
+      <DialogContent className="h-[90vh] w-[calc(100vw-4rem)] !max-w-[calc(100vw-4rem)] sm:!max-w-[calc(100vw-4rem)] flex flex-col">
         <DialogHeader>
           <DialogTitle>Review Trade Matches</DialogTitle>
+          {alignment && (
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Backtested:</span>
+                <span className="font-semibold text-foreground">{alignment.backtestedStrategy}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reported:</span>
+                <span className="font-semibold text-foreground">{alignment.reportedStrategy}</span>
+              </div>
+            </div>
+          )}
           <DialogDescription>
             Adjust which backtested trades to compare against the reported executions.
           </DialogDescription>
@@ -1082,46 +1105,56 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
             Select a strategy mapping to review matches.
           </p>
         ) : (
-          <div className="grid h-full gap-4 overflow-hidden md:grid-cols-[300px,1fr]">
-            <div className="flex flex-col overflow-hidden rounded-md border">
-              <div className="border-b px-4 py-3 text-sm font-medium">
-                Sessions
+          <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
+            <div className="rounded-md border shrink-0">
+              <div className="border-b px-4 py-2 text-sm font-medium">
+                Reported Sessions
               </div>
-              <div className="flex-1 overflow-y-auto px-2">
+              <div className="px-2 py-2">
                 {alignment.sessions.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground">
                     No reported sessions found.
                   </p>
                 ) : (
-                  <ul className="space-y-1">
-                    {alignment.sessions.map((session) => (
-                      <li key={session.session}>
+                  <div className="flex flex-wrap gap-2">
+                    {alignment.sessions.map((session) => {
+                      const matchedCount = session.items.filter(item => item.backtested && item.reported).length
+                      const backtestedCount = session.items.filter(item => item.backtested).length
+                      const reportedCount = session.items.filter(item => item.reported).length
+
+                      return (
                         <button
+                          key={session.session}
                           type="button"
                           onClick={() => setActiveSession(session.session)}
                           className={cn(
-                            "w-full rounded-md px-3 py-2 text-left text-sm transition",
+                            "rounded-md px-3 py-2 text-left text-sm transition border whitespace-nowrap",
                             activeSession === session.session
-                              ? "bg-primary/10 text-primary"
-                              : "hover:bg-muted",
+                              ? "bg-primary/10 border-primary text-primary"
+                              : "border-border hover:bg-muted",
                           )}
                         >
-                          <div className="font-semibold tracking-wide uppercase text-xs text-muted-foreground">
+                          <div className="font-semibold text-sm">
                             {session.session}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {session.items.length} trades
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <Badge variant={matchedCount > 0 ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                              {matchedCount} matched
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {backtestedCount} BT · {reportedCount} RPT
                           </div>
                         </button>
-                      </li>
-                    ))}
-                  </ul>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-col overflow-hidden rounded-md border">
-              <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col overflow-hidden rounded-md border flex-1 min-h-0">
+              <div className="flex flex-col gap-2 border-b px-6 py-2 sm:flex-row sm:items-start sm:justify-between shrink-0">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
@@ -1156,57 +1189,151 @@ function MatchReviewDialog({ alignment, open, onOpenChange, onSave }: MatchRevie
                   Reset Session
                 </Button>
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-3">
+              <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
                 {activeSessionData ? (
                   activeSessionData.items.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No trades for this session.</p>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="hidden md:grid md:grid-cols-2 md:gap-4 md:px-1">
-                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          Backtested Trades
-                        </span>
-                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          Reported Trades
-                        </span>
-                      </div>
-                      {activeSessionData.items.map((item, index) => {
-                        const backtestedSelected =
-                          item.backtested && selectedBacktested.has(item.backtested.id)
-                        const reportedSelected =
-                          item.reported && selectedReported.has(item.reported.id)
-                        const isSelected = Boolean(backtestedSelected || reportedSelected)
+                    <div className="space-y-2">
+                      <table className="w-full text-sm">
+                        <thead className="border-b">
+                          <tr>
+                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
+                              <span className="sr-only">Select</span>
+                            </th>
+                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">Time</th>
+                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Contracts</th>
+                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Premium</th>
+                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">P/L</th>
+                            <th className="pb-3 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">Auto</th>
+                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
+                              <span className="sr-only">Select</span>
+                            </th>
+                            <th className="pb-3 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">Time</th>
+                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Contracts</th>
+                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">Premium</th>
+                            <th className="pb-3 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">P/L</th>
+                            <th className="pb-3 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">Auto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeSessionData.items.map((item, index) => {
+                            const backtestedSelected =
+                              item.backtested && selectedBacktested.has(item.backtested.id)
+                            const reportedSelected =
+                              item.reported && selectedReported.has(item.reported.id)
+                            const isMatched = Boolean(item.backtested && item.reported)
 
-                        return (
-                          <div
-                            key={`${activeSession}-${index}`}
-                            className={cn(
-                              "grid gap-4 rounded-md border bg-card/60 p-3 transition-colors md:grid-cols-2",
-                              isSelected &&
-                                "border-green-500/40 bg-green-100 dark:border-green-500/40 dark:bg-green-900/30",
-                            )}
-                          >
-                            <TradeSelectCard
-                              label="Backtested"
-                              trade={item.backtested}
-                              checked={Boolean(backtestedSelected)}
-                              autoSelected={item.autoBacktested}
-                              onCheckedChange={(checked) =>
-                                toggleBacktested(item.backtested?.id, Boolean(checked))
-                              }
-                            />
-                            <TradeSelectCard
-                              label="Reported"
-                              trade={item.reported}
-                              checked={Boolean(reportedSelected)}
-                              autoSelected={item.autoReported}
-                              onCheckedChange={(checked) =>
-                                toggleReported(item.reported?.id, Boolean(checked))
-                              }
-                            />
-                          </div>
-                        )
-                      })}
+                            return (
+                              <tr
+                                key={`${activeSession}-${index}`}
+                                className={cn(
+                                  "border-b transition-colors",
+                                  isMatched && (backtestedSelected || reportedSelected) &&
+                                    "bg-green-50 dark:bg-green-900/20",
+                                )}
+                              >
+                                <td className="py-3 pr-3 align-middle">
+                                  {item.backtested && (
+                                    <Checkbox
+                                      checked={Boolean(backtestedSelected)}
+                                      onCheckedChange={(checked) =>
+                                        toggleBacktested(item.backtested?.id, Boolean(checked))
+                                      }
+                                      aria-label={`Include backtested trade ${formatDateTime(item.backtested.dateOpened)}`}
+                                    />
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 align-middle">
+                                  {item.backtested ? (
+                                    <span className="font-medium whitespace-nowrap">{formatDateTime(item.backtested.dateOpened)}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 text-right align-middle">
+                                  {item.backtested ? (
+                                    <span className="font-medium tabular-nums">{item.backtested.contracts}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 text-right align-middle">
+                                  {item.backtested ? (
+                                    <span className="font-medium tabular-nums">{formatCurrency(item.backtested.totalPremium)}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 text-right align-middle">
+                                  {item.backtested ? (
+                                    <span className={cn("font-semibold tabular-nums", item.backtested.pl >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500")}>
+                                      {formatCurrency(item.backtested.pl)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-6 text-center align-middle">
+                                  {item.backtested && item.autoBacktested && (
+                                    <Badge variant="outline" className="text-[10px] uppercase">
+                                      Auto
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-3 align-middle">
+                                  {item.reported && (
+                                    <Checkbox
+                                      checked={Boolean(reportedSelected)}
+                                      onCheckedChange={(checked) =>
+                                        toggleReported(item.reported?.id, Boolean(checked))
+                                      }
+                                      aria-label={`Include reported trade ${formatDateTime(item.reported.dateOpened)}`}
+                                    />
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 align-middle">
+                                  {item.reported ? (
+                                    <span className="font-medium whitespace-nowrap">{formatDateTime(item.reported.dateOpened)}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 text-right align-middle">
+                                  {item.reported ? (
+                                    <span className="font-medium tabular-nums">{item.reported.contracts}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 text-right align-middle">
+                                  {item.reported ? (
+                                    <span className="font-medium tabular-nums">{formatCurrency(item.reported.totalPremium)}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 pr-4 text-right align-middle">
+                                  {item.reported ? (
+                                    <span className={cn("font-semibold tabular-nums", item.reported.pl >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500")}>
+                                      {formatCurrency(item.reported.pl)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 text-center align-middle">
+                                  {item.reported && item.autoReported && (
+                                    <Badge variant="outline" className="text-[10px] uppercase">
+                                      Auto
+                                    </Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   )
                 ) : (
@@ -1278,67 +1405,6 @@ function buildSelectionConfig(
     backFallback: shouldFallbackBacktested,
     reportedFallback: shouldFallbackReported,
   }
-}
-
-interface TradeSelectCardProps {
-  label: string
-  trade?: NormalizedTrade
-  checked: boolean
-  autoSelected: boolean
-  onCheckedChange: (checked: boolean) => void
-}
-
-function TradeSelectCard({
-  label,
-  trade,
-  checked,
-  autoSelected,
-  onCheckedChange,
-}: TradeSelectCardProps) {
-  if (!trade) {
-    return (
-      <div className="rounded-md border border-dashed bg-muted/20 p-3 text-xs text-muted-foreground">
-        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground md:hidden">
-          {label}
-        </span>
-        No {label.toLowerCase()} trade for this session.
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-3 rounded-md border border-border/60 bg-background p-3 transition-colors",
-        checked && "border-green-500/50 bg-green-100 dark:border-green-500/40 dark:bg-green-900/30",
-      )}
-    >
-      <Checkbox
-        checked={checked}
-        onCheckedChange={(value) => onCheckedChange(Boolean(value))}
-        aria-label={`Include ${label.toLowerCase()} trade ${formatDateTime(trade.dateOpened)}`}
-        className="mt-1 shrink-0"
-      />
-      <div className="flex-1 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground md:hidden">
-            {label}
-          </span>
-          <span className="text-sm font-medium text-foreground">
-            {formatDateTime(trade.dateOpened)}
-          </span>
-          {autoSelected && (
-            <Badge variant="outline" className="text-[10px] uppercase">
-              Auto
-            </Badge>
-          )}
-        </div>
-        <div className="text-xs text-muted-foreground">
-          Contracts: {trade.contracts} • Premium: {formatCurrency(trade.totalPremium)} • P/L: {formatCurrency(trade.pl)}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function formatTradeCount(included: number, total: number): string {
