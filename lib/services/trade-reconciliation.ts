@@ -1,6 +1,6 @@
 import { getReportingTradesByBlock, getTradesByBlock } from '@/lib/db'
 import { ReportingTrade } from '@/lib/models/reporting-trade'
-import { StrategyAlignment, MatchOverrides } from '@/lib/models/strategy-alignment'
+import { StrategyAlignment, MatchOverrides, TradePair } from '@/lib/models/strategy-alignment'
 import { Trade } from '@/lib/models/trade'
 
 const MATCH_TOLERANCE_MS = 30 * 60 * 1000 // 30 minutes
@@ -140,7 +140,66 @@ function buildAlignmentSet(
   const backtestedTradesRaw = backtestedByStrategy.get(backtestedStrategy) ?? []
   const backtestedTrades = filterBacktestedTrades(backtestedTradesRaw, reportedTrades)
 
-  const matchResult = autoMatchTrades(backtestedTrades, reportedTrades)
+  // Build lookup maps for trades by ID
+  const backtestedById = new Map(backtestedTrades.map((t) => [t.id, t]))
+  const reportedById = new Map(reportedTrades.map((t) => [t.id, t]))
+
+  const overrides: MatchOverrides | undefined = alignment.matchOverrides
+
+  // Determine if we should use explicit pairs or auto-match
+  const useExplicitPairs = overrides?.tradePairs && overrides.tradePairs.length > 0
+
+  let matchResult: AutoMatchResult
+  let selectedBacktestedIds: Set<string>
+  let selectedReportedIds: Set<string>
+  let autoBacktestedIds: Set<string>
+  let autoReportedIds: Set<string>
+
+  if (useExplicitPairs) {
+    // Use explicit trade pairs from overrides
+    matchResult = buildMatchResultFromPairs(
+      overrides.tradePairs!,
+      backtestedById,
+      reportedById,
+      backtestedTrades,
+      reportedTrades,
+    )
+
+    // With explicit pairs, selected IDs come from the pairs
+    selectedBacktestedIds = new Set(
+      overrides.tradePairs!.map((p) => p.backtestedId).filter((id) => backtestedById.has(id)),
+    )
+    selectedReportedIds = new Set(
+      overrides.tradePairs!.map((p) => p.reportedId).filter((id) => reportedById.has(id)),
+    )
+
+    // Auto IDs are those marked as non-manual
+    autoBacktestedIds = new Set(
+      overrides.tradePairs!.filter((p) => !p.manual).map((p) => p.backtestedId),
+    )
+    autoReportedIds = new Set(
+      overrides.tradePairs!.filter((p) => !p.manual).map((p) => p.reportedId),
+    )
+  } else {
+    // Fall back to auto-matching
+    matchResult = autoMatchTrades(backtestedTrades, reportedTrades)
+
+    autoBacktestedIds = new Set(
+      matchResult.pairs.map((pair) => pair.backtested.id),
+    )
+    autoReportedIds = new Set(
+      matchResult.pairs.map((pair) => pair.reported.id),
+    )
+
+    // Use legacy selectedIds if available, otherwise use auto-matched IDs
+    selectedBacktestedIds = overrides
+      ? new Set(overrides.selectedBacktestedIds)
+      : autoBacktestedIds
+    selectedReportedIds = overrides
+      ? new Set(overrides.selectedReportedIds)
+      : autoReportedIds
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     console.debug('[reconciliation]', {
       alignmentId: alignment.id,
@@ -149,23 +208,9 @@ function buildAlignmentSet(
       backtestedCount: backtestedTrades.length,
       reportedCount: reportedTrades.length,
       matchedPairs: matchResult.pairs.length,
+      useExplicitPairs,
     })
   }
-
-  const autoBacktestedIds = new Set(
-    matchResult.pairs.map((pair) => pair.backtested.id),
-  )
-  const autoReportedIds = new Set(
-    matchResult.pairs.map((pair) => pair.reported.id),
-  )
-
-  const overrides: MatchOverrides | undefined = alignment.matchOverrides
-  const selectedBacktestedIds = overrides
-    ? new Set(overrides.selectedBacktestedIds)
-    : autoBacktestedIds
-  const selectedReportedIds = overrides
-    ? new Set(overrides.selectedReportedIds)
-    : autoReportedIds
 
   const includedBacktestedTrades =
     selectedBacktestedIds.size > 0
@@ -321,6 +366,40 @@ function autoMatchTrades(
         unmatchedBacktested.push(...backtestedList)
       }
     })
+
+  return { pairs, unmatchedBacktested, unmatchedReported }
+}
+
+function buildMatchResultFromPairs(
+  tradePairs: TradePair[],
+  backtestedById: Map<string, NormalizedTrade>,
+  reportedById: Map<string, NormalizedTrade>,
+  allBacktested: NormalizedTrade[],
+  allReported: NormalizedTrade[],
+): AutoMatchResult {
+  const pairs: MatchedPair[] = []
+  const pairedBacktestedIds = new Set<string>()
+  const pairedReportedIds = new Set<string>()
+
+  // Build pairs from explicit pairing data
+  tradePairs.forEach((pair) => {
+    const backtested = backtestedById.get(pair.backtestedId)
+    const reported = reportedById.get(pair.reportedId)
+
+    if (backtested && reported) {
+      pairs.push({ backtested, reported })
+      pairedBacktestedIds.add(pair.backtestedId)
+      pairedReportedIds.add(pair.reportedId)
+    }
+  })
+
+  // Identify unmatched trades
+  const unmatchedBacktested = allBacktested.filter(
+    (trade) => !pairedBacktestedIds.has(trade.id),
+  )
+  const unmatchedReported = allReported.filter(
+    (trade) => !pairedReportedIds.has(trade.id),
+  )
 
   return { pairs, unmatchedBacktested, unmatchedReported }
 }

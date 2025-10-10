@@ -15,4 +15,11 @@ export interface StrategyAlignment {
 export interface MatchOverrides {
   selectedBacktestedIds: string[]
   selectedReportedIds: string[]
+  tradePairs?: TradePair[]
+}
+
+export interface TradePair {
+  backtestedId: string
+  reportedId: string
+  manual: boolean  // true if user created, false if auto-matched
 }
