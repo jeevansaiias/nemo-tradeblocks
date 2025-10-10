@@ -71,6 +71,7 @@ export default function RiskSimulatorPage() {
   );
   const [useFixedSeed, setUseFixedSeed] = useState(true);
   const [seedValue, setSeedValue] = useState(42);
+  const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
 
   // Chart display options
   const [scaleType, setScaleType] = useState<"linear" | "log">("linear");
@@ -198,6 +199,7 @@ export default function RiskSimulatorPage() {
         strategy: undefined, // We pre-filter trades instead
         tradesPerYear,
         randomSeed: useFixedSeed ? seedValue : undefined,
+        normalizeTo1Lot,
       };
 
       const simulationResult = runMonteCarloSimulation(filteredTrades, params);
@@ -613,6 +615,61 @@ export default function RiskSimulatorPage() {
                         ? "all"
                         : `last ${Math.round(resamplePercentage)}%`}{" "}
                       of available trades
+                    </p>
+                  </div>
+
+                  {/* Normalize to 1-Lot Toggle */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Label>Normalize to 1-Lot</Label>
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80 p-0 overflow-hidden">
+                          <div className="space-y-3">
+                            <div className="bg-primary/5 border-b px-4 py-3">
+                              <h4 className="text-sm font-semibold text-primary">
+                                Normalize to 1-Lot
+                              </h4>
+                            </div>
+                            <div className="px-4 pb-4 space-y-3">
+                              <p className="text-sm font-medium text-foreground leading-relaxed">
+                                Scale trade P&L to a per-contract basis for
+                                consistent risk analysis.
+                              </p>
+                              <p className="text-xs text-muted-foreground leading-relaxed">
+                                If you trade multiple contracts per position
+                                (e.g., 5-lot or 10-lot positions), enable this
+                                to normalize all trades to 1-lot equivalents.
+                                This prevents inflated drawdowns and allows fair
+                                comparison across different position sizes. The
+                                simulator will divide each trade&apos;s P&L by
+                                its contract quantity to get per-contract
+                                performance.
+                              </p>
+                            </div>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Switch
+                        id="normalize-1lot"
+                        checked={normalizeTo1Lot}
+                        onCheckedChange={setNormalizeTo1Lot}
+                      />
+                      <Label
+                        htmlFor="normalize-1lot"
+                        className="cursor-pointer"
+                      >
+                        Scale trades to per-contract values
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {normalizeTo1Lot
+                        ? "Scaling each trade by its contract quantity"
+                        : "Using actual trade P&L values"}
                     </p>
                   </div>
 
