@@ -18,13 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import {
   calculateKellyMetrics,
   calculateStrategyKellyMetrics,
@@ -57,6 +51,7 @@ export default function PositionSizingPage() {
     new Set()
   );
   const [hasRun, setHasRun] = useState(false);
+  const [allStrategiesKellyPct, setAllStrategiesKellyPct] = useState(100);
 
   // Load trades and daily log when active block changes
   useEffect(() => {
@@ -150,9 +145,12 @@ export default function PositionSizingPage() {
     for (const strategy of strategyData) {
       const metrics = strategyMetricsMap.get(strategy.name)!;
       const inputPct = kellyValues[strategy.name] ?? 100;
-      const appliedPct = metrics.percent * (inputPct / 100);
+      // Apply BOTH Portfolio Kelly and Strategy Kelly multipliers
+      const appliedPct =
+        metrics.percent * (portfolioKellyPct / 100) * (inputPct / 100);
       const maxMarginPct = calculateMaxMarginPct(marginTimeline, strategy.name);
-      const allocationPct = maxMarginPct * (inputPct / 100);
+      const allocationPct =
+        maxMarginPct * (portfolioKellyPct / 100) * (inputPct / 100);
       const allocationDollars = (startingCapital * allocationPct) / 100;
 
       strategyAnalysis.push({
@@ -192,6 +190,7 @@ export default function PositionSizingPage() {
     kellyValues,
     startingCapital,
     marginMode,
+    portfolioKellyPct,
   ]);
 
   // Handlers
@@ -217,14 +216,6 @@ export default function PositionSizingPage() {
     } else {
       setSelectedStrategies(new Set());
     }
-  };
-
-  const setAllKellyValues = (value: number) => {
-    const newValues: Record<string, number> = {};
-    selectedStrategies.forEach((strategy) => {
-      newValues[strategy] = value;
-    });
-    setKellyValues((prev) => ({ ...prev, ...newValues }));
   };
 
   // Empty state
@@ -273,24 +264,32 @@ export default function PositionSizingPage() {
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">How to Use This Page</h2>
           <p className="text-sm text-muted-foreground">
-            Use this page to explore how Kelly-driven sizing could shape your backtests before you commit to a new allocation.
+            Use this page to explore how Kelly-driven sizing could shape your
+            backtests before you commit to a new allocation.
           </p>
           <ul className="space-y-2 text-sm text-muted-foreground list-disc list-inside">
             <li>
-              Set your starting capital and portfolio-level Kelly fraction to mirror the account you plan to backtest.
+              Set your starting capital and portfolio-level Kelly fraction to
+              mirror the account you plan to backtest.
             </li>
             <li>
-              Review each strategy card and adjust the Kelly % to reflect conviction, correlation, or capital limits.
+              Review each strategy card and adjust the Kelly % to reflect
+              conviction, correlation, or capital limits.
             </li>
             <li>
-              Run Allocation to surface portfolio Kelly metrics, applied capital, and projected margin demand so you can translate findings into your backtest position rules.
+              Run Allocation to surface portfolio Kelly metrics, applied
+              capital, and projected margin demand so you can translate findings
+              into your backtest position rules.
             </li>
             <li>
-              Iterate often—capture settings that feel sustainable, then take those parameters into your backtests for validation.
+              Iterate often—capture settings that feel sustainable, then take
+              those parameters into your backtests for validation.
             </li>
           </ul>
           <p className="text-xs text-muted-foreground italic">
-            Nothing here is a directive to size larger or smaller; it is a sandbox for stress-testing ideas with real trade history before you backtest or deploy.
+            Nothing here is a directive to size larger or smaller; it is a
+            sandbox for stress-testing ideas with real trade history before you
+            backtest or deploy.
           </p>
         </div>
       </Card>
@@ -345,9 +344,49 @@ export default function PositionSizingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="portfolio-kelly">
-                Portfolio Kelly Fraction (%)
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="portfolio-kelly">
+                  Portfolio Kelly Fraction (%)
+                </Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">
+                          Kelly Fraction Multiplier
+                        </h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          Global risk multiplier applied to ALL strategies
+                          before their individual Kelly %.
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Works as a two-layer system with Strategy Kelly %:
+                        </p>
+                        <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
+                          <li>25% = Very Conservative (1/4 Kelly)</li>
+                          <li>50% = Conservative (half Kelly - recommended)</li>
+                          <li>100% = Full Kelly (aggressive)</li>
+                        </ul>
+                        <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                          <p className="font-medium">Formula:</p>
+                          <p className="font-mono text-[10px] bg-muted/50 p-1 rounded">
+                            Allocation = Base Kelly × Portfolio % × Strategy %
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground italic border-l-2 border-primary/20 pl-2">
+                          Example: Base Kelly 40%, Portfolio 25%, Strategy 50% =
+                          40% × 0.25 × 0.50 = 5% of capital
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
               <Input
                 id="portfolio-kelly"
                 type="number"
@@ -400,42 +439,115 @@ export default function PositionSizingPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">
-              Selected: {selectedStrategies.size}{" "}
-              {selectedStrategies.size === 1 ? "strategy" : "strategies"}
-            </span>
-            <Select
-              onValueChange={(value) => setAllKellyValues(parseInt(value))}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Set selected to..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25">25% (Quarter Kelly)</SelectItem>
-                <SelectItem value="50">50% (Half Kelly)</SelectItem>
-                <SelectItem value="75">75%</SelectItem>
-                <SelectItem value="100">100% (Full Kelly)</SelectItem>
-                <SelectItem value="125">125%</SelectItem>
-                <SelectItem value="150">150%</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              onClick={() => {
-                const resetValues: Record<string, number> = {};
-                strategyData.forEach((s) => {
-                  resetValues[s.name] = 100;
-                });
-                setKellyValues(resetValues);
-              }}
-            >
-              Reset All
-            </Button>
-            <Button onClick={runAllocation} className="ml-auto gap-2">
-              <Play className="h-4 w-4" />
-              Run Allocation
-            </Button>
+          <div className="space-y-4">
+            {/* Slider to set all selected strategies */}
+            {selectedStrategies.size > 0 && (
+              <div className="space-y-3 p-4 border rounded-md bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">
+                    Apply Kelly % to {selectedStrategies.size} selected{" "}
+                    {selectedStrategies.size === 1 ? "strategy" : "strategies"}
+                  </Label>
+                  <span className="text-sm font-semibold text-primary">
+                    {allStrategiesKellyPct}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[allStrategiesKellyPct]}
+                    onValueChange={(values) =>
+                      setAllStrategiesKellyPct(values[0])
+                    }
+                    min={0}
+                    max={200}
+                    step={5}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const newValues: Record<string, number> = {};
+                      selectedStrategies.forEach((strategy) => {
+                        newValues[strategy] = allStrategiesKellyPct;
+                      });
+                      setKellyValues((prev) => ({ ...prev, ...newValues }));
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </div>
+                <div className="flex gap-2 text-xs text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setAllStrategiesKellyPct(25)}
+                    className="hover:text-foreground"
+                  >
+                    25%
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllStrategiesKellyPct(50)}
+                    className="hover:text-foreground"
+                  >
+                    50%
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllStrategiesKellyPct(75)}
+                    className="hover:text-foreground"
+                  >
+                    75%
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllStrategiesKellyPct(100)}
+                    className="hover:text-foreground"
+                  >
+                    100%
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllStrategiesKellyPct(125)}
+                    className="hover:text-foreground"
+                  >
+                    125%
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllStrategiesKellyPct(150)}
+                    className="hover:text-foreground"
+                  >
+                    150%
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const resetValues: Record<string, number> = {};
+                  strategyData.forEach((s) => {
+                    resetValues[s.name] = 100;
+                  });
+                  setKellyValues(resetValues);
+                  setAllStrategiesKellyPct(100);
+                }}
+              >
+                Reset All to 100%
+              </Button>
+              <Button onClick={runAllocation} className="ml-auto gap-2">
+                <Play className="h-4 w-4" />
+                Run Allocation
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
