@@ -44,8 +44,9 @@ export function StrategyResults({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {strategies.map((strategy) => {
-        const hasData =
-          strategy.kellyMetrics.avgWin > 0 && strategy.kellyMetrics.avgLoss > 0;
+        const hasValidKelly = strategy.kellyMetrics.hasValidKelly;
+        const hasOnlyWins = strategy.kellyMetrics.avgWin > 0 && strategy.kellyMetrics.avgLoss === 0;
+        const hasOnlyLosses = strategy.kellyMetrics.avgWin === 0 && strategy.kellyMetrics.avgLoss > 0;
 
         const payoffDisplay =
           isFinite(strategy.kellyMetrics.payoffRatio) &&
@@ -75,12 +76,22 @@ export function StrategyResults({
                   <Badge variant="secondary">
                     {strategy.tradeCount} {strategy.tradeCount === 1 ? "trade" : "trades"}
                   </Badge>
-                  {!hasData && (
+                  {!hasValidKelly && hasOnlyWins && (
                     <Badge variant="outline">
-                      Needs wins & losses
+                      Kelly N/A - Only wins
                     </Badge>
                   )}
-                  {hasData && strategy.kellyMetrics.percent <= 0 && (
+                  {!hasValidKelly && hasOnlyLosses && (
+                    <Badge variant="outline">
+                      Kelly N/A - Only losses
+                    </Badge>
+                  )}
+                  {!hasValidKelly && !hasOnlyWins && !hasOnlyLosses && strategy.tradeCount > 0 && (
+                    <Badge variant="outline">
+                      Kelly N/A - No P/L data
+                    </Badge>
+                  )}
+                  {hasValidKelly && strategy.kellyMetrics.percent <= 0 && (
                     <Badge variant="destructive">
                       Negative expectancy
                     </Badge>
@@ -93,16 +104,22 @@ export function StrategyResults({
               {/* Kelly percentages */}
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">
-                  Full Kelly {strategy.kellyMetrics.percent.toFixed(1)}%
+                  {hasValidKelly
+                    ? `Full Kelly ${strategy.kellyMetrics.percent.toFixed(1)}%`
+                    : "Kelly calculation unavailable"}
                 </p>
-                <Badge variant="outline">
-                  Applied {strategy.appliedPct.toFixed(1)}%
-                </Badge>
+                {hasValidKelly && (
+                  <Badge variant="outline">
+                    Applied {strategy.appliedPct.toFixed(1)}%
+                  </Badge>
+                )}
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                Kelly multiplier: {strategy.inputPct.toFixed(0)}%
-              </p>
+              {hasValidKelly && (
+                <p className="text-xs text-muted-foreground">
+                  Kelly multiplier: {strategy.inputPct.toFixed(0)}%
+                </p>
+              )}
 
               {/* Win rate and payoff ratio */}
               <div className="flex items-center justify-between">
