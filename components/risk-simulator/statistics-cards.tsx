@@ -9,7 +9,6 @@ import {
 import type { MonteCarloResult } from "@/lib/calculations/monte-carlo";
 import {
   AlertOctagon,
-  AlertTriangle,
   HelpCircle,
   Percent,
   Star,
@@ -41,7 +40,7 @@ export function StatisticsCards({ result }: StatisticsCardsProps) {
   return (
     <div className="space-y-6">
       {/* Key Metrics - Top Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Expected Return */}
         <Card className="p-4">
           <div className="flex items-start justify-between mb-3">
@@ -134,53 +133,6 @@ export function StatisticsCards({ result }: StatisticsCardsProps) {
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               Out of {parameters.numSimulations} simulations
-            </div>
-          </div>
-        </Card>
-
-        {/* Value at Risk */}
-        <Card className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Value at Risk
-              </span>
-            </div>
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <HelpCircle className="h-4 w-4 text-muted-foreground/60 cursor-help" />
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80 p-0 overflow-hidden">
-                <div className="space-y-3">
-                  <div className="bg-primary/5 border-b px-4 py-3">
-                    <h4 className="text-sm font-semibold text-primary">
-                      Value at Risk (95%)
-                    </h4>
-                  </div>
-                  <div className="px-4 pb-4 space-y-3">
-                    <p className="text-sm font-medium text-foreground leading-relaxed">
-                      The 5th percentile return - only 5% of simulations
-                      performed worse than this level.
-                    </p>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      This is your risk floor, showing downside exposure with
-                      95% confidence. If you can&apos;t tolerate this level of
-                      loss, consider reducing position sizes or trading less
-                      aggressively. Value at Risk is a standard measure used by
-                      institutional traders to quantify tail risk.
-                    </p>
-                  </div>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          </div>
-          <div>
-            <div className="text-2xl font-bold">
-              {(statistics.valueAtRisk.p5 * 100).toFixed(1)}%
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              5th percentile return
             </div>
           </div>
         </Card>
