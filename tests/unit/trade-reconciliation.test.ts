@@ -4,6 +4,8 @@ import { buildTradeReconciliation } from '@/lib/services/trade-reconciliation'
 import type { StrategyAlignment } from '@/lib/models/strategy-alignment'
 import type { Trade } from '@/lib/models/trade'
 import type { ReportingTrade } from '@/lib/models/reporting-trade'
+import type { StoredTrade } from '@/lib/db/trades-store'
+import type { StoredReportingTrade } from '@/lib/db/reporting-logs-store'
 
 jest.mock('@/lib/db', () => ({
   getTradesByBlock: jest.fn(),
@@ -11,8 +13,8 @@ jest.mock('@/lib/db', () => ({
 }))
 
 const { getTradesByBlock, getReportingTradesByBlock } = jest.requireMock('@/lib/db') as {
-  getTradesByBlock: jest.MockedFunction<(blockId: string) => Promise<any[]>>
-  getReportingTradesByBlock: jest.MockedFunction<(blockId: string) => Promise<any[]>>
+  getTradesByBlock: jest.MockedFunction<(blockId: string) => Promise<StoredTrade[]>>
+  getReportingTradesByBlock: jest.MockedFunction<(blockId: string) => Promise<StoredReportingTrade[]>>
 }
 
 describe('trade reconciliation matching', () => {
