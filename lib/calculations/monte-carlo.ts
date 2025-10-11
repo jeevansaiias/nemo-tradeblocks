@@ -322,17 +322,19 @@ export function getDailyResamplePool(
 }
 
 /**
- * Calculate percentage returns from trades based on capital at trade time
+ * Calculate percentage returns from trades based on HISTORICAL capital at trade time
  * This properly accounts for compounding strategies where position sizes grow with equity
  *
+ * IMPORTANT: Uses the actual historical account values to compute percentages, NOT the
+ * user's chosen initial capital. This ensures that when users scale up/down their starting
+ * capital in simulations, the percentage returns scale proportionally.
+ *
  * @param trades - Trades to calculate percentage returns from
- * @param initialCapital - Starting capital
  * @param normalizeTo1Lot - Whether to scale P&L to 1-lot before calculating percentage
  * @returns Array of percentage returns (as decimals, e.g., 0.05 = 5%)
  */
 export function calculatePercentageReturns(
   trades: Trade[],
-  initialCapital: number,
   normalizeTo1Lot?: boolean
 ): number[] {
   if (trades.length === 0) {
@@ -345,7 +347,10 @@ export function calculatePercentageReturns(
   );
 
   const percentageReturns: number[] = [];
-  let capital = initialCapital;
+
+  // Calculate HISTORICAL initial capital from the first trade
+  const firstTrade = sortedTrades[0];
+  let capital = firstTrade.fundsAtClose - firstTrade.pl;
 
   for (const trade of sortedTrades) {
     if (capital <= 0) {
@@ -357,11 +362,12 @@ export function calculatePercentageReturns(
     // Get trade P&L (optionally normalized)
     const pl = normalizeTo1Lot ? scaleTradeToOneLot(trade) : trade.pl;
 
-    // Calculate percentage return based on capital at trade time
+    // Calculate percentage return based on HISTORICAL capital at trade time
+    // This ensures percentages are independent of user's chosen simulation capital
     const percentageReturn = pl / capital;
     percentageReturns.push(percentageReturn);
 
-    // Update capital for next trade
+    // Update capital for next trade using historical account values
     capital += pl;
   }
 
@@ -603,7 +609,6 @@ export function runMonteCarloSimulation(
 
     const percentageReturns = calculatePercentageReturns(
       filteredTrades,
-      params.initialCapital,
       params.normalizeTo1Lot
     );
     const percentagePool = getPercentageResamplePool(

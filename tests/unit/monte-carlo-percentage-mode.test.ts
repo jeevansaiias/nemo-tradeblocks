@@ -10,11 +10,12 @@ import {
 } from "@/lib/calculations/monte-carlo";
 import { Trade } from "@/lib/models/trade";
 
-// Helper to create mock trades
+// Helper to create mock trades with proper fundsAtClose values
 function createMockTrade(
   pl: number,
   numContracts: number,
-  dateOpened: Date = new Date("2024-01-01")
+  dateOpened: Date = new Date("2024-01-01"),
+  fundsAtClose: number = 100000 // Default to a reasonable fundsAtClose
 ): Trade {
   return {
     dateOpened,
@@ -24,7 +25,7 @@ function createMockTrade(
     premium: 50,
     pl,
     numContracts,
-    fundsAtClose: 10000,
+    fundsAtClose, // Use the provided fundsAtClose
     marginReq: 1000,
     strategy: "Test Strategy",
     openingCommissionsFees: 1,
@@ -34,15 +35,15 @@ function createMockTrade(
 }
 
 describe("calculatePercentageReturns", () => {
-  it("should calculate percentage returns based on capital at trade time", () => {
-    const initialCapital = 100000;
+  it("should calculate percentage returns based on HISTORICAL capital at trade time", () => {
+    // Create trades with proper fundsAtClose values showing historical account growth
     const trades = [
-      createMockTrade(5000, 1, new Date("2024-01-01")),  // +5% on 100k = 5k
-      createMockTrade(5250, 1, new Date("2024-01-02")),  // +5% on 105k = 5.25k
-      createMockTrade(-5512.5, 1, new Date("2024-01-03")), // -5% on 110.25k = -5.5125k
+      createMockTrade(5000, 1, new Date("2024-01-01"), 105000),   // Started at 100k, +5k = 105k
+      createMockTrade(5250, 1, new Date("2024-01-02"), 110250),   // Started at 105k, +5.25k = 110.25k
+      createMockTrade(-5512.5, 1, new Date("2024-01-03"), 104737.5), // Started at 110.25k, -5.5125k
     ];
 
-    const percentageReturns = calculatePercentageReturns(trades, initialCapital);
+    const percentageReturns = calculatePercentageReturns(trades);
 
     expect(percentageReturns).toHaveLength(3);
     expect(percentageReturns[0]).toBeCloseTo(0.05, 4); // 5000 / 100000 = 0.05
@@ -51,61 +52,58 @@ describe("calculatePercentageReturns", () => {
   });
 
   it("should handle normalized trades (1-lot scaling)", () => {
-    const initialCapital = 100000;
     const trades = [
-      createMockTrade(10000, 10, new Date("2024-01-01")), // 10k / 10 = 1k per contract
-      createMockTrade(10500, 10, new Date("2024-01-02")), // 10.5k / 10 = 1.05k per contract
+      createMockTrade(10000, 10, new Date("2024-01-01"), 110000), // 10k / 10 = 1k per contract, started at 100k
+      createMockTrade(10500, 10, new Date("2024-01-02"), 111500), // 10.5k / 10 = 1.05k per contract
     ];
 
-    const percentageReturns = calculatePercentageReturns(trades, initialCapital, true);
+    const percentageReturns = calculatePercentageReturns(trades, true);
 
     expect(percentageReturns).toHaveLength(2);
-    // First trade: 1000 / 100000 = 0.01 (1%)
+    // First trade: (10000/10) / 100000 = 1000 / 100000 = 0.01 (1%)
     expect(percentageReturns[0]).toBeCloseTo(0.01, 4);
-    // Second trade: 1050 / 101000 ≈ 0.01039 (1.04%)
-    expect(percentageReturns[1]).toBeCloseTo(0.01039, 4);
+    // Second trade: After first trade capital is 101000 (100k + 1k normalized)
+    // (10500/10) / 101000 = 1050 / 101000 ≈ 0.010396 (~1.04%)
+    expect(percentageReturns[1]).toBeCloseTo(0.010396, 4);
   });
 
   it("should handle negative returns correctly", () => {
-    const initialCapital = 100000;
     const trades = [
-      createMockTrade(-10000, 1, new Date("2024-01-01")), // -10%
-      createMockTrade(-9000, 1, new Date("2024-01-02")),  // -10% of 90k = -9k
+      createMockTrade(-10000, 1, new Date("2024-01-01"), 90000),  // Started at 100k, -10k = 90k
+      createMockTrade(-9000, 1, new Date("2024-01-02"), 81000),   // Started at 90k, -9k = 81k
     ];
 
-    const percentageReturns = calculatePercentageReturns(trades, initialCapital);
+    const percentageReturns = calculatePercentageReturns(trades);
 
-    expect(percentageReturns[0]).toBeCloseTo(-0.10, 4);
-    expect(percentageReturns[1]).toBeCloseTo(-0.10, 4);
+    expect(percentageReturns[0]).toBeCloseTo(-0.10, 4); // -10000 / 100000 = -0.10
+    expect(percentageReturns[1]).toBeCloseTo(-0.10, 4); // -9000 / 90000 = -0.10
   });
 
   it("should handle account blowup gracefully", () => {
-    const initialCapital = 100000;
     const trades = [
-      createMockTrade(-100000, 1, new Date("2024-01-01")), // Loses entire capital
-      createMockTrade(5000, 1, new Date("2024-01-02")),    // Can't trade anymore
+      createMockTrade(-100000, 1, new Date("2024-01-01"), 0),      // Started at 100k, lost it all
+      createMockTrade(5000, 1, new Date("2024-01-02"), 5000),      // Can't trade with no capital
     ];
 
-    const percentageReturns = calculatePercentageReturns(trades, initialCapital);
+    const percentageReturns = calculatePercentageReturns(trades);
 
-    expect(percentageReturns[0]).toBe(-1.0); // -100%
-    expect(percentageReturns[1]).toBe(0);    // Account is busted, return 0
+    expect(percentageReturns[0]).toBe(-1.0); // -100000 / 100000 = -1.0 (-100%)
+    expect(percentageReturns[1]).toBe(0);    // Account is busted (capital <= 0), return 0
   });
 
   it("should sort trades chronologically before calculating", () => {
-    const initialCapital = 100000;
     const trades = [
-      createMockTrade(5000, 1, new Date("2024-01-03")),  // Out of order
-      createMockTrade(5000, 1, new Date("2024-01-01")),  // Should be first
-      createMockTrade(5250, 1, new Date("2024-01-02")),  // Should be second
+      createMockTrade(5000, 1, new Date("2024-01-03"), 115250),   // Out of order - should be third
+      createMockTrade(5000, 1, new Date("2024-01-01"), 105000),   // Should be first
+      createMockTrade(5250, 1, new Date("2024-01-02"), 110250),   // Should be second
     ];
 
-    const percentageReturns = calculatePercentageReturns(trades, initialCapital);
+    const percentageReturns = calculatePercentageReturns(trades);
 
     // Should process in correct chronological order
-    expect(percentageReturns[0]).toBeCloseTo(0.05, 4);    // 5k / 100k
-    expect(percentageReturns[1]).toBeCloseTo(0.05, 4);    // 5.25k / 105k
-    expect(percentageReturns[2]).toBeCloseTo(0.04545, 3); // 5k / 110.25k
+    expect(percentageReturns[0]).toBeCloseTo(0.05, 4);    // 5k / 100k (first trade)
+    expect(percentageReturns[1]).toBeCloseTo(0.05, 4);    // 5.25k / 105k (second trade)
+    expect(percentageReturns[2]).toBeCloseTo(0.04535, 3); // 5k / 110.25k (third trade)
   });
 });
 
@@ -323,6 +321,51 @@ describe("runMonteCarloSimulation with percentage mode", () => {
 
     expect(() => runMonteCarloSimulation(fewTrades, params)).toThrow(
       "Insufficient trades for Monte Carlo simulation"
+    );
+  });
+});
+
+describe("Initial capital scaling", () => {
+  it("should scale results when user changes initial capital in simulations", () => {
+    // Create trades with realistic historical account values
+    const trades: Trade[] = [];
+    let capital = 100000; // Historical starting capital
+
+    for (let i = 0; i < 20; i++) {
+      const percentReturn = (i % 2 === 0 ? 0.05 : -0.03); // Alternating +5% / -3%
+      const pl = capital * percentReturn;
+      capital += pl;
+      trades.push(createMockTrade(pl, 1, new Date(2024, 0, i + 1), capital));
+    }
+
+    // Run simulation with historical capital ($100k)
+    const params100k = {
+      numSimulations: 100,
+      simulationLength: 10,
+      resampleMethod: "percentage" as const,
+      initialCapital: 100000,
+      tradesPerYear: 252,
+      randomSeed: 42,
+    };
+
+    // Run simulation with 10x capital ($1M)
+    const params1M = {
+      ...params100k,
+      initialCapital: 1000000,
+    };
+
+    const result100k = runMonteCarloSimulation(trades, params100k);
+    const result1M = runMonteCarloSimulation(trades, params1M);
+
+    // CRITICAL: Final values should scale proportionally with initial capital
+    // (This is the bug fix - before, both would give same dollar P/L)
+    const ratio = result1M.statistics.meanFinalValue / result100k.statistics.meanFinalValue;
+    expect(ratio).toBeCloseTo(10, 0); // Should be ~10x
+
+    // Returns (percentages) should be similar regardless of capital
+    expect(result1M.statistics.meanTotalReturn).toBeCloseTo(
+      result100k.statistics.meanTotalReturn,
+      2
     );
   });
 });
