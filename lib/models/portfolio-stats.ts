@@ -22,6 +22,7 @@ export interface PortfolioStats {
   totalCommissions: number
   netPl: number
   profitFactor: number
+  initialCapital: number  // Starting portfolio value before any P/L
   // Streak and consistency metrics
   maxWinStreak?: number
   maxLossStreak?: number

@@ -254,6 +254,6 @@ export class TransactionError extends DatabaseError {
 }
 
 // Re-export functions from individual stores
-export { createBlock, getBlock, getAllBlocks, updateBlock, deleteBlock, getActiveBlock } from './blocks-store'
+export { createBlock, getBlock, getAllBlocks, updateBlock, deleteBlock, getActiveBlock, updateBlockStats } from './blocks-store'
 export { addTrades, getTradesByBlock, getTradeCountByBlock, deleteTradesByBlock } from './trades-store'
 export { addDailyLogEntries, getDailyLogsByBlock, getDailyLogCountByBlock, deleteDailyLogsByBlock } from './daily-logs-store'

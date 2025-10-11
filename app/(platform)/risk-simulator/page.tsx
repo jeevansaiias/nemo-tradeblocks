@@ -14,7 +14,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   HoverCard,
   HoverCardContent,
@@ -38,7 +38,9 @@ import {
 } from "@/lib/calculations/monte-carlo";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import { getTradesByBlock } from "@/lib/db/trades-store";
+import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";
 import { Trade } from "@/lib/models/trade";
+import { DailyLogEntry } from "@/lib/models/daily-log";
 import { useBlockStore } from "@/lib/stores/block-store";
 import {
   getDefaultSimulationPeriod,
@@ -66,9 +68,9 @@ export default function RiskSimulatorPage() {
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
   const [initialCapital, setInitialCapital] = useState(100000);
   const [tradesPerYear, setTradesPerYear] = useState(252);
-  const [resampleMethod, setResampleMethod] = useState<"trades" | "daily">(
-    "trades"
-  );
+  const [resampleMethod, setResampleMethod] = useState<
+    "trades" | "daily" | "percentage"
+  >("percentage");
   const [useFixedSeed, setUseFixedSeed] = useState(true);
   const [seedValue, setSeedValue] = useState(42);
   const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
@@ -84,6 +86,7 @@ export default function RiskSimulatorPage() {
 
   // Get available strategies from active block
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [dailyLogs, setDailyLogs] = useState<DailyLogEntry[]>([]);
   const availableStrategies = useMemo(() => {
     const strategies = new Set(trades.map((t) => t.strategy).filter(Boolean));
     return Array.from(strategies);
@@ -120,22 +123,29 @@ export default function RiskSimulatorPage() {
     return Math.max(10, avgTradesPerYear); // At least 10
   }, [trades]);
 
-  // Auto-calculate initial capital from trades data using the same method as block-stats
+  // Auto-calculate initial capital from trades data (prefer daily logs when available)
   const calculatedInitialCapital = useMemo(() => {
     if (trades.length === 0) return 100000; // Default
-    const initialCapital =
-      PortfolioStatsCalculator.calculateInitialCapital(trades);
+    const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(
+      trades,
+      dailyLogs.length > 0 ? dailyLogs : undefined
+    );
     return initialCapital > 0 ? initialCapital : 100000;
-  }, [trades]);
+  }, [trades, dailyLogs]);
 
-  // Load trades when active block changes
+  // Load trades and daily logs when active block changes
   useEffect(() => {
     if (activeBlockId) {
-      getTradesByBlock(activeBlockId).then((loadedTrades) => {
+      Promise.all([
+        getTradesByBlock(activeBlockId),
+        getDailyLogsByBlock(activeBlockId),
+      ]).then(([loadedTrades, loadedDailyLogs]) => {
         setTrades(loadedTrades);
+        setDailyLogs(loadedDailyLogs);
       });
     } else {
       setTrades([]);
+      setDailyLogs([]);
     }
   }, [activeBlockId]);
 
@@ -554,6 +564,179 @@ export default function RiskSimulatorPage() {
             />
           </div>
 
+          {/* Sampling Method and Normalization - Info Card */}
+          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <CardContent className="pt-6">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                    <HelpCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                    Choosing the Right Sampling Method & Normalization
+                  </h3>
+                  <div className="text-xs text-blue-800 dark:text-blue-200 space-y-2">
+                    <p>
+                      <strong>Percentage Returns:</strong> Best for most
+                      traders, especially those using percentage-based position
+                      sizing or compounding strategies. Automatically accounts
+                      for growing equity. Enable normalization if you trade
+                      varying contract sizes.
+                    </p>
+                    <p>
+                      <strong>Fixed Sizing Modes:</strong> Use{" "}
+                      <strong>Individual Trades</strong> or{" "}
+                      <strong>Daily Returns</strong> only if you always trade
+                      fixed dollar amounts. Enable normalization to compare
+                      across different lot sizes.
+                    </p>
+                    <p className="pt-2 border-t border-blue-200 dark:border-blue-800">
+                      <strong>💡 Tip:</strong> If you&apos;re unsure, stick with
+                      Percentage Returns. It prevents unrealistic drawdown
+                      calculations and matches how most traders actually size
+                      positions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Sampling Method and Normalization */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label>Sampling Method</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">
+                          Sampling Method
+                        </h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          Choose how to resample from your trading history.
+                        </p>
+                        <div className="space-y-2 text-xs text-muted-foreground">
+                          <p>
+                            <strong className="text-foreground">
+                              Individual Trades (Fixed):
+                            </strong>{" "}
+                            Resamples dollar P&L values from individual trades.
+                            Best for strategies with fixed position sizes.
+                          </p>
+                          <p>
+                            <strong className="text-foreground">
+                              Daily Returns (Fixed):
+                            </strong>{" "}
+                            Groups trades by day and resamples daily P&L totals.
+                            Better for concurrent positions, but still uses
+                            fixed dollar amounts.
+                          </p>
+                          <p>
+                            <strong className="text-foreground">
+                              Percentage Returns (Compounding):
+                            </strong>{" "}
+                            Converts each trade to a percentage return based on
+                            capital at trade time, then applies those
+                            percentages during simulation.{" "}
+                            <strong className="text-primary">
+                              Essential for compounding strategies
+                            </strong>{" "}
+                            where position sizes scale with equity. Prevents
+                            unrealistic drawdowns from large late-stage trades
+                            appearing early in simulations.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
+              <Select
+                value={resampleMethod}
+                onValueChange={(value) =>
+                  setResampleMethod(value as "trades" | "daily" | "percentage")
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">
+                    Percentage Returns (Compounding)
+                  </SelectItem>
+                  <SelectItem value="trades">
+                    Individual Trades (Fixed Sizing)
+                  </SelectItem>
+                  <SelectItem value="daily">
+                    Daily Returns (Fixed Sizing)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                How to resample from your trade history
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Label>Normalize to 1-Lot</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">
+                          Normalize to 1-Lot
+                        </h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          Scale trade P&L to a per-contract basis for consistent
+                          risk analysis.
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          If you trade multiple contracts per position (e.g.,
+                          5-lot or 10-lot positions), enable this to normalize
+                          all trades to 1-lot equivalents. This prevents
+                          inflated drawdowns and allows fair comparison across
+                          different position sizes. The simulator will divide
+                          each trade&apos;s P&L by its contract quantity to get
+                          per-contract performance.
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
+              <div className="flex items-center gap-4">
+                <Switch
+                  id="normalize-1lot"
+                  checked={normalizeTo1Lot}
+                  onCheckedChange={setNormalizeTo1Lot}
+                />
+                <Label htmlFor="normalize-1lot" className="cursor-pointer">
+                  Scale trades to per-contract values
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {normalizeTo1Lot
+                  ? "Scaling each trade by its contract quantity"
+                  : "Using actual trade P&L values"}
+              </p>
+            </div>
+          </div>
+
           {/* Advanced Settings */}
           <Accordion type="single" collapsible>
             <AccordionItem value="advanced">
@@ -618,10 +801,10 @@ export default function RiskSimulatorPage() {
                     </p>
                   </div>
 
-                  {/* Normalize to 1-Lot Toggle */}
-                  <div className="space-y-3">
+                  {/* Random Seed */}
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Label>Normalize to 1-Lot</Label>
+                      <Label>Random Seed</Label>
                       <HoverCard>
                         <HoverCardTrigger asChild>
                           <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
@@ -630,23 +813,22 @@ export default function RiskSimulatorPage() {
                           <div className="space-y-3">
                             <div className="bg-primary/5 border-b px-4 py-3">
                               <h4 className="text-sm font-semibold text-primary">
-                                Normalize to 1-Lot
+                                Random Seed
                               </h4>
                             </div>
                             <div className="px-4 pb-4 space-y-3">
                               <p className="text-sm font-medium text-foreground leading-relaxed">
-                                Scale trade P&L to a per-contract basis for
-                                consistent risk analysis.
+                                Control whether simulations produce identical or
+                                varied results across runs.
                               </p>
                               <p className="text-xs text-muted-foreground leading-relaxed">
-                                If you trade multiple contracts per position
-                                (e.g., 5-lot or 10-lot positions), enable this
-                                to normalize all trades to 1-lot equivalents.
-                                This prevents inflated drawdowns and allows fair
-                                comparison across different position sizes. The
-                                simulator will divide each trade&apos;s P&L by
-                                its contract quantity to get per-contract
-                                performance.
+                                Enable fixed seed to get reproducible results -
+                                the same simulation parameters will always
+                                produce identical outputs. This is essential for
+                                comparing different scenarios (like various
+                                position sizes or time periods) on equal
+                                footing. Disable for truly random simulations
+                                that vary each time you run them.
                               </p>
                             </div>
                           </div>
@@ -654,142 +836,32 @@ export default function RiskSimulatorPage() {
                       </HoverCard>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Switch
-                        id="normalize-1lot"
-                        checked={normalizeTo1Lot}
-                        onCheckedChange={setNormalizeTo1Lot}
-                      />
-                      <Label
-                        htmlFor="normalize-1lot"
-                        className="cursor-pointer"
-                      >
-                        Scale trades to per-contract values
-                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="use-seed"
+                          checked={useFixedSeed}
+                          onCheckedChange={setUseFixedSeed}
+                        />
+                        <Label htmlFor="use-seed" className="cursor-pointer">
+                          Use Fixed Seed
+                        </Label>
+                      </div>
+                      {useFixedSeed && (
+                        <Input
+                          type="number"
+                          value={seedValue}
+                          onChange={(e) =>
+                            setSeedValue(parseInt(e.target.value) || 42)
+                          }
+                          min={0}
+                          max={999999}
+                          className="w-24"
+                        />
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {normalizeTo1Lot
-                        ? "Scaling each trade by its contract quantity"
-                        : "Using actual trade P&L values"}
+                      Enable for reproducible results
                     </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label>Sampling Method</Label>
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80 p-0 overflow-hidden">
-                            <div className="space-y-3">
-                              <div className="bg-primary/5 border-b px-4 py-3">
-                                <h4 className="text-sm font-semibold text-primary">
-                                  Sampling Method
-                                </h4>
-                              </div>
-                              <div className="px-4 pb-4 space-y-3">
-                                <p className="text-sm font-medium text-foreground leading-relaxed">
-                                  Choose whether to resample individual trades
-                                  or daily portfolio returns.
-                                </p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Individual Trades samples each trade P&L
-                                  independently, preserving trade-level risk
-                                  characteristics. Daily Returns groups trades
-                                  by day and samples daily totals, which better
-                                  captures correlations when you run multiple
-                                  trades simultaneously. Use Individual Trades
-                                  for single-position strategies, Daily Returns
-                                  for portfolios with concurrent positions.
-                                </p>
-                              </div>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      </div>
-                      <Select
-                        value={resampleMethod}
-                        onValueChange={(value) =>
-                          setResampleMethod(value as "trades" | "daily")
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="trades">
-                            Individual Trades
-                          </SelectItem>
-                          <SelectItem value="daily">Daily Returns</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        How to resample from your trade history
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label>Random Seed</Label>
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80 p-0 overflow-hidden">
-                            <div className="space-y-3">
-                              <div className="bg-primary/5 border-b px-4 py-3">
-                                <h4 className="text-sm font-semibold text-primary">
-                                  Random Seed
-                                </h4>
-                              </div>
-                              <div className="px-4 pb-4 space-y-3">
-                                <p className="text-sm font-medium text-foreground leading-relaxed">
-                                  Control whether simulations produce identical
-                                  or varied results across runs.
-                                </p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Enable fixed seed to get reproducible results
-                                  - the same simulation parameters will always
-                                  produce identical outputs. This is essential
-                                  for comparing different scenarios (like
-                                  various position sizes or time periods) on
-                                  equal footing. Disable for truly random
-                                  simulations that vary each time you run them.
-                                </p>
-                              </div>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            id="use-seed"
-                            checked={useFixedSeed}
-                            onCheckedChange={setUseFixedSeed}
-                          />
-                          <Label htmlFor="use-seed" className="cursor-pointer">
-                            Use Fixed Seed
-                          </Label>
-                        </div>
-                        {useFixedSeed && (
-                          <Input
-                            type="number"
-                            value={seedValue}
-                            onChange={(e) =>
-                              setSeedValue(parseInt(e.target.value) || 42)
-                            }
-                            min={0}
-                            max={999999}
-                            className="w-24"
-                          />
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Enable for reproducible results
-                      </p>
-                    </div>
                   </div>
                 </div>
               </AccordionContent>

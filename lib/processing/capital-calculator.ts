@@ -40,7 +40,7 @@ export function calculateInitialCapitalFromTrades(trades: Trade[]): number {
 
 /**
  * Calculate initial capital from daily log data
- * Uses the earliest entry's net liquidity
+ * Uses the earliest entry's net liquidity minus its daily P/L to get the starting balance
  */
 export function calculateInitialCapitalFromDailyLog(entries: DailyLogEntry[]): number {
   if (entries.length === 0) {
@@ -52,7 +52,11 @@ export function calculateInitialCapitalFromDailyLog(entries: DailyLogEntry[]): n
     new Date(a.date).getTime() - new Date(b.date).getTime()
   )
 
-  return sortedEntries[0].netLiquidity
+  const firstEntry = sortedEntries[0]
+
+  // Initial capital = Net Liquidity - Daily P/L
+  // This accounts for any P/L that occurred on the first day
+  return firstEntry.netLiquidity - firstEntry.dailyPl
 }
 
 /**

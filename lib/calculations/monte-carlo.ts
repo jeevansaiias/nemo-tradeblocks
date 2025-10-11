@@ -24,8 +24,8 @@ export interface MonteCarloParams {
    */
   resampleWindow?: number;
 
-  /** Resample from individual trades or daily returns */
-  resampleMethod: "trades" | "daily";
+  /** Resample from individual trades, daily returns, or percentage returns */
+  resampleMethod: "trades" | "daily" | "percentage";
 
   /** Starting capital for simulations */
   initialCapital: number;
@@ -322,6 +322,75 @@ export function getDailyResamplePool(
 }
 
 /**
+ * Calculate percentage returns from trades based on capital at trade time
+ * This properly accounts for compounding strategies where position sizes grow with equity
+ *
+ * @param trades - Trades to calculate percentage returns from
+ * @param initialCapital - Starting capital
+ * @param normalizeTo1Lot - Whether to scale P&L to 1-lot before calculating percentage
+ * @returns Array of percentage returns (as decimals, e.g., 0.05 = 5%)
+ */
+export function calculatePercentageReturns(
+  trades: Trade[],
+  initialCapital: number,
+  normalizeTo1Lot?: boolean
+): number[] {
+  if (trades.length === 0) {
+    return [];
+  }
+
+  // Sort trades by date to ensure proper chronological order
+  const sortedTrades = [...trades].sort(
+    (a, b) => a.dateOpened.getTime() - b.dateOpened.getTime()
+  );
+
+  const percentageReturns: number[] = [];
+  let capital = initialCapital;
+
+  for (const trade of sortedTrades) {
+    if (capital <= 0) {
+      // Account is busted, treat remaining returns as 0
+      percentageReturns.push(0);
+      continue;
+    }
+
+    // Get trade P&L (optionally normalized)
+    const pl = normalizeTo1Lot ? scaleTradeToOneLot(trade) : trade.pl;
+
+    // Calculate percentage return based on capital at trade time
+    const percentageReturn = pl / capital;
+    percentageReturns.push(percentageReturn);
+
+    // Update capital for next trade
+    capital += pl;
+  }
+
+  return percentageReturns;
+}
+
+/**
+ * Get the resample pool from percentage returns data
+ *
+ * @param percentageReturns - All percentage returns
+ * @param resampleWindow - Number of recent returns to use (undefined = all)
+ * @returns Array of percentage returns to resample from
+ */
+export function getPercentageResamplePool(
+  percentageReturns: number[],
+  resampleWindow?: number
+): number[] {
+  if (
+    resampleWindow !== undefined &&
+    resampleWindow < percentageReturns.length
+  ) {
+    // Take the most recent N returns
+    return percentageReturns.slice(-resampleWindow);
+  }
+
+  return percentageReturns;
+}
+
+/**
  * Resample daily P&L values with replacement
  *
  * @param dailyPLs - Daily P&L values to resample from
@@ -344,15 +413,17 @@ export function resampleDailyPLs(
 /**
  * Run a single simulation path and calculate its metrics
  *
- * @param resampledPLs - Array of resampled P&L values
+ * @param resampledValues - Array of resampled values (either P&L or percentage returns)
  * @param initialCapital - Starting capital
  * @param tradesPerYear - Number of trades per year for annualization
+ * @param isPercentageMode - Whether values are percentage returns (true) or dollar P&L (false)
  * @returns SimulationPath with equity curve and metrics
  */
 function runSingleSimulation(
-  resampledPLs: number[],
+  resampledValues: number[],
   initialCapital: number,
-  tradesPerYear: number
+  tradesPerYear: number,
+  isPercentageMode: boolean = false
 ): SimulationPath {
   // Track capital over time
   let capital = initialCapital;
@@ -360,9 +431,17 @@ function runSingleSimulation(
   const returns: number[] = [];
 
   // Build equity curve (as cumulative returns from starting capital)
-  for (const pl of resampledPLs) {
+  for (const value of resampledValues) {
     const capitalBeforeTrade = capital;
-    capital += pl;
+
+    if (isPercentageMode) {
+      // Value is a percentage return - apply it to current capital
+      capital = capital * (1 + value);
+    } else {
+      // Value is dollar P&L - add it to capital
+      capital += value;
+    }
+
     const cumulativeReturn = (capital - initialCapital) / initialCapital;
     equityCurve.push(cumulativeReturn);
 
@@ -379,7 +458,7 @@ function runSingleSimulation(
   const totalReturn = (finalValue - initialCapital) / initialCapital;
 
   // Annualized return
-  const numTrades = resampledPLs.length;
+  const numTrades = resampledValues.length;
   const yearsElapsed = numTrades / tradesPerYear;
   const annualizedReturn =
     yearsElapsed > 0
@@ -484,6 +563,7 @@ export function runMonteCarloSimulation(
   // Get resample pool based on method
   let resamplePool: number[];
   let actualResamplePoolSize: number;
+  const isPercentageMode = params.resampleMethod === "percentage";
 
   if (params.resampleMethod === "trades") {
     // Individual trade P&L resampling
@@ -497,7 +577,7 @@ export function runMonteCarloSimulation(
     resamplePool = tradePool.map((t) =>
       params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl
     );
-  } else {
+  } else if (params.resampleMethod === "daily") {
     // Daily returns resampling
     const filteredTrades =
       params.strategy && params.strategy !== "all"
@@ -514,6 +594,24 @@ export function runMonteCarloSimulation(
     );
     actualResamplePoolSize = dailyPLs.length;
     resamplePool = dailyPLs;
+  } else {
+    // Percentage returns resampling (for compounding strategies)
+    const filteredTrades =
+      params.strategy && params.strategy !== "all"
+        ? trades.filter((t) => t.strategy === params.strategy)
+        : trades;
+
+    const percentageReturns = calculatePercentageReturns(
+      filteredTrades,
+      params.initialCapital,
+      params.normalizeTo1Lot
+    );
+    const percentagePool = getPercentageResamplePool(
+      percentageReturns,
+      params.resampleWindow
+    );
+    actualResamplePoolSize = percentagePool.length;
+    resamplePool = percentagePool;
   }
 
   // Validate resample pool size
@@ -541,7 +639,8 @@ export function runMonteCarloSimulation(
     const simulation = runSingleSimulation(
       resampledPLs,
       params.initialCapital,
-      params.tradesPerYear
+      params.tradesPerYear,
+      isPercentageMode
     );
 
     simulations.push(simulation);
