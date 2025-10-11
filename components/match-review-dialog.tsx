@@ -27,7 +27,7 @@ import type { TradePair } from "@/lib/models/strategy-alignment";
 import type { NormalizedTrade } from "@/lib/services/trade-reconciliation";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { Unlock, Link2, RotateCcw } from "lucide-react";
+import { Unlock, Link2, RotateCcw, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface MatchReviewDialogProps {
   alignment: AlignedTradeSet | null;
@@ -36,6 +36,18 @@ interface MatchReviewDialogProps {
   onSave: (tradePairs: TradePair[]) => void;
   normalizeTo1Lot?: boolean;
   onNormalizeTo1LotChange?: (value: boolean) => void;
+}
+
+interface SessionStats {
+  session: string;
+  matchedCount: number;
+  unmatchedBacktestedCount: number;
+  unmatchedReportedCount: number;
+  backtestedCount: number;
+  reportedCount: number;
+  matchableCount: number;
+  matchRate: number;
+  hasUnmatched: boolean;
 }
 
 export function MatchReviewDialog({
@@ -50,6 +62,9 @@ export function MatchReviewDialog({
   const [selectedBacktested, setSelectedBacktested] = useState<string | null>(null);
   const [selectedReported, setSelectedReported] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [sessionFilter, setSessionFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<'all' | 'last7' | 'last30' | 'last90'>('all');
 
   useEffect(() => {
     if (alignment && open) {
@@ -79,6 +94,9 @@ export function MatchReviewDialog({
       setConfirmedPairs(loadedPairs);
       setSelectedBacktested(null);
       setSelectedReported(null);
+      setSelectedSession(null); // Reset to session selection view
+      setSessionFilter('all'); // Reset filter
+      setDateRangeFilter('all'); // Reset date filter
     }
   }, [alignment, open]);
 
@@ -186,19 +204,310 @@ export function MatchReviewDialog({
     );
   }
 
-  // Get paired trade IDs
-  const pairedBacktestedIds = new Set(confirmedPairs.map((p) => p.backtestedId));
-  const pairedReportedIds = new Set(confirmedPairs.map((p) => p.reportedId));
+  // Calculate session stats
+  const sessionStats: SessionStats[] = alignment.sessions.map((sessionMatch) => {
+    const pairedIds = new Set(
+      confirmedPairs
+        .filter((pair) => {
+          const bt = alignment.backtestedTrades.find(t => t.id === pair.backtestedId);
+          return bt?.session === sessionMatch.session;
+        })
+        .flatMap(p => [p.backtestedId, p.reportedId])
+    );
 
-  // Get unmatched trades
-  const unmatchedBacktested = alignment.backtestedTrades.filter(
+    const sessionBacktested = alignment.backtestedTrades.filter(t => t.session === sessionMatch.session);
+    const sessionReported = alignment.reportedTrades.filter(t => t.session === sessionMatch.session);
+
+    const unmatchedBT = sessionBacktested.filter(t => !pairedIds.has(t.id)).length;
+    const unmatchedRPT = sessionReported.filter(t => !pairedIds.has(t.id)).length;
+    const backtestedCount = sessionBacktested.length;
+    const reportedCount = sessionReported.length;
+    const matched = Math.min(
+      backtestedCount - unmatchedBT,
+      reportedCount - unmatchedRPT
+    );
+    const matchableCount = Math.min(backtestedCount, reportedCount);
+    const matchRate = matchableCount === 0 ? 0 : matched / matchableCount;
+
+    return {
+      session: sessionMatch.session,
+      matchedCount: matched,
+      unmatchedBacktestedCount: unmatchedBT,
+      unmatchedReportedCount: unmatchedRPT,
+      backtestedCount,
+      reportedCount,
+      matchableCount,
+      matchRate,
+      hasUnmatched: unmatchedBT > 0 || unmatchedRPT > 0,
+    };
+  });
+
+  // If no session selected, show session selection view
+  if (!selectedSession) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="h-[85vh] w-full flex flex-col sm:max-w-[calc(100vw-2rem)] md:max-w-5xl xl:max-w-6xl">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Review Trade Matches</DialogTitle>
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Backtested:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {alignment.backtestedStrategy}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Reported:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {alignment.reportedStrategy}
+                </span>
+              </div>
+            </div>
+            <DialogDescription>
+              Adjust which backtested trades to compare against the reported executions.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto min-h-0 py-6 space-y-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Reported Sessions</h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={sessionFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSessionFilter('all')}
+                    className="h-8 text-xs"
+                  >
+                    All ({sessionStats.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={sessionFilter === 'matched' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSessionFilter('matched')}
+                    className="h-8 text-xs"
+                  >
+                    Matched ({sessionStats.filter(s => !s.hasUnmatched).length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={sessionFilter === 'unmatched' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSessionFilter('unmatched')}
+                    className="h-8 text-xs"
+                  >
+                    Needs Review ({sessionStats.filter(s => s.hasUnmatched).length})
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Date Range:</span>
+                <Button
+                  type="button"
+                  variant={dateRangeFilter === 'all' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setDateRangeFilter('all')}
+                  className="h-7 text-xs px-2"
+                >
+                  All Time
+                </Button>
+                <Button
+                  type="button"
+                  variant={dateRangeFilter === 'last7' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setDateRangeFilter('last7')}
+                  className="h-7 text-xs px-2"
+                >
+                  Last 7 Days
+                </Button>
+                <Button
+                  type="button"
+                  variant={dateRangeFilter === 'last30' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setDateRangeFilter('last30')}
+                  className="h-7 text-xs px-2"
+                >
+                  Last 30 Days
+                </Button>
+                <Button
+                  type="button"
+                  variant={dateRangeFilter === 'last90' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setDateRangeFilter('last90')}
+                  className="h-7 text-xs px-2"
+                >
+                  Last 90 Days
+                </Button>
+              </div>
+            </div>
+            <div className="grid auto-rows-fr grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {sessionStats
+                .filter((stats) => {
+                  // Match status filter
+                  if (sessionFilter === 'matched' && stats.hasUnmatched) return false;
+                  if (sessionFilter === 'unmatched' && !stats.hasUnmatched) return false;
+
+                  // Date range filter
+                  if (dateRangeFilter !== 'all') {
+                    const sessionDate = new Date(stats.session);
+                    const now = new Date();
+                    const daysAgo = (now.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24);
+
+                    if (dateRangeFilter === 'last7' && daysAgo > 7) return false;
+                    if (dateRangeFilter === 'last30' && daysAgo > 30) return false;
+                    if (dateRangeFilter === 'last90' && daysAgo > 90) return false;
+                  }
+
+                  return true;
+                })
+                .map((stats) => {
+                  const matchPercent = Math.round(stats.matchRate * 100);
+                  return (
+                    <button
+                      key={stats.session}
+                      type="button"
+                      onClick={() => setSelectedSession(stats.session)}
+                      className={cn(
+                        "group relative flex h-full min-w-[240px] flex-col rounded-xl border px-5 py-5 text-left shadow-sm transition-all",
+                        "hover:-translate-y-[1px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2",
+                        stats.hasUnmatched
+                          ? "border-amber-400/70 bg-amber-50/80 dark:border-amber-500/60 dark:bg-amber-500/10"
+                          : "border-emerald-400/70 bg-emerald-50/80 dark:border-emerald-500/60 dark:bg-emerald-500/10"
+                      )}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Session
+                          </div>
+                          <div className="mt-1 text-lg font-semibold leading-tight text-foreground">
+                            {formatSessionDate(stats.session)}
+                          </div>
+                        </div>
+                        <Badge
+                          variant={stats.hasUnmatched ? "outline" : "secondary"}
+                          className={cn(
+                            "text-xs font-medium shrink-0",
+                            stats.hasUnmatched
+                              ? "border-amber-400 text-amber-700 dark:border-amber-500/70 dark:text-amber-200"
+                              : "border-transparent bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200"
+                          )}
+                        >
+                          {stats.hasUnmatched ? "Needs Review" : "All Matched"}
+                        </Badge>
+                      </div>
+                      <div className="mt-4 flex items-center gap-2 text-sm font-medium">
+                        {stats.hasUnmatched ? (
+                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        )}
+                        <span
+                          className={cn(
+                            stats.hasUnmatched
+                              ? "text-amber-700 dark:text-amber-200"
+                              : "text-emerald-700 dark:text-emerald-200"
+                          )}
+                        >
+                          {stats.hasUnmatched
+                            ? `${stats.matchedCount} of ${stats.matchableCount} trades matched`
+                            : `${stats.matchedCount} trade${stats.matchedCount === 1 ? "" : "s"} matched`}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                        <div className="rounded-lg border border-muted bg-muted/40 px-3 py-2 transition-colors group-hover:bg-muted/60">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            Backtested
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-foreground">
+                            {stats.backtestedCount}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {stats.unmatchedBacktestedCount > 0 ? `${stats.unmatchedBacktestedCount} unmatched` : "No unmatched"}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-muted bg-muted/40 px-3 py-2 transition-colors group-hover:bg-muted/60">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                            Reported
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-foreground">
+                            {stats.reportedCount}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {stats.unmatchedReportedCount > 0 ? `${stats.unmatchedReportedCount} unmatched` : "No unmatched"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              stats.hasUnmatched
+                                ? "bg-amber-400/80 dark:bg-amber-500/70"
+                                : "bg-emerald-400/80 dark:bg-emerald-500/70"
+                            )}
+                            style={{
+                              width: stats.matchableCount === 0 ? "100%" : `${matchPercent}%`,
+                              opacity: stats.matchableCount === 0 ? 0.35 : 1,
+                            }}
+                          />
+                        </div>
+                        <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {stats.matchableCount === 0 ? "No comparable trades yet" : `Match Rate ${matchPercent}%`}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 border-t pt-4">
+            <Button
+              type="button"
+              onClick={() => onOpenChange(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Session detail view - filter trades to selected session
+  const sessionBacktestedTrades = alignment.backtestedTrades.filter(
+    (trade) => trade.session === selectedSession
+  );
+  const sessionReportedTrades = alignment.reportedTrades.filter(
+    (trade) => trade.session === selectedSession
+  );
+
+  // Get paired trade IDs for this session
+  const sessionPairs = confirmedPairs.filter((pair) => {
+    const bt = alignment.backtestedTrades.find(t => t.id === pair.backtestedId);
+    return bt?.session === selectedSession;
+  });
+
+  const pairedBacktestedIds = new Set(sessionPairs.map((p) => p.backtestedId));
+  const pairedReportedIds = new Set(sessionPairs.map((p) => p.reportedId));
+
+  // Get unmatched trades for this session
+  const unmatchedBacktested = sessionBacktestedTrades.filter(
     (trade) => !pairedBacktestedIds.has(trade.id)
   );
-  const unmatchedReported = alignment.reportedTrades.filter(
+  const unmatchedReported = sessionReportedTrades.filter(
     (trade) => !pairedReportedIds.has(trade.id)
   );
 
-  // Build trade lookup maps
+  // Build trade lookup maps (still need full alignment for lookups)
   const backtestedById = new Map(
     alignment.backtestedTrades.map((t) => [t.id, t])
   );
@@ -212,7 +521,20 @@ export function MatchReviewDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="h-[90vh] w-[calc(100vw-4rem)] !max-w-[calc(100vw-4rem)] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Review Trade Matches</DialogTitle>
+          <div className="flex items-center gap-3 mb-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedSession(null)}
+              className="h-8 w-8 p-0"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1">
+              <DialogTitle>Review Trade Matches - {formatSessionDate(selectedSession)}</DialogTitle>
+            </div>
+          </div>
           <div className="space-y-1 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -253,7 +575,7 @@ export function MatchReviewDialog({
               <div>
                 <div className="text-sm font-semibold text-green-700 dark:text-green-400">Confirmed Pairs</div>
                 <div className="text-xs text-muted-foreground">
-                  {confirmedPairs.length} matched {confirmedPairs.length === 1 ? 'pair' : 'pairs'}
+                  {sessionPairs.length} matched {sessionPairs.length === 1 ? 'pair' : 'pairs'}
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -280,13 +602,13 @@ export function MatchReviewDialog({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {confirmedPairs.length === 0 ? (
+              {sessionPairs.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
                   No confirmed pairs yet. Select trades below to create manual matches.
                 </div>
               ) : (
                 <div className="divide-y">
-                  {confirmedPairs.map((pair) => {
+                  {sessionPairs.map((pair) => {
                     const backtested = backtestedById.get(pair.backtestedId);
                     const reported = reportedById.get(pair.reportedId);
 
@@ -427,15 +749,15 @@ export function MatchReviewDialog({
 
         <DialogFooter className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            {confirmedPairs.length} pairs • {unmatchedBacktested.length} unmatched BT • {unmatchedReported.length} unmatched RPT
+            {sessionPairs.length} pairs • {unmatchedBacktested.length} unmatched BT • {unmatchedReported.length} unmatched RPT
           </div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => setSelectedSession(null)}
             >
-              Cancel
+              Back to Sessions
             </Button>
             <Button
               type="button"
@@ -578,4 +900,14 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatSessionDate(session: string): string {
+  // Session format is typically "YYYY-MM-DD"
+  const date = new Date(session);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
