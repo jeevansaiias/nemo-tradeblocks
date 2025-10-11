@@ -138,6 +138,9 @@ export class PortfolioStatsCalculator {
     // Periodic win rates
     const periodicWinRates = this.calculatePeriodicWinRates(validTrades)
 
+    // Calculate initial capital (prefer daily logs when available)
+    const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(validTrades, adjustedDailyLogs)
+
     return {
       totalTrades,
       totalPl,
@@ -165,6 +168,7 @@ export class PortfolioStatsCalculator {
       totalCommissions,
       netPl,
       profitFactor,
+      initialCapital,
     }
   }
 
@@ -730,15 +734,35 @@ export class PortfolioStatsCalculator {
       totalCommissions: 0,
       netPl: 0,
       profitFactor: 0,
+      initialCapital: 0,
     }
   }
 
   /**
-   * Calculate initial capital from trades
+   * Calculate initial capital from trades and/or daily logs
+   *
+   * @param trades - Trade data
+   * @param dailyLogEntries - Optional daily log entries (preferred when available)
+   * @returns Initial capital before any P/L
+   *
+   * When daily logs are provided, calculates: firstEntry.netLiquidity - firstEntry.dailyPl
+   * Otherwise, calculates: firstTrade.fundsAtClose - firstTrade.pl
    */
-  static calculateInitialCapital(trades: Trade[]): number {
+  static calculateInitialCapital(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): number {
     if (trades.length === 0) return 0
 
+    // Prefer daily log data when available for more accurate initial capital
+    if (dailyLogEntries && dailyLogEntries.length > 0) {
+      const sortedEntries = [...dailyLogEntries].sort((a, b) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      )
+      const firstEntry = sortedEntries[0]
+      // Initial capital = Net Liquidity - Daily P/L
+      // This accounts for any P/L that occurred on the first day
+      return firstEntry.netLiquidity - firstEntry.dailyPl
+    }
+
+    // Fall back to trade-based calculation
     // Sort trades chronologically
     const sortedTrades = [...trades].sort((a, b) => {
       const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()

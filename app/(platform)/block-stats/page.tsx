@@ -143,8 +143,9 @@ export default function BlockStatsPage() {
   };
 
   const getInitialCapital = () => {
-    if (filteredTrades.length === 0) return 0;
-    return PortfolioStatsCalculator.calculateInitialCapital(filteredTrades);
+    // Use the initial capital from portfolioStats which properly accounts for daily logs
+    if (!portfolioStats) return 0;
+    return portfolioStats.initialCapital;
   };
 
   const getAvgReturnOnMargin = () => {

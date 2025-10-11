@@ -37,7 +37,7 @@ import {
   REQUIRED_TRADE_COLUMNS,
   TRADE_COLUMN_ALIASES,
 } from "@/lib/models/trade";
-import { calculateInitialCapital } from "@/lib/processing/capital-calculator";
+import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import {
   DailyLogProcessingProgress,
   DailyLogProcessingResult,
@@ -648,13 +648,13 @@ export function BlockDialog({
         }
 
         // Calculate initial capital
-        initialCapital = calculateInitialCapital(
+        initialCapital = PortfolioStatsCalculator.calculateInitialCapital(
           adjustedTradeResult.trades,
           dailyResult?.entries
         );
       } else {
         // Calculate initial capital from trades only
-        initialCapital = calculateInitialCapital(adjustedTradeResult.trades);
+        initialCapital = PortfolioStatsCalculator.calculateInitialCapital(adjustedTradeResult.trades);
       }
 
       setProcessingStep("Calculating statistics...");

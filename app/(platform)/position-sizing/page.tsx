@@ -63,9 +63,11 @@ export default function PositionSizingPage() {
         setTrades(loadedTrades);
         setDailyLog(loadedDailyLog);
 
-        // Auto-detect starting capital
-        const calculatedCapital =
-          PortfolioStatsCalculator.calculateInitialCapital(loadedTrades);
+        // Auto-detect starting capital (prefer daily log when available)
+        const calculatedCapital = PortfolioStatsCalculator.calculateInitialCapital(
+          loadedTrades,
+          loadedDailyLog.length > 0 ? loadedDailyLog : undefined
+        );
         setStartingCapital(calculatedCapital > 0 ? calculatedCapital : 100000);
 
         // Initialize all strategies as selected with 100%

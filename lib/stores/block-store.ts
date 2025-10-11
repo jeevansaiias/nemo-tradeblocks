@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock } from '../db'
+import { getAllBlocks, getBlock, updateBlock as dbUpdateBlock, deleteBlock as dbDeleteBlock, getTradesByBlock, getDailyLogsByBlock, updateBlockStats } from '../db'
 import { ProcessedBlock } from '../models/block'
-// import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
+import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
 
 export interface Block {
   id: string
@@ -350,29 +350,26 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       console.log(`Recalculating stats for ${trades.length} trades and ${dailyLogs.length} daily logs`)
 
       // Recalculate all stats using the current calculation engine
-      // const calculator = new PortfolioStatsCalculator({
-      //   riskFreeRate: 2.0, // Default rate, could be made configurable
-      // })
+      const calculator = new PortfolioStatsCalculator({
+        riskFreeRate: processedBlock.analysisConfig?.riskFreeRate || 2.0,
+      })
 
-      // const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs)
+      const portfolioStats = calculator.calculatePortfolioStats(trades, dailyLogs)
+      const strategyStats = calculator.calculateStrategyStats(trades)
 
-      // Calculate basic stats for the UI
-      const basicStats = trades.length > 0 ? {
-        totalPnL: trades.reduce((sum, trade) => sum + trade.pl, 0),
-        winRate: (trades.filter(t => t.pl > 0).length / trades.length) * 100,
-        totalTrades: trades.length,
-        avgWin: trades.filter(t => t.pl > 0).length > 0
-          ? trades.filter(t => t.pl > 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl > 0).length
-          : 0,
-        avgLoss: trades.filter(t => t.pl < 0).length > 0
-          ? trades.filter(t => t.pl < 0).reduce((sum, t) => sum + t.pl, 0) / trades.filter(t => t.pl < 0).length
-          : 0,
-      } : {
-        totalPnL: 0,
-        winRate: 0,
-        totalTrades: 0,
-        avgWin: 0,
-        avgLoss: 0,
+      // Update ProcessedBlock stats in database
+      await updateBlockStats(id, portfolioStats, strategyStats)
+
+      // Update lastModified timestamp
+      await dbUpdateBlock(id, { lastModified: new Date() })
+
+      // Calculate basic stats for the UI (Block interface)
+      const basicStats = {
+        totalPnL: portfolioStats.totalPl,
+        winRate: portfolioStats.winRate * 100, // Convert to percentage for Block interface
+        totalTrades: portfolioStats.totalTrades,
+        avgWin: portfolioStats.avgWin,
+        avgLoss: portfolioStats.avgLoss,
       }
 
       // Create updated block for store
@@ -387,7 +384,7 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         )
       }))
 
-      console.log('Block recalculation completed successfully')
+      console.log('Block recalculation completed successfully. Initial capital:', portfolioStats.initialCapital)
     } catch (error) {
       console.error('Failed to recalculate block:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to recalculate block' })
