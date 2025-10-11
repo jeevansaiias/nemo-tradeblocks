@@ -4,9 +4,9 @@ import {
   IconChartHistogram,
   IconGauge,
   IconLayoutDashboard,
+  IconLink,
   IconRouteSquare,
   IconStack2,
-  IconLink,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
 import Link from "next/link";
@@ -43,6 +43,7 @@ const navData = {
       title: "Comparison Blocks",
       href: "/comparison-blocks",
       icon: IconLink,
+      badge: "Beta",
     },
     {
       title: "Position Sizing",

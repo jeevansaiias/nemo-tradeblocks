@@ -20,7 +20,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   getReportingTradesByBlock,
   getTradesByBlock,
@@ -98,6 +106,7 @@ export default function ComparisonBlocksPage() {
     null
   );
   const [dialogNote, setDialogNote] = useState("");
+  const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
 
   useEffect(() => {
     if (!activeBlock) {
@@ -178,8 +187,8 @@ export default function ComparisonBlocksPage() {
       return;
     }
 
-    refreshComparison(activeBlockId, alignments).catch(console.error);
-  }, [activeBlockId, alignments, refreshComparison, resetComparison]);
+    refreshComparison(activeBlockId, alignments, normalizeTo1Lot).catch(console.error);
+  }, [activeBlockId, alignments, normalizeTo1Lot, refreshComparison, resetComparison]);
 
   const alignmentCoverage = useMemo(() => {
     const reportingCovered = new Set<string>();
@@ -433,8 +442,7 @@ export default function ComparisonBlocksPage() {
 
   const handleSaveMatchOverrides = async (
     alignmentId: string,
-    backtestedIds: string[],
-    reportedIds: string[],
+    tradePairs: import("@/lib/models/strategy-alignment").TradePair[],
   ) => {
     const autoData = comparisonData?.alignments.find(
       (alignment) => alignment.alignmentId === alignmentId,
@@ -445,22 +453,19 @@ export default function ComparisonBlocksPage() {
       return
     }
 
-    const backSet = new Set(backtestedIds)
-    const reportedSet = new Set(reportedIds)
-    const autoBackSet = new Set(autoData.autoSelectedBacktestedIds)
-    const autoReportedSet = new Set(autoData.autoSelectedReportedIds)
-
-    const shouldStore =
-      !setsEqual(backSet, autoBackSet) || !setsEqual(reportedSet, autoReportedSet)
+    // Check if the pairs differ from auto-matched pairs
+    const hasManualPairs = tradePairs.some(p => p.manual)
+    const shouldStore = hasManualPairs || tradePairs.length !== autoData.autoSelectedBacktestedIds.length
 
     const nextAlignments = alignments.map((alignment) =>
       alignment.id === alignmentId
         ? {
             ...alignment,
-            matchOverrides: shouldStore
+            matchOverrides: shouldStore && tradePairs.length > 0
               ? {
-                  selectedBacktestedIds: Array.from(backSet),
-                  selectedReportedIds: Array.from(reportedSet),
+                  selectedBacktestedIds: [],
+                  selectedReportedIds: [],
+                  tradePairs,
                 }
               : undefined,
           }
@@ -645,7 +650,22 @@ export default function ComparisonBlocksPage() {
         </Card>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="normalize-1lot"
+            checked={normalizeTo1Lot}
+            onCheckedChange={setNormalizeTo1Lot}
+          />
+          <Label htmlFor="normalize-1lot" className="cursor-pointer text-sm">
+            Normalize to 1-lot
+          </Label>
+          <span className="text-xs text-muted-foreground">
+            {normalizeTo1Lot
+              ? "Showing per-contract values"
+              : "Showing actual trade values"}
+          </span>
+        </div>
         <Button
           type="button"
           onClick={openCreateDialog}
@@ -784,7 +804,24 @@ export default function ComparisonBlocksPage() {
                     Trade<br />Comparison
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Fill<br />Match
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger className="cursor-help">
+                          Fill<br />Match
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-xs">
+                            Percentage of trades that were successfully matched between backtested and reported results.
+                          </p>
+                          <p className="text-xs mt-2">
+                            Calculated as: <strong>matched pairs / max(backtested, reported)</strong>
+                          </p>
+                          <p className="text-xs mt-2 text-muted-foreground">
+                            Lower percentages indicate missing trades on either side or timing differences that prevented automatic matching.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </th>
                   <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Slippage /<br />Contract
@@ -894,11 +931,13 @@ export default function ComparisonBlocksPage() {
         onOpenChange={(open) => {
           if (!open) setMatchDialogAlignmentId(null)
         }}
-        onSave={(backIds, reportedIds) => {
+        onSave={(tradePairs) => {
           if (matchDialogAlignmentId) {
-            handleSaveMatchOverrides(matchDialogAlignmentId, backIds, reportedIds)
+            handleSaveMatchOverrides(matchDialogAlignmentId, tradePairs)
           }
         }}
+        normalizeTo1Lot={normalizeTo1Lot}
+        onNormalizeTo1LotChange={setNormalizeTo1Lot}
       />
     </div>
   );
@@ -956,13 +995,6 @@ function getDeltaClass(value: number): string {
   return "text-muted-foreground";
 }
 
-function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
-  if (a.size !== b.size) return false
-  for (const value of a) {
-    if (!b.has(value)) return false
-  }
-  return true
-}
 
 function MappingDialog({
   open,

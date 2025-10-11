@@ -10,7 +10,7 @@ interface ComparisonStoreState {
   error: string | null
   data: ReconciliationPayload | null
   lastBlockId: string | null
-  refresh: (blockId: string, alignments: StrategyAlignment[]) => Promise<void>
+  refresh: (blockId: string, alignments: StrategyAlignment[], normalizeTo1Lot?: boolean) => Promise<void>
   reset: () => void
 }
 
@@ -20,11 +20,11 @@ export const useComparisonStore = create<ComparisonStoreState>((set) => ({
   data: null,
   lastBlockId: null,
 
-  refresh: async (blockId, alignments) => {
+  refresh: async (blockId, alignments, normalizeTo1Lot = false) => {
     set({ isLoading: true, error: null, lastBlockId: blockId })
 
     try {
-      const payload = await buildTradeReconciliation(blockId, alignments)
+      const payload = await buildTradeReconciliation(blockId, alignments, normalizeTo1Lot)
       set({ data: payload, isLoading: false })
     } catch (error) {
       set({

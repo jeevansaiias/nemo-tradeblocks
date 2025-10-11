@@ -19,6 +19,7 @@ export interface NormalizedTrade {
   pl: number
   openingFees: number
   closingFees: number
+  legs?: string
 }
 
 export interface TradeSessionMatchItem {
@@ -91,6 +92,7 @@ interface AutoMatchResult {
 export async function buildTradeReconciliation(
   blockId: string,
   alignments: StrategyAlignment[],
+  normalizeTo1Lot = false,
 ): Promise<ReconciliationPayload> {
   const [backtestedTrades, reportedTrades] = await Promise.all([
     getTradesByBlock(blockId),
@@ -104,7 +106,7 @@ export async function buildTradeReconciliation(
   const reportedByStrategy = groupByStrategy(normalizedReported)
 
   const alignmentSets: AlignedTradeSet[] = alignments.map((alignment) =>
-    buildAlignmentSet(alignment, backtestedByStrategy, reportedByStrategy),
+    buildAlignmentSet(alignment, backtestedByStrategy, reportedByStrategy, normalizeTo1Lot),
   )
 
   const alignedReported = new Set(
@@ -132,6 +134,7 @@ function buildAlignmentSet(
   alignment: StrategyAlignment,
   backtestedByStrategy: Map<string, NormalizedTrade[]>,
   reportedByStrategy: Map<string, NormalizedTrade[]>,
+  normalizeTo1Lot: boolean,
 ): AlignedTradeSet {
   const backtestedStrategy = alignment.liveStrategies[0] ?? 'Unknown'
   const reportedStrategy = alignment.reportingStrategies[0] ?? 'Unknown'
@@ -233,6 +236,7 @@ function buildAlignmentSet(
     includedBacktestedTrades,
     includedReportedTrades,
     matchedPairs,
+    normalizeTo1Lot,
   )
 
   if (process.env.NODE_ENV !== 'production') {
@@ -291,6 +295,7 @@ function normalizeBacktestedTrade(trade: Trade): NormalizedTrade {
     pl: trade.pl,
     openingFees: trade.openingCommissionsFees ?? 0,
     closingFees: trade.closingCommissionsFees ?? 0,
+    legs: trade.legs,
   }
 }
 
@@ -313,6 +318,7 @@ function normalizeReportedTrade(trade: ReportingTrade): NormalizedTrade {
     pl: trade.pl,
     openingFees: 0,
     closingFees: 0,
+    legs: trade.legs,
   }
 }
 
@@ -349,7 +355,6 @@ function autoMatchTrades(
         const candidate = findBestWithinTolerance(
           reported,
           backtestedList,
-          index,
         )
 
         if (candidate) {
@@ -407,21 +412,12 @@ function buildMatchResultFromPairs(
 function findBestWithinTolerance(
   reported: NormalizedTrade,
   candidates: NormalizedTrade[],
-  indexHint: number,
 ): NormalizedTrade | undefined {
   if (candidates.length === 0) {
     return undefined
   }
 
-  const preferred = candidates[indexHint]
-  if (preferred) {
-    const diff = Math.abs(preferred.sortTime - reported.sortTime)
-    if (diff <= MATCH_TOLERANCE_MS) {
-      candidates.splice(indexHint, 1)
-      return preferred
-    }
-  }
-
+  // Find the closest match by time within tolerance
   let bestIdx = -1
   let bestDiff = Number.POSITIVE_INFINITY
 
@@ -541,9 +537,10 @@ function buildMetrics(
   selectedBacktested: NormalizedTrade[],
   selectedReported: NormalizedTrade[],
   matchedPairs: MatchedPair[],
+  normalizeTo1Lot: boolean,
 ): AlignmentMetrics {
-  const backtestedTotals = calculateTradeTotals(selectedBacktested)
-  const reportedTotals = calculateTradeTotals(selectedReported)
+  const backtestedTotals = calculateTradeTotals(selectedBacktested, normalizeTo1Lot)
+  const reportedTotals = calculateTradeTotals(selectedReported, normalizeTo1Lot)
   const deltaTotals = calculateDeltaTotals(backtestedTotals, reportedTotals)
 
   const matchedBacktestedContracts = matchedPairs.reduce(
@@ -569,10 +566,12 @@ function buildMetrics(
         ) / matchedBacktestedContracts
       : 0
 
-  const matchRate =
-    backtestedTotals.tradeCount > 0
-      ? matchedPairs.length / backtestedTotals.tradeCount
-      : 0
+  // Calculate match rate as percentage of matched pairs out of the larger dataset
+  // This gives a more realistic alignment quality metric
+  const totalTrades = Math.max(backtestedTotals.tradeCount, reportedTotals.tradeCount)
+  const matchRate = totalTrades > 0
+    ? matchedPairs.length / totalTrades
+    : 0
 
   return {
     backtested: backtestedTotals,
@@ -584,15 +583,30 @@ function buildMetrics(
   }
 }
 
-function calculateTradeTotals(trades: NormalizedTrade[]): TradeTotals {
+function calculateTradeTotals(trades: NormalizedTrade[], normalizeTo1Lot: boolean): TradeTotals {
   const tradeCount = trades.length
-  const totalPl = trades.reduce((acc, trade) => acc + trade.pl, 0)
-  const totalPremium = trades.reduce((acc, trade) => acc + trade.totalPremium, 0)
-  const totalContracts = trades.reduce((acc, trade) => acc + trade.contracts, 0)
-  const totalFees = trades.reduce(
-    (acc, trade) => acc + trade.openingFees + trade.closingFees,
-    0,
-  )
+
+  // Scale values to per-contract if normalization is enabled
+  const totalPl = trades.reduce((acc, trade) => {
+    const pl = normalizeTo1Lot && trade.contracts > 0 ? trade.pl / trade.contracts : trade.pl
+    return acc + pl
+  }, 0)
+
+  const totalPremium = trades.reduce((acc, trade) => {
+    const premium = normalizeTo1Lot && trade.contracts > 0
+      ? trade.totalPremium / trade.contracts
+      : trade.totalPremium
+    return acc + premium
+  }, 0)
+
+  const totalContracts = normalizeTo1Lot ? tradeCount : trades.reduce((acc, trade) => acc + trade.contracts, 0)
+
+  const totalFees = trades.reduce((acc, trade) => {
+    const fees = normalizeTo1Lot && trade.contracts > 0
+      ? (trade.openingFees + trade.closingFees) / trade.contracts
+      : trade.openingFees + trade.closingFees
+    return acc + fees
+  }, 0)
 
   const avgPl = tradeCount > 0 ? totalPl / tradeCount : 0
   const avgPremiumPerContract =

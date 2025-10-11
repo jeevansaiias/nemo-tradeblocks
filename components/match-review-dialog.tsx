@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -11,15 +10,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import type { AlignedTradeSet } from "@/lib/stores/comparison-store";
+import type { TradePair } from "@/lib/models/strategy-alignment";
+import type { NormalizedTrade } from "@/lib/services/trade-reconciliation";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { Unlock, Link2, RotateCcw } from "lucide-react";
 
 interface MatchReviewDialogProps {
   alignment: AlignedTradeSet | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (backtestedIds: string[], reportedIds: string[]) => void;
+  onSave: (tradePairs: TradePair[]) => void;
+  normalizeTo1Lot?: boolean;
+  onNormalizeTo1LotChange?: (value: boolean) => void;
 }
 
 export function MatchReviewDialog({
@@ -27,79 +43,124 @@ export function MatchReviewDialog({
   open,
   onOpenChange,
   onSave,
+  normalizeTo1Lot = false,
+  onNormalizeTo1LotChange,
 }: MatchReviewDialogProps) {
-  const [selectedBacktested, setSelectedBacktested] = useState<Set<string>>(
-    new Set()
-  );
-  const [selectedReported, setSelectedReported] = useState<Set<string>>(
-    new Set()
-  );
-  const [activeSession, setActiveSession] = useState<string | null>(null);
-  const [backtestedFallbackToAll, setBacktestedFallbackToAll] = useState(false);
-  const [reportedFallbackToAll, setReportedFallbackToAll] = useState(false);
+  const [confirmedPairs, setConfirmedPairs] = useState<TradePair[]>([]);
+  const [selectedBacktested, setSelectedBacktested] = useState<string | null>(null);
+  const [selectedReported, setSelectedReported] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     if (alignment && open) {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[comparison] open match dialog", alignment.alignmentId, {
-          sessions: alignment.sessions.length,
-          autoBacktested: alignment.autoSelectedBacktestedIds.length,
-          autoReported: alignment.autoSelectedReportedIds.length,
+      // Build pairs from the session data
+      // When a user has saved custom pairs, they come through selectedBacktestedIds/selectedReportedIds
+      // We need to build the pairs from what's actually matched in sessions
+      const loadedPairs: TradePair[] = [];
+
+      alignment.sessions.forEach((session) => {
+        session.items.forEach((item) => {
+          // Only include items that have both backtested and reported trades
+          if (item.backtested && item.reported) {
+            // Determine if this is a manual pair or auto pair
+            // If it's auto-matched (autoBacktested && autoReported), it's auto
+            // Otherwise, it's a manual pairing
+            const isAuto = item.autoBacktested && item.autoReported;
+
+            loadedPairs.push({
+              backtestedId: item.backtested.id,
+              reportedId: item.reported.id,
+              manual: !isAuto,
+            });
+          }
         });
-      }
-      const selectionConfig = buildSelectionConfig(alignment, "selected");
-      setSelectedBacktested(selectionConfig.backSet);
-      setSelectedReported(selectionConfig.reportedSet);
-      setBacktestedFallbackToAll(selectionConfig.backFallback);
-      setReportedFallbackToAll(selectionConfig.reportedFallback);
-      setActiveSession(alignment.sessions[0]?.session ?? null);
+      });
+
+      setConfirmedPairs(loadedPairs);
+      setSelectedBacktested(null);
+      setSelectedReported(null);
     }
   }, [alignment, open]);
 
-  const toggleBacktested = (id: string | undefined, checked: boolean) => {
-    if (!id) return;
-    setBacktestedFallbackToAll(false);
-    setSelectedBacktested((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        next.add(id);
-      } else {
-        next.delete(id);
-      }
-      return next;
-    });
+  const handleUnlockPair = (pair: TradePair) => {
+    setConfirmedPairs((prev) => prev.filter(
+      (p) => !(p.backtestedId === pair.backtestedId && p.reportedId === pair.reportedId)
+    ));
   };
 
-  const toggleReported = (id: string | undefined, checked: boolean) => {
-    if (!id) return;
-    setReportedFallbackToAll(false);
-    setSelectedReported((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        next.add(id);
-      } else {
-        next.delete(id);
-      }
-      return next;
+  const handleCreateManualPair = () => {
+    if (!selectedBacktested || !selectedReported || !alignment) return;
+
+    const backtestedTrade = backtestedById.get(selectedBacktested);
+    const reportedTrade = reportedById.get(selectedReported);
+
+    if (!backtestedTrade || !reportedTrade) return;
+
+    const newPair: TradePair = {
+      backtestedId: selectedBacktested,
+      reportedId: selectedReported,
+      manual: true,
+    };
+
+    // Insert the pair in chronological order based on backtested trade time
+    setConfirmedPairs((prev) => {
+      const updated = [...prev, newPair];
+
+      // Sort by backtested trade sortTime
+      updated.sort((a, b) => {
+        const tradeA = backtestedById.get(a.backtestedId);
+        const tradeB = backtestedById.get(b.backtestedId);
+
+        if (!tradeA || !tradeB) return 0;
+
+        return tradeA.sortTime - tradeB.sortTime;
+      });
+
+      return updated;
     });
+
+    setSelectedBacktested(null);
+    setSelectedReported(null);
   };
 
-  const handleReset = () => {
+  const handleResetToAuto = () => {
+    // Check if there are any manual pairs
+    const hasManualPairs = confirmedPairs.some(p => p.manual);
+
+    if (hasManualPairs) {
+      // Show confirmation dialog
+      setShowResetConfirm(true);
+    } else {
+      // No manual pairs, safe to reset
+      confirmResetToAuto();
+    }
+  };
+
+  const confirmResetToAuto = () => {
     if (!alignment) return;
-    const config = buildSelectionConfig(alignment, "auto");
-    setSelectedBacktested(config.backSet);
-    setSelectedReported(config.reportedSet);
-    setBacktestedFallbackToAll(config.backFallback);
-    setReportedFallbackToAll(config.reportedFallback);
+
+    const autoPairs: TradePair[] = [];
+
+    alignment.sessions.forEach((session) => {
+      session.items.forEach((item) => {
+        if (item.backtested && item.reported && item.autoBacktested && item.autoReported) {
+          autoPairs.push({
+            backtestedId: item.backtested.id,
+            reportedId: item.reported.id,
+            manual: false,
+          });
+        }
+      });
+    });
+
+    setConfirmedPairs(autoPairs);
+    setSelectedBacktested(null);
+    setSelectedReported(null);
+    setShowResetConfirm(false);
   };
 
   const handleSave = () => {
-    if (!alignment) return;
-    const backIds = backtestedFallbackToAll
-      ? []
-      : Array.from(selectedBacktested);
-    const reportedIds = reportedFallbackToAll ? [] : Array.from(selectedReported);
-    onSave(backIds, reportedIds);
+    onSave(confirmedPairs);
   };
 
   const handleClose = (nextOpen: boolean) => {
@@ -110,453 +171,264 @@ export function MatchReviewDialog({
     }
   };
 
-  const activeSessionData =
-    alignment && activeSession
-      ? alignment.sessions.find((session) => session.session === activeSession) ??
-        null
-      : null;
+  if (!alignment) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Review Trade Matches</DialogTitle>
+            <DialogDescription>
+              Select a strategy mapping to review matches.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-  const sessionStats = activeSessionData
-    ? activeSessionData.items.reduce(
-        (acc, item) => {
-          if (item.backtested) {
-            acc.totalBacktested += 1;
-            if (selectedBacktested.has(item.backtested.id)) {
-              acc.selectedBacktested += 1;
-            }
-          }
+  // Get paired trade IDs
+  const pairedBacktestedIds = new Set(confirmedPairs.map((p) => p.backtestedId));
+  const pairedReportedIds = new Set(confirmedPairs.map((p) => p.reportedId));
 
-          if (item.reported) {
-            acc.totalReported += 1;
-            if (selectedReported.has(item.reported.id)) {
-              acc.selectedReported += 1;
-            }
-          }
+  // Get unmatched trades
+  const unmatchedBacktested = alignment.backtestedTrades.filter(
+    (trade) => !pairedBacktestedIds.has(trade.id)
+  );
+  const unmatchedReported = alignment.reportedTrades.filter(
+    (trade) => !pairedReportedIds.has(trade.id)
+  );
 
-          if (item.backtested && item.reported) {
-            acc.matchedPairs += 1;
-          }
+  // Build trade lookup maps
+  const backtestedById = new Map(
+    alignment.backtestedTrades.map((t) => [t.id, t])
+  );
+  const reportedById = new Map(
+    alignment.reportedTrades.map((t) => [t.id, t])
+  );
 
-          return acc;
-        },
-        {
-          matchedPairs: 0,
-          selectedBacktested: 0,
-          totalBacktested: 0,
-          selectedReported: 0,
-          totalReported: 0,
-        }
-      )
-    : null;
+  const canCreatePair = selectedBacktested && selectedReported;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="h-[90vh] w-[calc(100vw-4rem)] !max-w-[calc(100vw-4rem)] sm:!max-w-[calc(100vw-4rem)] flex flex-col">
+      <DialogContent className="h-[90vh] w-[calc(100vw-4rem)] !max-w-[calc(100vw-4rem)] flex flex-col">
         <DialogHeader>
           <DialogTitle>Review Trade Matches</DialogTitle>
-          {alignment && (
-            <div className="space-y-1 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Backtested:
-                </span>
-                <span className="font-semibold text-foreground">
-                  {alignment.backtestedStrategy}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Reported:
-                </span>
-                <span className="font-semibold text-foreground">
-                  {alignment.reportedStrategy}
-                </span>
-              </div>
+          <div className="space-y-1 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Backtested:
+              </span>
+              <span className="font-semibold text-foreground">
+                {alignment.backtestedStrategy}
+              </span>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Reported:
+              </span>
+              <span className="font-semibold text-foreground">
+                {alignment.reportedStrategy}
+              </span>
+            </div>
+            {normalizeTo1Lot && (
+              <div className="flex items-center gap-2 pt-1">
+                <Badge variant="secondary" className="text-xs">
+                  Normalized to 1-lot
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  All values shown per contract
+                </span>
+              </div>
+            )}
+          </div>
           <DialogDescription>
-            Adjust which backtested trades to compare against the reported
-            executions.
+            Lock in confirmed trade pairs or create manual matches between backtested and reported trades.
           </DialogDescription>
         </DialogHeader>
 
-        {!alignment ? (
-          <p className="text-sm text-muted-foreground">
-            Select a strategy mapping to review matches.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-4 overflow-hidden flex-1 min-h-0">
-            <div className="rounded-md border shrink-0">
-              <div className="border-b px-4 py-2 text-sm font-medium">
-                Reported Sessions
+        <div className="flex flex-col gap-6 overflow-hidden flex-1 min-h-0">
+          {/* Confirmed Pairs Section */}
+          <div className="flex flex-col overflow-hidden rounded-md border flex-1">
+            <div className="flex items-center justify-between border-b px-4 py-3 bg-green-500/10 dark:bg-green-500/20">
+              <div>
+                <div className="text-sm font-semibold text-green-700 dark:text-green-400">Confirmed Pairs</div>
+                <div className="text-xs text-muted-foreground">
+                  {confirmedPairs.length} matched {confirmedPairs.length === 1 ? 'pair' : 'pairs'}
+                </div>
               </div>
-              <div className="px-2 py-2 max-h-48 overflow-y-auto">
-                {alignment.sessions.length === 0 ? (
-                  <p className="p-4 text-sm text-muted-foreground">
-                    No reported sessions found.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {alignment.sessions.map((session) => {
-                      const matchedCount = session.items.filter(
-                        (item) => item.backtested && item.reported
-                      ).length;
-                      const backtestedCount = session.items.filter(
-                        (item) => item.backtested
-                      ).length;
-                      const reportedCount = session.items.filter(
-                        (item) => item.reported
-                      ).length;
-
-                      return (
-                        <button
-                          key={session.session}
-                          type="button"
-                          onClick={() => setActiveSession(session.session)}
-                          className={cn(
-                            "rounded-md px-3 py-2 text-left text-sm transition border whitespace-nowrap",
-                            activeSession === session.session
-                              ? "bg-primary/10 border-primary text-primary"
-                              : "border-border hover:bg-muted"
-                          )}
-                        >
-                          <div className="font-semibold text-sm">
-                            {session.session}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            <Badge
-                              variant={
-                                matchedCount > 0 ? "default" : "secondary"
-                              }
-                              className="text-[10px] px-1.5 py-0"
-                            >
-                              {matchedCount} matched
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {backtestedCount} BT · {reportedCount} RPT
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col overflow-hidden rounded-md border flex-1 min-h-0">
-              <div className="flex flex-col gap-2 border-b px-6 py-2 sm:flex-row sm:items-start sm:justify-between shrink-0">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] uppercase tracking-wide"
-                    >
-                      Matched Trades
-                    </Badge>
-                    {sessionStats && (
-                      <span className="text-xs text-muted-foreground">
-                        {sessionStats.matchedPairs} pairs •{" "}
-                        {formatTradeCount(
-                          sessionStats.selectedBacktested,
-                          sessionStats.totalBacktested
-                        )}{" "}
-                        backtested •{" "}
-                        {formatTradeCount(
-                          sessionStats.selectedReported,
-                          sessionStats.totalReported
-                        )}{" "}
-                        reported
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm font-medium">
-                    {activeSession || "Select a session"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Toggle trades to include in the comparison.
-                  </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="normalize-dialog"
+                    checked={normalizeTo1Lot}
+                    onCheckedChange={onNormalizeTo1LotChange}
+                    disabled={!onNormalizeTo1LotChange}
+                  />
+                  <Label htmlFor="normalize-dialog" className="cursor-pointer text-xs">
+                    Normalize to 1-lot
+                  </Label>
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => {
-                    if (!alignment) return;
-                    const config = buildSelectionConfig(alignment, "auto");
-                    setSelectedBacktested(config.backSet);
-                    setSelectedReported(config.reportedSet);
-                    setBacktestedFallbackToAll(config.backFallback);
-                    setReportedFallbackToAll(config.reportedFallback);
-                  }}
-                  disabled={!alignment}
+                  size="sm"
+                  onClick={handleResetToAuto}
                 >
-                  Reset Session
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reset to Auto
                 </Button>
               </div>
-              <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
-                {activeSessionData ? (
-                  activeSessionData.items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No trades for this session.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/30">
-                            <th
-                              colSpan={6}
-                              className="py-3 text-center text-xs font-semibold uppercase tracking-wider text-foreground"
-                            >
-                              Backtested Trades
-                            </th>
-                            <th className="w-4 bg-border"></th>
-                            <th
-                              colSpan={6}
-                              className="py-3 text-center text-xs font-semibold uppercase tracking-wider text-foreground"
-                            >
-                              Reported Trades
-                            </th>
-                          </tr>
-                          <tr className="border-b">
-                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
-                              <span className="sr-only">Select</span>
-                            </th>
-                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              Time
-                            </th>
-                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              Contracts
-                            </th>
-                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              Premium
-                            </th>
-                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              P/L
-                            </th>
-                            <th className="pb-3 pt-2 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">
-                              Auto
-                            </th>
-                            <th className="w-4 bg-border"></th>
-                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground w-10">
-                              <span className="sr-only">Select</span>
-                            </th>
-                            <th className="pb-3 pt-2 text-left font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              Time
-                            </th>
-                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              Contracts
-                            </th>
-                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              Premium
-                            </th>
-                            <th className="pb-3 pt-2 text-right font-medium uppercase tracking-wide text-xs text-muted-foreground">
-                              P/L
-                            </th>
-                            <th className="pb-3 pt-2 text-center font-medium uppercase tracking-wide text-xs text-muted-foreground w-16">
-                              Auto
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activeSessionData.items.map((item, index) => {
-                            const backtestedSelected =
-                              item.backtested &&
-                              selectedBacktested.has(item.backtested.id);
-                            const reportedSelected =
-                              item.reported &&
-                              selectedReported.has(item.reported.id);
-                            const isMatched = Boolean(
-                              item.backtested && item.reported
-                            );
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {confirmedPairs.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  No confirmed pairs yet. Select trades below to create manual matches.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {confirmedPairs.map((pair) => {
+                    const backtested = backtestedById.get(pair.backtestedId);
+                    const reported = reportedById.get(pair.reportedId);
 
-                            return (
-                              <tr
-                                key={`${activeSession}-${index}`}
-                                className={cn(
-                                  "border-b transition-colors hover:bg-muted/30",
-                                  isMatched &&
-                                    (backtestedSelected || reportedSelected) &&
-                                    "bg-primary/5"
-                                )}
-                              >
-                                <td className="py-4 pl-3 pr-3 align-middle">
-                                  {item.backtested && item.reported && (
-                                    <Checkbox
-                                      checked={Boolean(backtestedSelected)}
-                                      onCheckedChange={(checked) =>
-                                        toggleBacktested(
-                                          item.backtested?.id,
-                                          Boolean(checked)
-                                        )
-                                      }
-                                      aria-label={`Include backtested trade ${formatDateTime(
-                                        item.backtested
-                                      )}`}
-                                    />
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 align-middle">
-                                  {item.backtested ? (
-                                    <span className="font-medium whitespace-nowrap">
-                                      {formatDateTime(item.backtested)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground italic">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-right align-middle">
-                                  {item.backtested ? (
-                                    <span className="font-medium tabular-nums">
-                                      {item.backtested.contracts}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-right align-middle">
-                                  {item.backtested ? (
-                                    <span className="font-medium tabular-nums">
-                                      {formatCurrency(
-                                        item.backtested.totalPremium
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-right align-middle">
-                                  {item.backtested ? (
-                                    <span
-                                      className={cn(
-                                        "font-semibold tabular-nums",
-                                        item.backtested.pl >= 0
-                                          ? "text-green-600 dark:text-green-500"
-                                          : "text-red-600 dark:text-red-500"
-                                      )}
-                                    >
-                                      {formatCurrency(item.backtested.pl)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-center align-middle">
-                                  {item.backtested && item.autoBacktested && (
-                                    <span className="text-xs text-muted-foreground">
-                                      AUTO
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="w-4 bg-border"></td>
-                                <td className="py-4 pl-3 pr-3 align-middle">
-                                  {item.reported && item.backtested && (
-                                    <Checkbox
-                                      checked={Boolean(reportedSelected)}
-                                      onCheckedChange={(checked) =>
-                                        toggleReported(
-                                          item.reported?.id,
-                                          Boolean(checked)
-                                        )
-                                      }
-                                      aria-label={`Include reported trade ${formatDateTime(
-                                        item.reported
-                                      )}`}
-                                    />
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 align-middle">
-                                  {item.reported ? (
-                                    <span className="font-medium whitespace-nowrap">
-                                      {formatDateTime(item.reported)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground italic">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-right align-middle">
-                                  {item.reported ? (
-                                    <span className="font-medium tabular-nums">
-                                      {item.reported.contracts}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-right align-middle">
-                                  {item.reported ? (
-                                    <span className="font-medium tabular-nums">
-                                      {formatCurrency(item.reported.totalPremium)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 pr-4 text-right align-middle">
-                                  {item.reported ? (
-                                    <span
-                                      className={cn(
-                                        "font-semibold tabular-nums",
-                                        item.reported.pl >= 0
-                                          ? "text-green-600 dark:text-green-500"
-                                          : "text-red-600 dark:text-red-500"
-                                      )}
-                                    >
-                                      {formatCurrency(item.reported.pl)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 text-center align-middle">
-                                  {item.reported && item.autoReported && (
-                                    <span className="text-xs text-muted-foreground">
-                                      AUTO
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Select a session to review its trades.
-                  </p>
-                )}
-              </div>
+                    if (!backtested || !reported) return null;
+
+                    return (
+                      <div
+                        key={`${pair.backtestedId}-${pair.reportedId}`}
+                        className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex-1 grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+                          <TradeCard trade={backtested} label="Backtested" normalizeTo1Lot={normalizeTo1Lot} />
+                          <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <TradeCard trade={reported} label="Reported" normalizeTo1Lot={normalizeTo1Lot} />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={pair.manual ? "secondary" : "default"} className="text-xs">
+                            {pair.manual ? "MANUAL" : "AUTO"}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleUnlockPair(pair)}
+                            aria-label="Unlock pair"
+                          >
+                            <Unlock className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Unmatched Trades Section */}
+          <div className="flex flex-col overflow-hidden rounded-md border flex-1">
+            <div className="border-b px-4 py-3 bg-amber-500/10 dark:bg-amber-500/20">
+              <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">Unmatched Trades</div>
+              <div className="text-xs text-muted-foreground">
+                Select one trade from each side to create a manual pair
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden grid grid-cols-2 divide-x min-h-0">
+              {/* Backtested Trades */}
+              <div className="flex flex-col overflow-hidden">
+                <div className="px-4 py-2 border-b bg-blue-500/10 dark:bg-blue-500/20">
+                  <div className="text-xs font-medium uppercase tracking-wide text-blue-700 dark:text-blue-400">
+                    Backtested ({unmatchedBacktested.length})
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {unmatchedBacktested.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">
+                      All backtested trades are paired
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {unmatchedBacktested.map((trade) => (
+                        <button
+                          key={trade.id}
+                          type="button"
+                          onClick={() => setSelectedBacktested(
+                            selectedBacktested === trade.id ? null : trade.id
+                          )}
+                          className={cn(
+                            "w-full p-3 text-left transition-colors",
+                            selectedBacktested === trade.id
+                              ? "bg-primary/10 border-l-4 border-primary"
+                              : "hover:bg-muted/50"
+                          )}
+                          aria-label={`Select backtested trade from ${formatDateTime(trade)}`}
+                        >
+                          <TradeListItem trade={trade} normalizeTo1Lot={normalizeTo1Lot} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Reported Trades */}
+              <div className="flex flex-col overflow-hidden">
+                <div className="px-4 py-2 border-b bg-purple-500/10 dark:bg-purple-500/20">
+                  <div className="text-xs font-medium uppercase tracking-wide text-purple-700 dark:text-purple-400">
+                    Reported ({unmatchedReported.length})
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {unmatchedReported.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">
+                      All reported trades are paired
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {unmatchedReported.map((trade) => (
+                        <button
+                          key={trade.id}
+                          type="button"
+                          onClick={() => setSelectedReported(
+                            selectedReported === trade.id ? null : trade.id
+                          )}
+                          className={cn(
+                            "w-full p-3 text-left transition-colors",
+                            selectedReported === trade.id
+                              ? "bg-primary/10 border-l-4 border-primary"
+                              : "hover:bg-muted/50"
+                          )}
+                          aria-label={`Select reported trade from ${formatDateTime(trade)}`}
+                        >
+                          <TradeListItem trade={trade} normalizeTo1Lot={normalizeTo1Lot} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Create Pair Button */}
+            {canCreatePair && (
+              <div className="border-t px-4 py-3 bg-muted/30">
+                <Button
+                  type="button"
+                  onClick={handleCreateManualPair}
+                  className="w-full"
+                  size="sm"
+                >
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Create Manual Pair
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
 
         <DialogFooter className="flex items-center justify-between">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleReset}
-            disabled={!alignment}
-          >
-            Reset to Auto Matches
-          </Button>
+          <div className="text-xs text-muted-foreground">
+            {confirmedPairs.length} pairs • {unmatchedBacktested.length} unmatched BT • {unmatchedReported.length} unmatched RPT
+          </div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -568,70 +440,122 @@ export function MatchReviewDialog({
             <Button
               type="button"
               onClick={handleSave}
-              disabled={!alignment}
             >
-              Save Selection
+              Save Pairs
             </Button>
           </div>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset to Auto Matching?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all manual trade pairs and reset to automatic matching based on time proximity.
+              <br /><br />
+              <strong>This action cannot be undone.</strong> Any manual pairings you created will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmResetToAuto}>
+              Reset to Auto
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
 
-type SelectionSource = "selected" | "auto";
+function TradeCard({ trade, label, normalizeTo1Lot }: { trade: NormalizedTrade; label: string; normalizeTo1Lot: boolean }) {
+  // Normalize values if flag is set
+  const displayPremium = normalizeTo1Lot && trade.contracts > 0
+    ? trade.totalPremium / trade.contracts
+    : trade.totalPremium;
+  const displayPl = normalizeTo1Lot && trade.contracts > 0
+    ? trade.pl / trade.contracts
+    : trade.pl;
 
-function buildSelectionConfig(
-  alignment: AlignedTradeSet,
-  source: SelectionSource
-): {
-  backSet: Set<string>;
-  reportedSet: Set<string>;
-  backFallback: boolean;
-  reportedFallback: boolean;
-} {
-  const backSource =
-    source === "selected"
-      ? alignment.selectedBacktestedIds
-      : alignment.autoSelectedBacktestedIds;
-
-  const reportedSource =
-    source === "selected"
-      ? alignment.selectedReportedIds
-      : alignment.autoSelectedReportedIds;
-
-  const shouldFallbackBacktested =
-    backSource.length === 0 && alignment.backtestedTrades.length > 0;
-
-  const shouldFallbackReported =
-    reportedSource.length === 0 && alignment.reportedTrades.length > 0;
-
-  const backIds = shouldFallbackBacktested
-    ? alignment.backtestedTrades.map((trade) => trade.id)
-    : backSource;
-
-  const reportedIds = shouldFallbackReported
-    ? alignment.reportedTrades.map((trade) => trade.id)
-    : reportedSource;
-
-  return {
-    backSet: new Set(backIds),
-    reportedSet: new Set(reportedIds),
-    backFallback: shouldFallbackBacktested,
-    reportedFallback: shouldFallbackReported,
-  };
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-3">
+          <div className="text-sm font-medium whitespace-nowrap">
+            {formatDateTime(trade)}
+          </div>
+          <Badge variant="outline" className="text-xs shrink-0">
+            {normalizeTo1Lot ? '1x' : `${trade.contracts}x`}
+          </Badge>
+          <div className="text-xs text-muted-foreground tabular-nums">
+            {formatCurrency(displayPremium)}
+          </div>
+          <div
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              displayPl >= 0
+                ? "text-green-600 dark:text-green-500"
+                : "text-red-600 dark:text-red-500"
+            )}
+          >
+            {formatCurrency(displayPl)}
+          </div>
+        </div>
+        {trade.legs && (
+          <div className="text-xs text-muted-foreground font-mono leading-relaxed">
+            {trade.legs}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
-function formatTradeCount(included: number, total: number): string {
-  if (total === 0) {
-    return "0";
-  }
+function TradeListItem({ trade, normalizeTo1Lot }: { trade: NormalizedTrade; normalizeTo1Lot: boolean }) {
+  // Normalize values if flag is set
+  const displayPremium = normalizeTo1Lot && trade.contracts > 0
+    ? trade.totalPremium / trade.contracts
+    : trade.totalPremium;
+  const displayPl = normalizeTo1Lot && trade.contracts > 0
+    ? trade.pl / trade.contracts
+    : trade.pl;
 
-  if (included === total) {
-    return String(total);
-  }
-
-  return `${included} / ${total}`;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium">
+          {formatDateTime(trade)}
+        </div>
+        <Badge variant="outline" className="text-xs">
+          {normalizeTo1Lot ? '1x' : `${trade.contracts}x`}
+        </Badge>
+      </div>
+      {trade.legs && (
+        <div className="text-[11px] text-muted-foreground font-mono leading-relaxed">
+          {trade.legs}
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground tabular-nums">
+          Premium: {formatCurrency(displayPremium)}
+        </div>
+        <div
+          className={cn(
+            "text-sm font-semibold tabular-nums",
+            displayPl >= 0
+              ? "text-green-600 dark:text-green-500"
+              : "text-red-600 dark:text-red-500"
+          )}
+        >
+          {formatCurrency(displayPl)}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function formatDateTime(trade: {
@@ -639,7 +563,6 @@ function formatDateTime(trade: {
   timeOpened?: string;
   sortTime: number;
 }): string {
-  // Use sortTime which properly combines date and time
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
