@@ -1,5 +1,7 @@
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import { Trade } from "@/lib/models/trade";
+import { DailyLogEntry } from "@/lib/models/daily-log";
+import { calculateInitialCapitalFromDailyLog, calculateInitialCapital } from "@/lib/processing/capital-calculator";
 
 // Helper to create mock trade
 function createMockTrade(
@@ -9,29 +11,22 @@ function createMockTrade(
   strategy: string = "Test Strategy"
 ): Trade {
   return {
-    id: `trade-${Math.random()}`,
     dateOpened,
     dateClosed: dateOpened,
     timeOpened: "09:30:00",
     timeClosed: "10:30:00",
-    ticker: "SPY",
+    openingPrice: 100,
+    legs: "SPY 100C/105C",
+    premium: 500,
+    closingPrice: 100 + pl / 100,
     strategy,
-    quantity: 100,
-    entryPrice: 100,
-    exitPrice: 100 + pl / 100,
+    numContracts: 1,
     pl,
-    plPercent: pl / fundsAtClose * 100,
-    commission: 1,
-    totalCommissions: 2,
     openingCommissionsFees: 1,
     closingCommissionsFees: 1,
-    tradeType: "LONG",
-    marginUsed: 10000,
-    accountBalance: fundsAtClose,
-    accountPeak: fundsAtClose,
-    capitalEfficiency: 1,
-    kelly: 0.05,
+    marginReq: 10000,
     fundsAtClose,
+    openingShortLongRatio: 1.0,
   };
 }
 
@@ -169,6 +164,93 @@ describe("Initial Capital Calculation", () => {
 
       const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(trades);
       expect(initialCapital).toBe(100000); // -10000 - (-110000)
+    });
+  });
+
+  describe("Initial Capital from Daily Log", () => {
+    function createDailyLogEntry(
+      date: string,
+      netLiquidity: number,
+      dailyPl: number
+    ): DailyLogEntry {
+      return {
+        date: new Date(date),
+        netLiquidity,
+        currentFunds: netLiquidity,
+        withdrawn: 0,
+        tradingFunds: netLiquidity,
+        dailyPl,
+        dailyPlPct: (dailyPl / (netLiquidity - dailyPl)) * 100,
+        drawdownPct: 0,
+      };
+    }
+
+    it("should calculate initial capital from daily log with profit on first day", () => {
+      // Started with $500,000, made $7,690 profit on first day -> $507,690
+      const entries = [
+        createDailyLogEntry("2024-01-01", 507690, 7690),
+        createDailyLogEntry("2024-01-02", 510000, 2310),
+      ];
+
+      const initialCapital = calculateInitialCapitalFromDailyLog(entries);
+      expect(initialCapital).toBe(500000); // 507690 - 7690
+    });
+
+    it("should calculate initial capital from daily log with loss on first day", () => {
+      // Started with $500,000, lost $5,000 on first day -> $495,000
+      const entries = [
+        createDailyLogEntry("2024-01-01", 495000, -5000),
+        createDailyLogEntry("2024-01-02", 498000, 3000),
+      ];
+
+      const initialCapital = calculateInitialCapitalFromDailyLog(entries);
+      expect(initialCapital).toBe(500000); // 495000 - (-5000)
+    });
+
+    it("should calculate initial capital from daily log with zero P/L on first day", () => {
+      // Started with $500,000, break-even on first day -> $500,000
+      const entries = [
+        createDailyLogEntry("2024-01-01", 500000, 0),
+        createDailyLogEntry("2024-01-02", 505000, 5000),
+      ];
+
+      const initialCapital = calculateInitialCapitalFromDailyLog(entries);
+      expect(initialCapital).toBe(500000); // 500000 - 0
+    });
+
+    it("should use earliest date when entries are out of order", () => {
+      const entries = [
+        createDailyLogEntry("2024-01-03", 515000, 5000),
+        createDailyLogEntry("2024-01-01", 507690, 7690), // This is earliest
+        createDailyLogEntry("2024-01-02", 510000, 2310),
+      ];
+
+      const initialCapital = calculateInitialCapitalFromDailyLog(entries);
+      expect(initialCapital).toBe(500000); // Should use Jan 1st entry
+    });
+
+    it("should prefer daily log over trades when both available", () => {
+      const trades = [
+        createMockTrade(new Date("2024-01-01"), 507690, 7690),
+      ];
+
+      const dailyLog = [
+        createDailyLogEntry("2024-01-01", 507690, 7690),
+      ];
+
+      const initialCapital = calculateInitialCapital(trades, dailyLog);
+      expect(initialCapital).toBe(500000); // Should use daily log calculation
+    });
+
+    it("should fall back to trades when daily log is empty", () => {
+      const trades = [
+        createMockTrade(new Date("2024-01-01"), 507690, 7690),
+      ];
+
+      const dailyLog: DailyLogEntry[] = [];
+
+      const initialCapital = calculateInitialCapital(trades, dailyLog);
+      expect(initialCapital).toBe(500000); // Should fall back to trade calculation
     });
   });
 });

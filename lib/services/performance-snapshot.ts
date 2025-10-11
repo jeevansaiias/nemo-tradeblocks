@@ -2,7 +2,6 @@ import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
 import { PortfolioStatsCalculator } from '@/lib/calculations/portfolio-stats'
-import { calculateInitialCapital } from '@/lib/processing/capital-calculator'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -272,7 +271,7 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
       }]
     }
 
-    let initialCapital = calculateInitialCapital(fallbackTrades)
+    let initialCapital = PortfolioStatsCalculator.calculateInitialCapital(fallbackTrades)
     if (!isFinite(initialCapital) || initialCapital <= 0) {
       initialCapital = 100000
     }
@@ -307,7 +306,7 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
     return curve
   }
 
-  let initialCapital = calculateInitialCapital(closedTrades)
+  let initialCapital = PortfolioStatsCalculator.calculateInitialCapital(closedTrades)
   if (!isFinite(initialCapital) || initialCapital <= 0) {
     initialCapital = 100000
   }

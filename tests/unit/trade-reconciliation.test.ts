@@ -10,7 +10,10 @@ jest.mock('@/lib/db', () => ({
   getReportingTradesByBlock: jest.fn(),
 }))
 
-const { getTradesByBlock, getReportingTradesByBlock } = jest.requireMock('@/lib/db')
+const { getTradesByBlock, getReportingTradesByBlock } = jest.requireMock('@/lib/db') as {
+  getTradesByBlock: jest.MockedFunction<(blockId: string) => Promise<any[]>>
+  getReportingTradesByBlock: jest.MockedFunction<(blockId: string) => Promise<any[]>>
+}
 
 describe('trade reconciliation matching', () => {
   const alignment: StrategyAlignment = {
