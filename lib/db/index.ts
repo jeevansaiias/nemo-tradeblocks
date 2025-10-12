@@ -1,5 +1,5 @@
 /**
- * IndexedDB Database Service for TradeBlocks
+ * IndexedDB Database Service for NemoBlocks
  *
  * Manages the client-side database for storing blocks, trades, and daily logs.
  * Uses a versioned schema with migration support.
@@ -12,7 +12,7 @@
 // import { PortfolioStats, StrategyStats, PerformanceMetrics } from '../models/portfolio-stats'
 
 // Database configuration
-export const DB_NAME = 'TradeBlocksDB'
+export const DB_NAME = 'NemoBlocksDB'
 export const DB_VERSION = 1
 
 // Object store names
@@ -254,6 +254,6 @@ export class TransactionError extends DatabaseError {
 }
 
 // Re-export functions from individual stores
-export { createBlock, getBlock, getAllBlocks, updateBlock, deleteBlock, getActiveBlock, updateBlockStats } from './blocks-store'
-export { addTrades, getTradesByBlock, getTradeCountByBlock, deleteTradesByBlock } from './trades-store'
-export { addDailyLogEntries, getDailyLogsByBlock, getDailyLogCountByBlock, deleteDailyLogsByBlock } from './daily-logs-store'
+export { createBlock, deleteBlock, getActiveBlock, getAllBlocks, getBlock, updateBlock, updateBlockStats } from './blocks-store'
+export { addDailyLogEntries, deleteDailyLogsByBlock, getDailyLogCountByBlock, getDailyLogsByBlock } from './daily-logs-store'
+export { addTrades, deleteTradesByBlock, getTradeCountByBlock, getTradesByBlock } from './trades-store'

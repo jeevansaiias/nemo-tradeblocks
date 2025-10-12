@@ -1,12 +1,12 @@
-# TradeBlocks Code Owners
+# NemoBlocks Code Owners
 # Global owners for all files
-* @davidromeo
+* @jeevansai
 
 # Critical configuration files
-vercel.json @davidromeo
-requirements.txt @davidromeo
-.github/ @davidromeo
+vercel.json @jeevansai
+requirements.txt @jeevansai
+.github/ @jeevansai
 
 # Core application
-app/main.py @davidromeo
-app/api/ @davidromeo
+app/main.py @jeevansai
+app/api/ @jeevansai

@@ -2,7 +2,7 @@
  * CSV Parser Service
  *
  * Handles CSV file parsing with progress tracking, error handling,
- * and validation for TradeBlocks data.
+ * and validation for NemoBlocks data.
  */
 
 import { ParsingError } from '../models'

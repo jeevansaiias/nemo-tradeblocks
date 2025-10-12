@@ -93,7 +93,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <span className="flex flex-col">
                   <span className="text-sm font-semibold leading-tight">
-                    TradeBlocks
+                    NemoBlocks
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Analytics Platform

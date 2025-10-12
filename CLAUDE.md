@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TradeBlocks is a Next.js 15 application for analyzing options trading performance. It processes CSV exports of trade logs and daily portfolio logs to calculate comprehensive portfolio statistics, drawdowns, and performance metrics. The application uses IndexedDB for client-side storage of trading data.
+NemoBlocks is a Next.js 15 application for analyzing options trading performance. It processes CSV exports of trade logs and daily portfolio logs to calculate comprehensive portfolio statistics, drawdowns, and performance metrics. The application uses IndexedDB for client-side storage of trading data.
 
 ## Development Commands
 
@@ -187,10 +187,10 @@ The `legacy/` folder contains the original Python/Dash application that this Nex
 
 ```bash
 # From repository root
-PYTHONPATH=/Users/davidromeo/Code/tradeblocks python legacy/app/main.py
+PYTHONPATH=/Users/davidromeo/Code/nemoblocks python legacy/app/main.py
 
 # Run legacy tests
-PYTHONPATH=/Users/davidromeo/Code/tradeblocks pytest legacy/tests/ -v
+PYTHONPATH=/Users/davidromeo/Code/nemoblocks pytest legacy/tests/ -v
 ```
 
 ### Migration Notes

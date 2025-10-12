@@ -1,6 +1,6 @@
-# TradeBlocks
+# NemoBlocks
 
-TradeBlocks is a Next.js 15 analytics workspace for evaluating options trading performance. Upload trade and daily portfolio CSV exports to calculate portfolio statistics, visualize equity curves, run Monte Carlo risk simulations, and compare strategies in one place.
+NemoBlocks is a Next.js 15 analytics workspace for evaluating options trading performance. Upload trade and daily portfolio CSV exports to calculate portfolio statistics, visualize equity curves, run Monte Carlo risk simulations, and compare strategies in one place.
 
 ## Highlights
 - **Block-based workflows:** Organize trade logs, optional daily logs, and derived statistics into named "blocks" you can activate, edit, and recalculate on demand.
@@ -51,5 +51,5 @@ TradeBlocks is a Next.js 15 analytics workspace for evaluating options trading p
 2. Update or add tests when behaviour changes.
 3. Run `npm run lint` and `npm test` before opening a pull request.
 
-TradeBlocks is actively evolving—additions should maintain parity with the legacy analytics while leaning into the block-based architecture documented above.
+NemoBlocks is actively evolving—additions should maintain parity with the legacy analytics while leaning into the block-based architecture documented above.
 
