@@ -85,16 +85,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-2"
+              className="data-[slot=sidebar-menu-button]:!p-3"
             >
               <Link href="/block-stats" className="flex items-center gap-3">
                 <div className="flex-shrink-0">
                   <Image
                     src="/nemoblocks-logo.png"
                     alt="NemoBlocks Logo"
-                    width={32}
-                    height={32}
-                    className="rounded-md"
+                    width={48}
+                    height={48}
+                    className="rounded-lg"
                   />
                 </div>
                 <span className="flex flex-col">
