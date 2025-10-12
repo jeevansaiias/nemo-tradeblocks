@@ -75,6 +75,7 @@ export default function ComparisonBlocksPage() {
   const comparisonData = useComparisonStore((state) => state.data);
   const comparisonError = useComparisonStore((state) => state.error);
   const comparisonLoading = useComparisonStore((state) => state.isLoading);
+  const comparisonLastBlockId = useComparisonStore((state) => state.lastBlockId);
   const refreshComparison = useComparisonStore((state) => state.refresh);
   const resetComparison = useComparisonStore((state) => state.reset);
   const activeBlockId = activeBlock?.id ?? null;
@@ -130,12 +131,23 @@ export default function ComparisonBlocksPage() {
   }, [activeBlockId, normalizeTo1Lot]);
 
   useEffect(() => {
+    if (!activeBlockId) {
+      resetComparison();
+      setAlignments([]);
+      setReportingStrategies([]);
+      setBacktestedStrategies([]);
+      return;
+    }
+
     if (!activeBlock) {
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    resetComparison();
+    // Clear alignments immediately to prevent stale data
+    setAlignments([]);
 
     const load = async () => {
       try {
@@ -195,7 +207,7 @@ export default function ComparisonBlocksPage() {
     };
 
     load().catch(console.error);
-  }, [activeBlock]);
+  }, [activeBlockId, activeBlock, resetComparison]);
 
   useEffect(() => {
     if (!activeBlockId) {
@@ -275,7 +287,8 @@ export default function ComparisonBlocksPage() {
     : null;
 
   const summaryRows = useMemo(() => {
-    if (!comparisonData) return [];
+    // Only show comparison data if it matches the current block
+    if (!comparisonData || comparisonLastBlockId !== activeBlockId) return [];
     if (process.env.NODE_ENV !== "production") {
       console.debug("[comparison] reconciliation", comparisonData);
     }
@@ -346,7 +359,7 @@ export default function ComparisonBlocksPage() {
         unmatchedSessions,
       };
     });
-  }, [comparisonData]);
+  }, [comparisonData, comparisonLastBlockId, activeBlockId]);
 
   const aggregateMatchStats = useMemo(() => {
     return summaryRows.reduce(
@@ -543,41 +556,6 @@ export default function ComparisonBlocksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Comparison Blocks
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Map reporting strategies from your backtests to live trade
-            strategies for the block
-            <span className="font-medium text-foreground">
-              {" "}
-              {activeBlock.name}
-            </span>
-            .
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">
-            Reporting strategies: {reportingStrategies.length}
-          </Badge>
-          <Badge variant="outline">
-            Backtested strategies: {backtestedStrategies.length}
-          </Badge>
-          {comparisonData && (
-            <>
-              <Badge variant="outline">
-                Unmapped reported: {comparisonData.unmappedReported.length}
-              </Badge>
-              <Badge variant="outline">
-                Unmapped backtested: {comparisonData.unmappedBacktested.length}
-              </Badge>
-            </>
-          )}
-        </div>
-      </div>
-
       {combinedError && (
         <Card className="border-destructive bg-destructive/5">
           <CardHeader className="pb-2">
@@ -591,23 +569,24 @@ export default function ComparisonBlocksPage() {
         </Card>
       )}
 
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          onClick={openCreateDialog}
-          disabled={isLoading || comparisonLoading}
-        >
-          <Plus className="mr-2 h-4 w-4" /> Add Strategy Mapping
-        </Button>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle>Aligned Strategies</CardTitle>
-          <CardDescription>
-            Review, edit, or remove existing mappings before saving them back to
-            the block.
-          </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <CardTitle>Aligned Strategies</CardTitle>
+              <CardDescription>
+                Review, edit, or remove existing mappings before saving them back to
+                the block.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              onClick={openCreateDialog}
+              disabled={isLoading || comparisonLoading}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Strategy Mapping
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {(isLoading || comparisonLoading) && (

@@ -37,6 +37,10 @@ const routeMeta: Record<
     title: "Correlation Matrix",
     description: "Understand strategy overlap before deploying capital.",
   },
+  "/comparison-blocks": {
+    title: "Comparison Blocks",
+    description: "Align and compare backtested vs reported trade data.",
+  },
   "/settings": {
     title: "Settings",
     description:
