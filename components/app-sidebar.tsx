@@ -8,7 +8,7 @@ import {
   IconRouteSquare,
   IconStack2,
 } from "@tabler/icons-react";
-import { Blocks } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
 
@@ -89,7 +89,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <Link href="/block-stats" className="flex items-center gap-3">
                 <div className="flex-shrink-0">
-                  <Blocks className="h-8 w-8 text-primary" />
+                  <Image
+                    src="/nemoblocks-logo.png"
+                    alt="NemoBlocks Logo"
+                    width={32}
+                    height={32}
+                    className="rounded-md"
+                  />
                 </div>
                 <span className="flex flex-col">
                   <span className="text-sm font-semibold leading-tight">
