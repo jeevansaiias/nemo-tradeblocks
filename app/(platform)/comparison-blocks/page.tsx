@@ -377,6 +377,9 @@ export default function ComparisonBlocksPage() {
       return
     }
 
+    // selectedBacktestedIds and selectedReportedIds should contain ALL trades
+    // that are included in this comparison (both matched and unmatched).
+    // The tradePairs array determines which trades are actually paired.
     const allBacktestedIds = autoData.backtestedTrades.map((trade) => trade.id)
     const allReportedIds = autoData.reportedTrades.map((trade) => trade.id)
 
@@ -613,8 +616,8 @@ export default function ComparisonBlocksPage() {
                   key={mapping.id}
                   className="rounded-lg border bg-card/60 p-3"
                 >
-                  <div className="grid gap-3 text-sm md:grid-cols-[1fr_auto] md:items-center">
-                    <div className="grid gap-3 md:grid-cols-[repeat(2,minmax(0,260px))] md:items-center md:gap-6">
+                  <div className="grid gap-3 text-sm md:grid-cols-[1fr_auto] md:items-start">
+                    <div className="grid gap-3 md:grid-cols-2 md:gap-6">
                       <StrategyBadgeGroup
                         label="Reporting"
                         strategies={mapping.reportingStrategies}
@@ -626,7 +629,7 @@ export default function ComparisonBlocksPage() {
                         compact
                       />
                     </div>
-                    <div className="flex items-center gap-2 justify-end md:justify-start">
+                    <div className="flex items-center gap-2 justify-end md:justify-start md:pt-5">
                       <Button
                         type="button"
                         variant="outline"
