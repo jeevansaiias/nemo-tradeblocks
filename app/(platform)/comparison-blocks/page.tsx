@@ -24,20 +24,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   getReportingTradesByBlock,
   getTradesByBlock,
   updateBlock as updateProcessedBlock,
 } from "@/lib/db";
 import { StrategyAlignment } from "@/lib/models/strategy-alignment";
 import { useBlockStore } from "@/lib/stores/block-store";
-import { useComparisonStore, type AlignedTradeSet } from "@/lib/stores/comparison-store";
-import type { NormalizedTrade } from "@/lib/services/trade-reconciliation";
+import { useComparisonStore } from "@/lib/stores/comparison-store";
 import { cn } from "@/lib/utils";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -47,6 +40,8 @@ interface SelectableStrategy {
   count: number;
   totalPl: number;
 }
+
+const NORMALIZE_STORAGE_KEY_PREFIX = "comparison:normalizeTo1Lot:";
 
 function buildStrategySummary(
   strategies: string[],
@@ -107,6 +102,30 @@ export default function ComparisonBlocksPage() {
   );
   const [dialogNote, setDialogNote] = useState("");
   const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
+
+  useEffect(() => {
+    if (!activeBlockId || typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = `${NORMALIZE_STORAGE_KEY_PREFIX}${activeBlockId}`;
+    const stored = window.localStorage.getItem(storageKey);
+
+    if (stored !== null) {
+      setNormalizeTo1Lot(stored === "true");
+    } else {
+      setNormalizeTo1Lot(false);
+    }
+  }, [activeBlockId]);
+
+  useEffect(() => {
+    if (!activeBlockId || typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = `${NORMALIZE_STORAGE_KEY_PREFIX}${activeBlockId}`;
+    window.localStorage.setItem(storageKey, normalizeTo1Lot ? "true" : "false");
+  }, [activeBlockId, normalizeTo1Lot]);
 
   useEffect(() => {
     if (!activeBlock) {
@@ -251,193 +270,98 @@ export default function ComparisonBlocksPage() {
       console.debug("[comparison] reconciliation", comparisonData);
     }
 
-    return comparisonData.alignments.map((alignment) => ({
-      id: alignment.alignmentId,
-      reportedStrategy: alignment.reportedStrategy,
-      backtestedStrategy: alignment.backtestedStrategy,
-      reported: alignment.metrics.reported,
-      backtested: alignment.metrics.backtested,
-      delta: alignment.metrics.delta,
-      matchRate: alignment.metrics.matchRate,
-      slippagePerContract: alignment.metrics.slippagePerContract,
-      sizeVariance: alignment.metrics.sizeVariance,
-      selectedBacktestedCount:
-        alignment.selectedBacktestedIds.length > 0
-          ? alignment.selectedBacktestedIds.length
-          : alignment.backtestedTrades.length,
-      totalBacktestedCount: alignment.backtestedTrades.length,
-      selectedReportedCount:
-        alignment.selectedReportedIds.length > 0
-          ? alignment.selectedReportedIds.length
-          : alignment.reportedTrades.length,
-      totalReportedCount: alignment.reportedTrades.length,
-    }));
+    return comparisonData.alignments.map((alignment) => {
+      let autoMatchedCount = 0;
+      let manualMatchedCount = 0;
+      let unmatchedBacktestedCount = 0;
+      let unmatchedReportedCount = 0;
+      let matchedSessions = 0;
+      let unmatchedSessions = 0;
+
+      alignment.sessions.forEach((session) => {
+        let sessionHasUnmatched = false;
+        let sessionHasMatch = false;
+
+        session.items.forEach((item) => {
+          const hasBacktested = Boolean(item.backtested);
+          const hasReported = Boolean(item.reported);
+
+          if (hasBacktested && hasReported) {
+            if (item.autoBacktested && item.autoReported) {
+              autoMatchedCount += 1;
+            } else {
+              manualMatchedCount += 1;
+            }
+            sessionHasMatch = true;
+          } else {
+            if (hasBacktested) {
+              unmatchedBacktestedCount += 1;
+              sessionHasUnmatched = true;
+            }
+            if (hasReported) {
+              unmatchedReportedCount += 1;
+              sessionHasUnmatched = true;
+            }
+          }
+        });
+
+        if (sessionHasUnmatched) {
+          unmatchedSessions += 1;
+        }
+        if (sessionHasMatch) {
+          matchedSessions += 1;
+        }
+      });
+
+      const totalBacktestedCount =
+        autoMatchedCount + manualMatchedCount + unmatchedBacktestedCount;
+      const totalReportedCount =
+        autoMatchedCount + manualMatchedCount + unmatchedReportedCount;
+
+      return {
+        id: alignment.alignmentId,
+        reportedStrategy: alignment.reportedStrategy,
+        backtestedStrategy: alignment.backtestedStrategy,
+        matchRate: alignment.metrics.matchRate,
+        autoMatchedCount,
+        manualMatchedCount,
+        unmatchedBacktestedCount,
+        unmatchedReportedCount,
+        totalBacktestedCount,
+        totalReportedCount,
+        totalSessions: alignment.sessions.length,
+        matchedSessions,
+        unmatchedSessions,
+      };
+    });
   }, [comparisonData]);
 
-  const aggregateSummary = useMemo(() => {
-    if (summaryRows.length === 0) {
-      return null;
-    }
-
-    const result = summaryRows.reduce(
+  const aggregateMatchStats = useMemo(() => {
+    return summaryRows.reduce(
       (acc, row) => {
-        acc.backtested.tradeCount += row.backtested.tradeCount;
-        acc.backtested.totalPl += row.backtested.totalPl;
-        acc.backtested.totalFees += row.backtested.totalFees;
-        acc.backtested.totalPremium += row.backtested.totalPremium;
-        acc.backtested.totalContracts += row.backtested.totalContracts;
-
-        acc.reported.tradeCount += row.reported.tradeCount;
-        acc.reported.totalPl += row.reported.totalPl;
-        acc.reported.totalFees += row.reported.totalFees;
-        acc.reported.totalPremium += row.reported.totalPremium;
-        acc.reported.totalContracts += row.reported.totalContracts;
-
-        acc.delta.tradeCount += row.delta.tradeCount;
-        acc.delta.totalPl += row.delta.totalPl;
-        acc.delta.totalFees += row.delta.totalFees;
-        acc.delta.totalPremium += row.delta.totalPremium;
-        acc.delta.totalContracts += row.delta.totalContracts;
-
-        acc.matchRateNumerator +=
-          Math.min(row.reported.tradeCount, row.backtested.tradeCount);
-        acc.matchRateDenominator += row.backtested.tradeCount;
-        acc.slippageNumerator +=
-          row.slippagePerContract * Math.max(row.backtested.totalContracts, 1);
-        acc.slippageDenominator += Math.max(
-          row.backtested.totalContracts,
-          1,
-        );
-        acc.sizeNumerator +=
-          row.sizeVariance * Math.max(row.backtested.totalContracts, 1);
-        acc.sizeDenominator += Math.max(row.backtested.totalContracts, 1);
-
+        acc.autoMatched += row.autoMatchedCount;
+        acc.manualMatched += row.manualMatchedCount;
+        acc.unmatchedBacktested += row.unmatchedBacktestedCount;
+        acc.unmatchedReported += row.unmatchedReportedCount;
+        acc.totalBacktested += row.totalBacktestedCount;
+        acc.totalReported += row.totalReportedCount;
+        acc.totalSessions += row.totalSessions;
+        acc.matchedSessions += row.matchedSessions;
+        acc.unmatchedSessions += row.unmatchedSessions;
         return acc;
       },
       {
-        backtested: {
-          tradeCount: 0,
-          totalPl: 0,
-          avgPl: 0,
-          totalPremium: 0,
-          totalContracts: 0,
-          totalFees: 0,
-          avgPremiumPerContract: 0,
-        },
-        reported: {
-          tradeCount: 0,
-          totalPl: 0,
-          avgPl: 0,
-          totalPremium: 0,
-          totalContracts: 0,
-          totalFees: 0,
-          avgPremiumPerContract: 0,
-        },
-        delta: {
-          tradeCount: 0,
-          totalPl: 0,
-          avgPl: 0,
-          totalPremium: 0,
-          totalContracts: 0,
-          totalFees: 0,
-          avgPremiumPerContract: 0,
-        },
-        matchRateNumerator: 0,
-        matchRateDenominator: 0,
-        slippageNumerator: 0,
-        slippageDenominator: 0,
-        sizeNumerator: 0,
-        sizeDenominator: 0,
+        autoMatched: 0,
+        manualMatched: 0,
+        unmatchedBacktested: 0,
+        unmatchedReported: 0,
+        totalBacktested: 0,
+        totalReported: 0,
+        totalSessions: 0,
+        matchedSessions: 0,
+        unmatchedSessions: 0,
       },
     )
-
-    result.backtested.avgPl =
-      result.backtested.tradeCount > 0
-        ? result.backtested.totalPl / result.backtested.tradeCount
-        : 0
-    result.backtested.avgPremiumPerContract =
-      result.backtested.totalContracts > 0
-        ? result.backtested.totalPremium / result.backtested.totalContracts
-        : 0
-
-    result.reported.avgPl =
-      result.reported.tradeCount > 0
-        ? result.reported.totalPl / result.reported.tradeCount
-        : 0
-    result.reported.avgPremiumPerContract =
-      result.reported.totalContracts > 0
-        ? result.reported.totalPremium / result.reported.totalContracts
-        : 0
-
-    result.delta.avgPl =
-      result.backtested.tradeCount > 0
-        ? result.delta.totalPl / result.backtested.tradeCount
-        : 0
-    result.delta.avgPremiumPerContract =
-      result.backtested.totalContracts > 0
-        ? result.delta.totalPremium / result.backtested.totalContracts
-        : 0
-
-    return result
-  }, [summaryRows]);
-
-  const aggregateTradeCounts = useMemo(
-    () =>
-      summaryRows.reduce(
-        (acc, row) => {
-          acc.backtested.selected += row.selectedBacktestedCount;
-          acc.backtested.total += row.totalBacktestedCount;
-          acc.reported.selected += row.selectedReportedCount;
-          acc.reported.total += row.totalReportedCount;
-          return acc;
-        },
-        {
-          backtested: { selected: 0, total: 0 },
-          reported: { selected: 0, total: 0 },
-        },
-      ),
-    [summaryRows],
-  )
-
-  const aggregateMatchRate = useMemo(() => {
-    const expectedTrades = summaryRows.reduce(
-      (sum, row) => sum + row.backtested.tradeCount,
-      0,
-    )
-    if (expectedTrades === 0) return 0
-
-    const matchedTrades = summaryRows.reduce(
-      (sum, row) => sum + row.matchRate * row.backtested.tradeCount,
-      0,
-    )
-
-    return matchedTrades / expectedTrades
-  }, [summaryRows])
-
-  const aggregateSlippagePerContract = useMemo(() => {
-    let numerator = 0
-    let denominator = 0
-
-    summaryRows.forEach((row) => {
-      const weight = Math.max(row.backtested.totalContracts, 1)
-      numerator += row.slippagePerContract * weight
-      denominator += weight
-    })
-
-    return denominator > 0 ? numerator / denominator : 0
-  }, [summaryRows])
-
-  const aggregateSizeVariance = useMemo(() => {
-    let numerator = 0
-    let denominator = 0
-
-    summaryRows.forEach((row) => {
-      const weight = Math.max(row.backtested.totalContracts, 1)
-      numerator += row.sizeVariance * weight
-      denominator += weight
-    })
-
-    return denominator > 0 ? numerator / denominator : 0
   }, [summaryRows])
 
   const handleSaveMatchOverrides = async (
@@ -453,26 +377,27 @@ export default function ComparisonBlocksPage() {
       return
     }
 
-    // Check if the pairs differ from auto-matched pairs
-    const hasManualPairs = tradePairs.some(p => p.manual)
-    const shouldStore = hasManualPairs || tradePairs.length !== autoData.autoSelectedBacktestedIds.length
+    const allBacktestedIds = autoData.backtestedTrades.map((trade) => trade.id)
+    const allReportedIds = autoData.reportedTrades.map((trade) => trade.id)
 
-    const nextAlignments = alignments.map((alignment) =>
-      alignment.id === alignmentId
+    const nextAlignments = alignments.map((mapping) =>
+      mapping.id === alignmentId
         ? {
-            ...alignment,
-            matchOverrides: shouldStore && tradePairs.length > 0
-              ? {
-                  selectedBacktestedIds: [],
-                  selectedReportedIds: [],
-                  tradePairs,
-                }
-              : undefined,
+            ...mapping,
+            matchOverrides: {
+              selectedBacktestedIds: allBacktestedIds,
+              selectedReportedIds: allReportedIds,
+              tradePairs,
+            },
           }
-        : alignment,
+        : mapping,
     )
 
-    void persistAlignments(nextAlignments)
+    await persistAlignments(nextAlignments)
+    // Refresh comparison with the new alignments
+    if (activeBlockId) {
+      await refreshComparison(activeBlockId, nextAlignments, normalizeTo1Lot)
+    }
     setMatchDialogAlignmentId(null)
   }
 
@@ -650,22 +575,7 @@ export default function ComparisonBlocksPage() {
         </Card>
       )}
 
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <Switch
-            id="normalize-1lot"
-            checked={normalizeTo1Lot}
-            onCheckedChange={setNormalizeTo1Lot}
-          />
-          <Label htmlFor="normalize-1lot" className="cursor-pointer text-sm">
-            Normalize to 1-lot
-          </Label>
-          <span className="text-xs text-muted-foreground">
-            {normalizeTo1Lot
-              ? "Showing per-contract values"
-              : "Showing actual trade values"}
-          </span>
-        </div>
+      <div className="flex justify-end">
         <Button
           type="button"
           onClick={openCreateDialog}
@@ -776,61 +686,57 @@ export default function ComparisonBlocksPage() {
         onSave={upsertMapping}
       />
 
-      {summaryRows.length > 0 && !comparisonLoading && !isLoading && (
+      {(summaryRows.length > 0 || comparisonLoading || isLoading) && (
         <Card>
-          <CardHeader>
-            <CardTitle>Performance Overview</CardTitle>
-            <CardDescription>
-              How closely reported results matched the backtest (backtested vs reported).
-            </CardDescription>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Reconciliation Summary</CardTitle>
+              <CardDescription>
+                Keep reconciliations aligned by monitoring matched trades, sessions needing review,
+                and outstanding differences between backtested and reported executions.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="normalize-1lot"
+                checked={normalizeTo1Lot}
+                onCheckedChange={setNormalizeTo1Lot}
+                disabled={comparisonLoading || isLoading}
+              />
+              <Label htmlFor="normalize-1lot" className="cursor-pointer text-sm">
+                Normalize to 1-lot
+              </Label>
+              <span className="text-xs text-muted-foreground">
+                {normalizeTo1Lot
+                  ? "Showing per-contract values"
+                  : "Showing actual trade values"}
+              </span>
+            </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="overflow-x-auto relative">
+            {(comparisonLoading || isLoading) && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-sm">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Updating reconciliation…</span>
+              </div>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="pb-3 pt-2 pr-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Strategy<br />Mapping
                   </th>
-                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Backtested<br />P/L
-                  </th>
-                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Reported<br />P/L
-                  </th>
-                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    P/L<br />Variance
+                  <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground border-x">
+                    Sessions
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Trade<br />Comparison
+                    Matched<br />Trades
+                  </th>
+                  <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground border-x">
+                    Included<br />Trades
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="cursor-help">
-                          Fill<br />Match
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="text-xs">
-                            Percentage of trades that were successfully matched between backtested and reported results.
-                          </p>
-                          <p className="text-xs mt-2">
-                            Calculated as: <strong>matched pairs / max(backtested, reported)</strong>
-                          </p>
-                          <p className="text-xs mt-2 text-muted-foreground">
-                            Lower percentages indicate missing trades on either side or timing differences that prevented automatic matching.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </th>
-                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Slippage /<br />Contract
-                  </th>
-                  <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Sizing<br />Drift
-                  </th>
-                  <th className="pb-3 pt-2 px-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Δ Fees
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -845,14 +751,51 @@ export default function ComparisonBlocksPage() {
                         ↳ {row.reportedStrategy}
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold tabular-nums">
-                      {formatCurrency(row.backtested.totalPl)}
+                    <td className="py-3 px-3">
+                      <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Total</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.totalSessions}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Matched</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.matchedSessions}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.unmatchedSessions}</div>
+                        </div>
+                      </div>
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold tabular-nums">
-                      {formatCurrency(row.reported.totalPl)}
+                    <td className="py-3 px-3">
+                      <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Auto</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.autoMatchedCount}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Manual</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.manualMatchedCount}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            BT {row.unmatchedBacktestedCount} / RPT {row.unmatchedReportedCount}
+                          </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className={cn("py-3 px-3 text-right font-bold tabular-nums", getDeltaClass(row.delta.totalPl))}>
-                      {formatCurrency(row.delta.totalPl)}
+                    <td className="py-3 px-3">
+                      <div className="grid grid-cols-2 gap-3 text-xs text-center rounded-md border border-muted bg-muted/20 p-2">
+                        <div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">BT</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.totalBacktestedCount}</div>
+                        </div>
+                        <div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">RPT</div>
+                          <div className="font-medium text-foreground tabular-nums">{row.totalReportedCount}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3 px-3 text-center">
                       <Button
@@ -864,58 +807,66 @@ export default function ComparisonBlocksPage() {
                       >
                         <span className="font-medium">Review</span>
                       </Button>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        <span className="font-medium">{row.totalBacktestedCount}</span> vs <span className="font-medium">{row.totalReportedCount}</span> trades
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <Badge variant={row.matchRate >= 0.9 ? "default" : row.matchRate >= 0.7 ? "secondary" : "destructive"} className="tabular-nums">
-                        {formatPercent(row.matchRate)}
-                      </Badge>
-                    </td>
-                    <td className={cn("py-3 px-3 text-right tabular-nums", getDeltaClass(row.slippagePerContract))}>
-                      {formatCurrency(row.slippagePerContract)}
-                    </td>
-                    <td className={cn("py-3 px-3 text-right tabular-nums", getDeltaClass(row.sizeVariance))}>
-                      {formatPercent(row.sizeVariance)}
-                    </td>
-                    <td className={cn("py-3 px-3 text-right tabular-nums", getDeltaClass(row.delta.totalFees))}>
-                      {formatCurrency(row.delta.totalFees)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              {aggregateSummary && (
+              {summaryRows.length > 0 && (
                 <tfoot>
                   <tr className="border-t-2 bg-muted/30">
                     <td className="py-3 pr-4 font-bold">Totals</td>
-                    <td className="py-3 px-3 text-right font-bold tabular-nums">
-                      {formatCurrency(aggregateSummary.backtested.totalPl)}
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold tabular-nums">
-                      {formatCurrency(aggregateSummary.reported.totalPl)}
-                    </td>
-                    <td className={cn("py-3 px-3 text-right font-bold tabular-nums", getDeltaClass(aggregateSummary.delta.totalPl))}>
-                      {formatCurrency(aggregateSummary.delta.totalPl)}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <div className="text-xs text-muted-foreground">
-                        <span className="font-medium">{aggregateTradeCounts.backtested.total}</span> vs <span className="font-medium">{aggregateTradeCounts.reported.total}</span> trades
+                    <td className="py-3 px-3">
+                      <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Total</div>
+                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.totalSessions}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Matched</div>
+                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.matchedSessions}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
+                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.unmatchedSessions}</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-center">
-                      <Badge variant={aggregateMatchRate >= 0.9 ? "default" : aggregateMatchRate >= 0.7 ? "secondary" : "destructive"} className="tabular-nums">
-                        {formatPercent(aggregateMatchRate)}
-                      </Badge>
+                    <td className="py-3 px-3">
+                      <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Auto</div>
+                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.autoMatched}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Manual</div>
+                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.manualMatched}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            BT {aggregateMatchStats.unmatchedBacktested} / RPT {aggregateMatchStats.unmatchedReported}
+                          </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className={cn("py-3 px-3 text-right font-semibold tabular-nums", getDeltaClass(aggregateSlippagePerContract))}>
-                      {formatCurrency(aggregateSlippagePerContract)}
+                    <td className="py-3 px-3">
+                      <div className="grid grid-cols-2 gap-3 text-xs text-center rounded-md border border-muted bg-muted/20 p-2">
+                        <div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">BT</div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {aggregateMatchStats.totalBacktested}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">RPT</div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {aggregateMatchStats.totalReported}
+                          </div>
+                        </div>
+                      </div>
                     </td>
-                    <td className={cn("py-3 px-3 text-right font-semibold tabular-nums", getDeltaClass(aggregateSizeVariance))}>
-                      {formatPercent(aggregateSizeVariance)}
-                    </td>
-                    <td className={cn("py-3 px-3 text-right font-semibold tabular-nums", getDeltaClass(aggregateSummary.delta.totalFees))}>
-                      {formatCurrency(aggregateSummary.delta.totalFees)}
+                    <td className="py-3 px-3 text-center text-xs text-muted-foreground">
+                      —
                     </td>
                   </tr>
                 </tfoot>
@@ -971,28 +922,6 @@ function StrategyBadgeGroup({
       </div>
     </div>
   );
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatPercent(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "percent",
-    maximumFractionDigits: 1,
-    signDisplay: "exceptZero",
-  }).format(value);
-}
-
-function getDeltaClass(value: number): string {
-  if (value > 0) return "text-emerald-600";
-  if (value < 0) return "text-destructive";
-  return "text-muted-foreground";
 }
 
 

@@ -148,9 +148,10 @@ function buildAlignmentSet(
   const reportedById = new Map(reportedTrades.map((t) => [t.id, t]))
 
   const overrides: MatchOverrides | undefined = alignment.matchOverrides
+  const tradePairOverride = overrides?.tradePairs
 
   // Determine if we should use explicit pairs or auto-match
-  const useExplicitPairs = overrides?.tradePairs && overrides.tradePairs.length > 0
+  const useExplicitPairs = Array.isArray(tradePairOverride)
 
   let matchResult: AutoMatchResult
   let selectedBacktestedIds: Set<string>
@@ -159,29 +160,35 @@ function buildAlignmentSet(
   let autoReportedIds: Set<string>
 
   if (useExplicitPairs) {
+    const explicitPairs = tradePairOverride ?? []
+
     // Use explicit trade pairs from overrides
     matchResult = buildMatchResultFromPairs(
-      overrides.tradePairs!,
+      explicitPairs,
       backtestedById,
       reportedById,
       backtestedTrades,
       reportedTrades,
     )
 
-    // With explicit pairs, selected IDs come from the pairs
-    selectedBacktestedIds = new Set(
-      overrides.tradePairs!.map((p) => p.backtestedId).filter((id) => backtestedById.has(id)),
-    )
-    selectedReportedIds = new Set(
-      overrides.tradePairs!.map((p) => p.reportedId).filter((id) => reportedById.has(id)),
-    )
+    // With explicit pairs, selected IDs should honor explicit selections when provided.
+    const explicitSelectedBacktested = overrides?.selectedBacktestedIds ?? []
+    const explicitSelectedReported = overrides?.selectedReportedIds ?? []
+
+    selectedBacktestedIds = explicitSelectedBacktested.length > 0
+      ? new Set(explicitSelectedBacktested.filter((id) => backtestedById.has(id)))
+      : new Set(explicitPairs.map((p) => p.backtestedId).filter((id) => backtestedById.has(id)))
+
+    selectedReportedIds = explicitSelectedReported.length > 0
+      ? new Set(explicitSelectedReported.filter((id) => reportedById.has(id)))
+      : new Set(explicitPairs.map((p) => p.reportedId).filter((id) => reportedById.has(id)))
 
     // Auto IDs are those marked as non-manual
     autoBacktestedIds = new Set(
-      overrides.tradePairs!.filter((p) => !p.manual).map((p) => p.backtestedId),
+      explicitPairs.filter((p) => !p.manual).map((p) => p.backtestedId),
     )
     autoReportedIds = new Set(
-      overrides.tradePairs!.filter((p) => !p.manual).map((p) => p.reportedId),
+      explicitPairs.filter((p) => !p.manual).map((p) => p.reportedId),
     )
   } else {
     // Fall back to auto-matching

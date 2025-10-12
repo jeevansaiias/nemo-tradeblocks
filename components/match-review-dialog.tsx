@@ -26,7 +26,7 @@ import type { AlignedTradeSet } from "@/lib/stores/comparison-store";
 import type { TradePair } from "@/lib/models/strategy-alignment";
 import type { NormalizedTrade } from "@/lib/services/trade-reconciliation";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Unlock, Link2, RotateCcw, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface MatchReviewDialogProps {
@@ -50,6 +50,46 @@ interface SessionStats {
   hasUnmatched: boolean;
 }
 
+const MATCH_TOLERANCE_MS = 30 * 60 * 1000;
+
+function buildAutoPairsForSession(
+  backtested: NormalizedTrade[],
+  reported: NormalizedTrade[],
+): TradePair[] {
+  if (backtested.length === 0 || reported.length === 0) {
+    return [];
+  }
+
+  const sortedBacktested = [...backtested].sort((a, b) => a.sortTime - b.sortTime);
+  const sortedReported = [...reported].sort((a, b) => a.sortTime - b.sortTime);
+  const remainingBacktested = [...sortedBacktested];
+  const pairs: TradePair[] = [];
+
+  sortedReported.forEach((reportedTrade) => {
+    let bestIndex = -1;
+    let bestDiff = Number.POSITIVE_INFINITY;
+
+    remainingBacktested.forEach((candidate, index) => {
+      const diff = Math.abs(candidate.sortTime - reportedTrade.sortTime);
+      if (diff <= MATCH_TOLERANCE_MS && diff < bestDiff) {
+        bestIndex = index;
+        bestDiff = diff;
+      }
+    });
+
+    if (bestIndex >= 0) {
+      const [matched] = remainingBacktested.splice(bestIndex, 1);
+      pairs.push({
+        backtestedId: matched.id,
+        reportedId: reportedTrade.id,
+        manual: false,
+      });
+    }
+  });
+
+  return pairs;
+}
+
 export function MatchReviewDialog({
   alignment,
   open,
@@ -66,6 +106,9 @@ export function MatchReviewDialog({
   const [sessionFilter, setSessionFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<'all' | 'last7' | 'last30' | 'last90'>('all');
 
+  // Track the alignment ID to detect when we switch to a different strategy comparison
+  const alignmentIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (alignment && open) {
       // Build pairs from the session data
@@ -75,8 +118,14 @@ export function MatchReviewDialog({
 
       alignment.sessions.forEach((session) => {
         session.items.forEach((item) => {
-          // Only include items that have both backtested and reported trades
-          if (item.backtested && item.reported) {
+          // Only include items that represent confirmed matches
+          const isMatched =
+            item.backtested &&
+            item.reported &&
+            ((item.autoBacktested && item.autoReported) ||
+              (item.includedBacktested && item.includedReported));
+
+          if (isMatched && item.backtested && item.reported) {
             // Determine if this is a manual pair or auto pair
             // If it's auto-matched (autoBacktested && autoReported), it's auto
             // Otherwise, it's a manual pairing
@@ -94,9 +143,15 @@ export function MatchReviewDialog({
       setConfirmedPairs(loadedPairs);
       setSelectedBacktested(null);
       setSelectedReported(null);
-      setSelectedSession(null); // Reset to session selection view
-      setSessionFilter('all'); // Reset filter
-      setDateRangeFilter('all'); // Reset date filter
+
+      // Only reset session/filters if we're opening the dialog or switching alignments
+      const alignmentChanged = alignmentIdRef.current !== alignment.alignmentId;
+      if (alignmentChanged || !alignmentIdRef.current) {
+        setSelectedSession(null); // Reset to session selection view
+        setSessionFilter('all'); // Reset filter
+        setDateRangeFilter('all'); // Reset date filter
+        alignmentIdRef.current = alignment.alignmentId;
+      }
     }
   }, [alignment, open]);
 
@@ -142,36 +197,63 @@ export function MatchReviewDialog({
   };
 
   const handleResetToAuto = () => {
-    // Check if there are any manual pairs
-    const hasManualPairs = confirmedPairs.some(p => p.manual);
+    if (!alignment || !selectedSession) return;
+
+    const sessionBacktestedIds = new Set(
+      alignment.backtestedTrades
+        .filter((trade) => trade.session === selectedSession)
+        .map((trade) => trade.id)
+    );
+
+    const hasManualPairs = confirmedPairs.some(
+      (pair) => pair.manual && sessionBacktestedIds.has(pair.backtestedId)
+    );
 
     if (hasManualPairs) {
-      // Show confirmation dialog
       setShowResetConfirm(true);
     } else {
-      // No manual pairs, safe to reset
       confirmResetToAuto();
     }
   };
 
   const confirmResetToAuto = () => {
-    if (!alignment) return;
+    if (!alignment || !selectedSession) return;
 
-    const autoPairs: TradePair[] = [];
+    const sessionBacktestedTrades = alignment.backtestedTrades.filter(
+      (trade) => trade.session === selectedSession
+    );
+    const sessionReportedTrades = alignment.reportedTrades.filter(
+      (trade) => trade.session === selectedSession
+    );
 
-    alignment.sessions.forEach((session) => {
-      session.items.forEach((item) => {
-        if (item.backtested && item.reported && item.autoBacktested && item.autoReported) {
-          autoPairs.push({
-            backtestedId: item.backtested.id,
-            reportedId: item.reported.id,
-            manual: false,
-          });
-        }
+    const autoPairs = buildAutoPairsForSession(
+      sessionBacktestedTrades,
+      sessionReportedTrades
+    );
+    const backtestedLookup = new Map(
+      alignment.backtestedTrades.map((trade) => [trade.id, trade])
+    );
+
+    setConfirmedPairs((prev) => {
+      const sessionBacktestedIds = new Set(
+        sessionBacktestedTrades.map((trade) => trade.id)
+      );
+
+      const nextPairs = prev.filter(
+        (pair) => !sessionBacktestedIds.has(pair.backtestedId)
+      );
+      nextPairs.push(...autoPairs);
+
+      nextPairs.sort((a, b) => {
+        const tradeA = backtestedLookup.get(a.backtestedId);
+        const tradeB = backtestedLookup.get(b.backtestedId);
+        if (!tradeA || !tradeB) return 0;
+        return tradeA.sortTime - tradeB.sortTime;
       });
+
+      return nextPairs;
     });
 
-    setConfirmedPairs(autoPairs);
     setSelectedBacktested(null);
     setSelectedReported(null);
     setShowResetConfirm(false);
@@ -302,7 +384,7 @@ export function MatchReviewDialog({
                     onClick={() => setSessionFilter('unmatched')}
                     className="h-8 text-xs"
                   >
-                    Needs Review ({sessionStats.filter(s => s.hasUnmatched).length})
+                    Unmatched ({sessionStats.filter(s => s.hasUnmatched).length})
                   </Button>
                 </div>
               </div>
@@ -381,26 +463,13 @@ export function MatchReviewDialog({
                           : "border-emerald-400/70 bg-emerald-50/80 dark:border-emerald-500/60 dark:bg-emerald-500/10"
                       )}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Session
-                          </div>
-                          <div className="mt-1 text-lg font-semibold leading-tight text-foreground">
-                            {formatSessionDate(stats.session)}
-                          </div>
+                      <div>
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Session
                         </div>
-                        <Badge
-                          variant={stats.hasUnmatched ? "outline" : "secondary"}
-                          className={cn(
-                            "text-xs font-medium shrink-0",
-                            stats.hasUnmatched
-                              ? "border-amber-400 text-amber-700 dark:border-amber-500/70 dark:text-amber-200"
-                              : "border-transparent bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200"
-                          )}
-                        >
-                          {stats.hasUnmatched ? "Needs Review" : "All Matched"}
-                        </Badge>
+                        <div className="mt-1 text-lg font-semibold leading-tight text-foreground">
+                          {formatSessionDate(stats.session)}
+                        </div>
                       </div>
                       <div className="mt-4 flex items-center gap-2 text-sm font-medium">
                         {stats.hasUnmatched ? (
