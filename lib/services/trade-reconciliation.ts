@@ -29,6 +29,7 @@ export interface TradeSessionMatchItem {
   autoReported: boolean
   includedBacktested: boolean
   includedReported: boolean
+  isPaired: boolean  // true if from matchResult.pairs, false if from unmatched loop
 }
 
 export interface TradeSessionMatch {
@@ -477,6 +478,7 @@ function buildSessionMatches(
       autoReported: autoReportedIds.has(pair.reported.id),
       includedBacktested: selectedBacktestedIds.has(pair.backtested.id),
       includedReported: selectedReportedIds.has(pair.reported.id),
+      isPaired: true,  // This item represents an actual pair
     })
   })
 
@@ -528,6 +530,7 @@ function buildSessionMatches(
           includedReported: reportedTrade
             ? selectedReportedIds.has(reportedTrade.id)
             : false,
+          isPaired: false,  // This item is just unmatched trades displayed together
         })
       }
 

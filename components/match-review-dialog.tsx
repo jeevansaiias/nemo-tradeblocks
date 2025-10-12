@@ -112,23 +112,15 @@ export function MatchReviewDialog({
   useEffect(() => {
     if (alignment && open) {
       // Build pairs from the session data
-      // When a user has saved custom pairs, they come through selectedBacktestedIds/selectedReportedIds
-      // We need to build the pairs from what's actually matched in sessions
+      // Use the isPaired flag to distinguish actual pairs from unmatched trades
+      // that happen to be displayed side-by-side
       const loadedPairs: TradePair[] = [];
 
       alignment.sessions.forEach((session) => {
         session.items.forEach((item) => {
-          // Only include items that represent confirmed matches
-          const isMatched =
-            item.backtested &&
-            item.reported &&
-            ((item.autoBacktested && item.autoReported) ||
-              (item.includedBacktested && item.includedReported));
-
-          if (isMatched && item.backtested && item.reported) {
-            // Determine if this is a manual pair or auto pair
-            // If it's auto-matched (autoBacktested && autoReported), it's auto
-            // Otherwise, it's a manual pairing
+          // Only load items that are actual pairs (from matchResult.pairs)
+          // Items with isPaired=false are just unmatched trades displayed together
+          if (item.isPaired && item.backtested && item.reported) {
             const isAuto = item.autoBacktested && item.autoReported;
 
             loadedPairs.push({

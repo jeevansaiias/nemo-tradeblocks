@@ -1,8 +1,8 @@
 "use client";
 
+import { MatchReviewDialog } from "@/components/match-review-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MatchReviewDialog } from "@/components/match-review-dialog";
 import {
   Card,
   CardContent,
@@ -19,9 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   getReportingTradesByBlock,
@@ -89,7 +89,9 @@ export default function ComparisonBlocksPage() {
     SelectableStrategy[]
   >([]);
   const [alignments, setAlignments] = useState<StrategyAlignment[]>([]);
-  const [matchDialogAlignmentId, setMatchDialogAlignmentId] = useState<string | null>(null);
+  const [matchDialogAlignmentId, setMatchDialogAlignmentId] = useState<
+    string | null
+  >(null);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -206,8 +208,16 @@ export default function ComparisonBlocksPage() {
       return;
     }
 
-    refreshComparison(activeBlockId, alignments, normalizeTo1Lot).catch(console.error);
-  }, [activeBlockId, alignments, normalizeTo1Lot, refreshComparison, resetComparison]);
+    refreshComparison(activeBlockId, alignments, normalizeTo1Lot).catch(
+      console.error
+    );
+  }, [
+    activeBlockId,
+    alignments,
+    normalizeTo1Lot,
+    refreshComparison,
+    resetComparison,
+  ]);
 
   const alignmentCoverage = useMemo(() => {
     const reportingCovered = new Set<string>();
@@ -260,7 +270,7 @@ export default function ComparisonBlocksPage() {
 
   const activeMatchAlignment = matchDialogAlignmentId
     ? comparisonData?.alignments.find(
-        (alignment) => alignment.alignmentId === matchDialogAlignmentId,
+        (alignment) => alignment.alignmentId === matchDialogAlignmentId
       ) ?? null
     : null;
 
@@ -286,7 +296,9 @@ export default function ComparisonBlocksPage() {
           const hasBacktested = Boolean(item.backtested);
           const hasReported = Boolean(item.reported);
 
-          if (hasBacktested && hasReported) {
+          // Only count as matched if isPaired is true (actual pair from matchResult.pairs)
+          // Items with both trades but isPaired=false are just unmatched trades displayed together
+          if (item.isPaired && hasBacktested && hasReported) {
             if (item.autoBacktested && item.autoReported) {
               autoMatchedCount += 1;
             } else {
@@ -360,28 +372,29 @@ export default function ComparisonBlocksPage() {
         totalSessions: 0,
         matchedSessions: 0,
         unmatchedSessions: 0,
-      },
-    )
-  }, [summaryRows])
+      }
+    );
+  }, [summaryRows]);
 
   const handleSaveMatchOverrides = async (
     alignmentId: string,
-    tradePairs: import("@/lib/models/strategy-alignment").TradePair[],
+    tradePairs: import("@/lib/models/strategy-alignment").TradePair[]
   ) => {
     const autoData = comparisonData?.alignments.find(
-      (alignment) => alignment.alignmentId === alignmentId,
-    )
+      (alignment) => alignment.alignmentId === alignmentId
+    );
 
     if (!autoData) {
-      setMatchDialogAlignmentId(null)
-      return
+      setMatchDialogAlignmentId(null);
+      return;
     }
 
     // selectedBacktestedIds and selectedReportedIds should contain ALL trades
-    // that are included in this comparison (both matched and unmatched).
-    // The tradePairs array determines which trades are actually paired.
-    const allBacktestedIds = autoData.backtestedTrades.map((trade) => trade.id)
-    const allReportedIds = autoData.reportedTrades.map((trade) => trade.id)
+    // to ensure they're included in stats calculations.
+    // The tradePairs array is the authoritative source for what's actually paired.
+    // The isPaired flag in session items distinguishes real pairs from unmatched trades.
+    const allBacktestedIds = autoData.backtestedTrades.map((trade) => trade.id);
+    const allReportedIds = autoData.reportedTrades.map((trade) => trade.id);
 
     const nextAlignments = alignments.map((mapping) =>
       mapping.id === alignmentId
@@ -393,16 +406,16 @@ export default function ComparisonBlocksPage() {
               tradePairs,
             },
           }
-        : mapping,
-    )
+        : mapping
+    );
 
-    await persistAlignments(nextAlignments)
+    await persistAlignments(nextAlignments);
     // Refresh comparison with the new alignments
     if (activeBlockId) {
-      await refreshComparison(activeBlockId, nextAlignments, normalizeTo1Lot)
+      await refreshComparison(activeBlockId, nextAlignments, normalizeTo1Lot);
     }
-    setMatchDialogAlignmentId(null)
-  }
+    setMatchDialogAlignmentId(null);
+  };
 
   const persistAlignments = async (nextAlignments: StrategyAlignment[]) => {
     if (!activeBlock) {
@@ -600,7 +613,9 @@ export default function ComparisonBlocksPage() {
           {(isLoading || comparisonLoading) && (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {isLoading ? "Loading strategy data..." : "Reconciling mappings..."}
+              {isLoading
+                ? "Loading strategy data..."
+                : "Reconciling mappings..."}
             </div>
           )}
           {!isLoading && !comparisonLoading && alignments.length === 0 && (
@@ -695,8 +710,9 @@ export default function ComparisonBlocksPage() {
             <div>
               <CardTitle>Reconciliation Summary</CardTitle>
               <CardDescription>
-                Keep reconciliations aligned by monitoring matched trades, sessions needing review,
-                and outstanding differences between backtested and reported executions.
+                Keep reconciliations aligned by monitoring matched trades,
+                sessions needing review, and outstanding differences between
+                backtested and reported executions.
               </CardDescription>
             </div>
             <div className="flex items-center gap-3">
@@ -706,7 +722,10 @@ export default function ComparisonBlocksPage() {
                 onCheckedChange={setNormalizeTo1Lot}
                 disabled={comparisonLoading || isLoading}
               />
-              <Label htmlFor="normalize-1lot" className="cursor-pointer text-sm">
+              <Label
+                htmlFor="normalize-1lot"
+                className="cursor-pointer text-sm"
+              >
                 Normalize to 1-lot
               </Label>
               <span className="text-xs text-muted-foreground">
@@ -720,23 +739,31 @@ export default function ComparisonBlocksPage() {
             {(comparisonLoading || isLoading) && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-sm">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Updating reconciliation…</span>
+                <span className="text-xs text-muted-foreground">
+                  Updating reconciliation…
+                </span>
               </div>
             )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="pb-3 pt-2 pr-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Strategy<br />Mapping
+                    Strategy
+                    <br />
+                    Mapping
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground border-x">
                     Sessions
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Matched<br />Trades
+                    Matched
+                    <br />
+                    Trades
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground border-x">
-                    Included<br />Trades
+                    Included
+                    <br />
+                    Trades
                   </th>
                   <th className="pb-3 pt-2 px-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Actions
@@ -745,7 +772,10 @@ export default function ComparisonBlocksPage() {
               </thead>
               <tbody className="divide-y">
                 {summaryRows.map((row) => (
-                  <tr key={row.id} className="hover:bg-muted/50 transition-colors">
+                  <tr
+                    key={row.id}
+                    className="hover:bg-muted/50 transition-colors"
+                  >
                     <td className="py-3 pr-4">
                       <div className="font-semibold text-foreground">
                         {row.backtestedStrategy}
@@ -757,33 +787,56 @@ export default function ComparisonBlocksPage() {
                     <td className="py-3 px-3">
                       <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Total</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.totalSessions}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Total
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {row.totalSessions}
+                          </div>
                         </div>
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Matched</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.matchedSessions}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Matched
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {row.matchedSessions}
+                          </div>
                         </div>
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.unmatchedSessions}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Unmatched
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {row.unmatchedSessions}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-3">
                       <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Auto</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.autoMatchedCount}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Manual</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.manualMatchedCount}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Auto
+                          </div>
                           <div className="font-medium text-foreground tabular-nums">
-                            BT {row.unmatchedBacktestedCount} / RPT {row.unmatchedReportedCount}
+                            {row.autoMatchedCount}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Manual
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {row.manualMatchedCount}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Unmatched
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            BT {row.unmatchedBacktestedCount} / RPT{" "}
+                            {row.unmatchedReportedCount}
                           </div>
                         </div>
                       </div>
@@ -791,12 +844,20 @@ export default function ComparisonBlocksPage() {
                     <td className="py-3 px-3">
                       <div className="grid grid-cols-2 gap-3 text-xs text-center rounded-md border border-muted bg-muted/20 p-2">
                         <div>
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">BT</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.totalBacktestedCount}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            BT
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {row.totalBacktestedCount}
+                          </div>
                         </div>
                         <div>
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">RPT</div>
-                          <div className="font-medium text-foreground tabular-nums">{row.totalReportedCount}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            RPT
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {row.totalReportedCount}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -821,33 +882,56 @@ export default function ComparisonBlocksPage() {
                     <td className="py-3 px-3">
                       <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Total</div>
-                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.totalSessions}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Total
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {aggregateMatchStats.totalSessions}
+                          </div>
                         </div>
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Matched</div>
-                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.matchedSessions}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Matched
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {aggregateMatchStats.matchedSessions}
+                          </div>
                         </div>
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
-                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.unmatchedSessions}</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Unmatched
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {aggregateMatchStats.unmatchedSessions}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-3">
                       <div className="grid grid-cols-3 gap-3 text-xs rounded-md border border-muted bg-muted/20 p-2">
                         <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Auto</div>
-                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.autoMatched}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Manual</div>
-                          <div className="font-medium text-foreground tabular-nums">{aggregateMatchStats.manualMatched}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">Unmatched</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Auto
+                          </div>
                           <div className="font-medium text-foreground tabular-nums">
-                            BT {aggregateMatchStats.unmatchedBacktested} / RPT {aggregateMatchStats.unmatchedReported}
+                            {aggregateMatchStats.autoMatched}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Manual
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            {aggregateMatchStats.manualMatched}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            Unmatched
+                          </div>
+                          <div className="font-medium text-foreground tabular-nums">
+                            BT {aggregateMatchStats.unmatchedBacktested} / RPT{" "}
+                            {aggregateMatchStats.unmatchedReported}
                           </div>
                         </div>
                       </div>
@@ -855,13 +939,17 @@ export default function ComparisonBlocksPage() {
                     <td className="py-3 px-3">
                       <div className="grid grid-cols-2 gap-3 text-xs text-center rounded-md border border-muted bg-muted/20 p-2">
                         <div>
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">BT</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            BT
+                          </div>
                           <div className="font-medium text-foreground tabular-nums">
                             {aggregateMatchStats.totalBacktested}
                           </div>
                         </div>
                         <div>
-                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">RPT</div>
+                          <div className="uppercase tracking-wide text-muted-foreground text-[10px]">
+                            RPT
+                          </div>
                           <div className="font-medium text-foreground tabular-nums">
                             {aggregateMatchStats.totalReported}
                           </div>
@@ -883,11 +971,11 @@ export default function ComparisonBlocksPage() {
         alignment={activeMatchAlignment}
         open={Boolean(activeMatchAlignment)}
         onOpenChange={(open) => {
-          if (!open) setMatchDialogAlignmentId(null)
+          if (!open) setMatchDialogAlignmentId(null);
         }}
         onSave={(tradePairs) => {
           if (matchDialogAlignmentId) {
-            handleSaveMatchOverrides(matchDialogAlignmentId, tradePairs)
+            handleSaveMatchOverrides(matchDialogAlignmentId, tradePairs);
           }
         }}
         normalizeTo1Lot={normalizeTo1Lot}
@@ -926,7 +1014,6 @@ function StrategyBadgeGroup({
     </div>
   );
 }
-
 
 function MappingDialog({
   open,
