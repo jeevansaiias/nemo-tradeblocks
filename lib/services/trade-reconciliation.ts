@@ -2,6 +2,13 @@ import { getReportingTradesByBlock, getTradesByBlock } from '@/lib/db'
 import { ReportingTrade } from '@/lib/models/reporting-trade'
 import { StrategyAlignment, MatchOverrides, TradePair } from '@/lib/models/strategy-alignment'
 import { Trade } from '@/lib/models/trade'
+import {
+  calculatePairedTTest,
+  calculateCorrelationMetrics,
+  TTestResult,
+  CorrelationMetrics,
+  MatchedPair as StatMatchedPair,
+} from '@/lib/calculations/reconciliation-stats'
 
 const MATCH_TOLERANCE_MS = 30 * 60 * 1000 // 30 minutes
 
@@ -44,6 +51,8 @@ export interface AlignmentMetrics {
   matchRate: number
   slippagePerContract: number
   sizeVariance: number
+  tTest: TTestResult | null
+  correlation: CorrelationMetrics | null
   notes?: string
 }
 
@@ -583,6 +592,15 @@ function buildMetrics(
     ? matchedPairs.length / totalTrades
     : 0
 
+  // Calculate statistical metrics for matched pairs
+  const statPairs: StatMatchedPair[] = matchedPairs.map(pair => ({
+    backtested: pair.backtested,
+    reported: pair.reported,
+  }))
+
+  const tTest = calculatePairedTTest(statPairs)
+  const correlation = calculateCorrelationMetrics(statPairs)
+
   return {
     backtested: backtestedTotals,
     reported: reportedTotals,
@@ -590,6 +608,8 @@ function buildMetrics(
     matchRate,
     slippagePerContract,
     sizeVariance,
+    tTest,
+    correlation,
   }
 }
 
