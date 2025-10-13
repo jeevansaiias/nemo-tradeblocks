@@ -152,8 +152,32 @@ function buildAlignmentSet(
   reportedByStrategy: Map<string, NormalizedTrade[]>,
   normalizeTo1Lot: boolean,
 ): AlignedTradeSet {
-  const backtestedStrategy = alignment.liveStrategies[0] ?? 'Unknown'
-  const reportedStrategy = alignment.reportingStrategies[0] ?? 'Unknown'
+  const backtestedStrategy = alignment.liveStrategies[0]
+  const reportedStrategy = alignment.reportingStrategies[0]
+
+  if (!backtestedStrategy || !reportedStrategy) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[reconciliation] alignment missing strategies', {
+        alignmentId: alignment.id,
+        liveStrategies: alignment.liveStrategies,
+        reportingStrategies: alignment.reportingStrategies,
+      })
+    }
+
+    return {
+      alignmentId: alignment.id,
+      backtestedStrategy: backtestedStrategy ?? 'Unknown',
+      reportedStrategy: reportedStrategy ?? 'Unknown',
+      backtestedTrades: [],
+      reportedTrades: [],
+      metrics: buildMetrics([], [], [], normalizeTo1Lot),
+      sessions: [],
+      autoSelectedBacktestedIds: [],
+      autoSelectedReportedIds: [],
+      selectedBacktestedIds: [],
+      selectedReportedIds: [],
+    }
+  }
 
   const reportedTrades = reportedByStrategy.get(reportedStrategy) ?? []
   const backtestedTradesRaw = backtestedByStrategy.get(backtestedStrategy) ?? []
