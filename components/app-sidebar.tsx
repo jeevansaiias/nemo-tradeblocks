@@ -5,6 +5,7 @@ import {
   IconGauge,
   IconLayoutDashboard,
   IconLink,
+  IconReportAnalytics,
   IconRouteSquare,
   IconStack2,
 } from "@tabler/icons-react";
@@ -40,11 +41,11 @@ const navData = {
       icon: IconLayoutDashboard,
     },
     {
-      title: "Comparison Blocks",
-      href: "/comparison-blocks",
-      icon: IconLink,
-      badge: "Beta",
+      title: "Performance Blocks",
+      href: "/performance-blocks",
+      icon: IconReportAnalytics,
     },
+
     {
       title: "Position Sizing",
       href: "/position-sizing",
@@ -59,6 +60,12 @@ const navData = {
       title: "Correlation Matrix",
       href: "/correlation-matrix",
       icon: IconChartHistogram,
+    },
+    {
+      title: "Comparison Blocks",
+      href: "/comparison-blocks",
+      icon: IconLink,
+      badge: "Beta",
     },
   ],
 };
