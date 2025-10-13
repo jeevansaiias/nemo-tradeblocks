@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  IconChartHistogram,
-  IconGauge,
-  IconLayoutDashboard,
-  IconReportAnalytics,
-  IconRouteSquare,
-  IconStack2,
+    IconChartHistogram,
+    IconGauge,
+    IconGitCompare,
+    IconLayoutDashboard,
+    IconReportAnalytics,
+    IconRouteSquare,
+    IconStack2,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,13 +19,13 @@ import { NavMain } from "@/components/nav-main";
 import { SidebarActiveBlocks } from "@/components/sidebar-active-blocks";
 import { SidebarFooterLegal } from "@/components/sidebar-footer-legal";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
 const navData = {
@@ -43,6 +44,11 @@ const navData = {
       title: "Performance Blocks",
       href: "/performance-blocks",
       icon: IconReportAnalytics,
+    },
+    {
+      title: "Comparison Blocks",
+      href: "/comparison-blocks",
+      icon: IconGitCompare,
     },
     {
       title: "Position Sizing",
