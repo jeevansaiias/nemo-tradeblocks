@@ -86,7 +86,7 @@ export class ReportingTradeProcessor {
     const normalizedHeaders = normalizeHeaders(parseResult.headers, REPORTING_TRADE_COLUMN_ALIASES)
     const missingColumns = findMissingHeaders(normalizedHeaders, REQUIRED_REPORTING_TRADE_COLUMNS)
     if (missingColumns.length > 0) {
-      throw new Error(`Missing required reporting log columns: ${missingColumns.join(', ')}`)
+      throw new Error(`Missing required reporting trade columns: ${missingColumns.join(', ')}`)
     }
 
     this.config.progressCallback({
