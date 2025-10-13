@@ -191,53 +191,74 @@ export function ReconciliationMetrics({ metrics, alignment, className }: Reconci
           <CardContent className="space-y-4">
             {/* Key Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="text-center p-2 bg-muted/50 rounded">
-                <div className="text-base font-semibold">
-                  {tTest.pValue < 0.001 ? '<0.001' : tTest.pValue.toFixed(3)}
-                </div>
-                <div className="text-xs text-muted-foreground">p-value</div>
-              </div>
+              <MetricCard
+                title="p-value"
+                value={tTest.pValue < 0.001 ? '<0.001' : tTest.pValue.toFixed(3)}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Probability of seeing a difference this extreme if backtested and reported P/L were identical",
+                  detailed: "Lower p-values (< 0.05) indicate the observed difference in matched P/L is unlikely to be due to random chance."
+                }}
+              />
 
-              <div className="text-center p-2 bg-muted/50 rounded">
-                <div className="text-base font-semibold">
-                  {tTest.tStatistic.toFixed(2)}
-                </div>
-                <div className="text-xs text-muted-foreground">t-statistic</div>
-              </div>
+              <MetricCard
+                title="t-statistic"
+                value={tTest.tStatistic.toFixed(2)}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Standardized effect size for the paired P/L differences",
+                  detailed: "Higher absolute t-statistics signal stronger evidence against the null hypothesis of equal backtested and reported performance."
+                }}
+              />
 
-              <div className="text-center p-2 bg-muted/50 rounded">
-                <div className="text-base font-semibold">
-                  ${tTest.meanDifference.toFixed(2)}
-                </div>
-                <div className="text-xs text-muted-foreground">Mean Diff</div>
-              </div>
+              <MetricCard
+                title="Mean Diff"
+                value={formatCurrency(tTest.meanDifference)}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Average reported minus backtested P/L per matched trade",
+                  detailed: "Positive values mean reported trades outperformed backtests on average. Values respect the 1-lot normalization toggle."
+                }}
+              />
 
-              <div className="text-center p-2 bg-muted/50 rounded">
-                <div className="text-base font-semibold">
-                  {tTest.degreesOfFreedom}
-                </div>
-                <div className="text-xs text-muted-foreground">df</div>
-              </div>
+              <MetricCard
+                title="Degrees of Freedom"
+                value={tTest.degreesOfFreedom}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Number of independent paired observations minus one",
+                  detailed: "Equal to matched trade count - 1. More degrees of freedom produce more reliable p-values."
+                }}
+              />
             </div>
 
             {/* Confidence Interval */}
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-muted-foreground">
-                95% Confidence Interval
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-muted/50 rounded p-2 text-center">
-                  <div className="text-sm font-semibold">
-                    ${tTest.confidenceInterval[0].toFixed(2)}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">to</div>
-                <div className="flex-1 bg-muted/50 rounded p-2 text-center">
-                  <div className="text-sm font-semibold">
-                    ${tTest.confidenceInterval[1].toFixed(2)}
-                  </div>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+              <MetricCard
+                title="95% CI Lower"
+                value={formatCurrency(tTest.confidenceInterval[0])}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Lower bound of the 95% confidence interval",
+                  detailed: "We are 95% confident the true average reported-minus-backtested P/L falls above this value."
+                }}
+              />
+
+              <MetricCard
+                title="95% CI Upper"
+                value={formatCurrency(tTest.confidenceInterval[1])}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Upper bound of the 95% confidence interval",
+                  detailed: "We are 95% confident the true average reported-minus-backtested P/L falls below this value."
+                }}
+              />
             </div>
           </CardContent>
         </Card>
@@ -250,90 +271,38 @@ export function ReconciliationMetrics({ metrics, alignment, className }: Reconci
             <CardTitle className="text-base font-semibold">Correlation Analysis</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Correlation Values */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="text-center p-3 bg-muted/50 rounded">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  {correlation.pearsonR >= 0 ? (
-                    <TrendingUp className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-red-500" />
-                  )}
-                  <div className="text-xl font-bold">
-                    {correlation.pearsonR.toFixed(3)}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">Pearson r</div>
-                <div className="text-xs text-muted-foreground/70 mt-1">
-                  (Linear correlation)
-                </div>
-              </div>
+              <MetricCard
+                title="Pearson r"
+                value={correlation.pearsonR.toFixed(3)}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Linear correlation between backtested and reported P/L",
+                  detailed: "Measures how closely reported results track backtested results on a trade-by-trade basis. Values near ±1 indicate strong linear alignment."
+                }}
+              />
 
-              <div className="text-center p-3 bg-muted/50 rounded">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  {correlation.spearmanRho >= 0 ? (
-                    <TrendingUp className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-red-500" />
-                  )}
-                  <div className="text-xl font-bold">
-                    {correlation.spearmanRho.toFixed(3)}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">Spearman ρ</div>
-                <div className="text-xs text-muted-foreground/70 mt-1">
-                  (Rank correlation)
-                </div>
-              </div>
+              <MetricCard
+                title="Spearman ρ"
+                value={correlation.spearmanRho.toFixed(3)}
+                format="number"
+                size="sm"
+                tooltip={{
+                  flavor: "Rank correlation between backtested and reported P/L",
+                  detailed: "Captures whether the relative ordering of trade outcomes matches between backtested and reported results, even when magnitudes differ."
+                }}
+              />
             </div>
 
-            {/* Correlation strength indicator */}
-            <div className="flex items-center gap-2 text-sm">
-              <div className="flex-1 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-2 rounded-full" />
-              <div className="text-xs text-muted-foreground">
-                {Math.abs(correlation.pearsonR) >= 0.7 ? "Strong" :
-                 Math.abs(correlation.pearsonR) >= 0.5 ? "Moderate" : "Weak"}
+            {correlation.interpretation && (
+              <div className="text-xs text-muted-foreground leading-relaxed">
+                {correlation.interpretation}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}
-
-      {/* Trade Efficiency Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <MetricCard
-          title="Total Fees (BT)"
-          value={backtested.totalFees}
-          format="currency"
-          subtitle="Backtested"
-          tooltip={{
-            flavor: "Total commissions and fees for backtested trades",
-            detailed: "Includes opening and closing commissions for all matched backtested trades."
-          }}
-        />
-
-        <MetricCard
-          title="Total Fees (RP)"
-          value={reported.totalFees}
-          format="currency"
-          subtitle="Reported"
-          tooltip={{
-            flavor: "Total commissions and fees for reported trades",
-            detailed: "Actual fees paid during live execution."
-          }}
-        />
-
-        <MetricCard
-          title="Fee Difference"
-          value={delta.totalFees}
-          format="currency"
-          isPositive={delta.totalFees <= 0}
-          tooltip={{
-            flavor: "Difference in total fees",
-            detailed: "Positive values indicate higher fees in reported trades. This can impact net P/L significantly."
-          }}
-        />
-      </div>
     </div>
   )
 }

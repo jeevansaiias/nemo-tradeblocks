@@ -1,24 +1,39 @@
 "use client"
 
 import { ChartWrapper, createHistogramLayout } from "@/components/performance-charts/chart-wrapper"
-import { AlignedTradeSet } from "@/lib/services/trade-reconciliation"
+import { AlignedTradeSet, NormalizedTrade } from "@/lib/services/trade-reconciliation"
 import type { PlotData } from "plotly.js"
 import { useMemo } from "react"
 
 interface SlippageDistributionChartProps {
   alignment: AlignedTradeSet
+  normalizeTo1Lot?: boolean
   className?: string
 }
 
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
 export function SlippageDistributionChart({
   alignment,
+  normalizeTo1Lot = false,
   className,
 }: SlippageDistributionChartProps) {
   const { plotData, layout, stats } = useMemo(() => {
     // Extract matched pairs
     const matchedPairs = alignment.sessions.flatMap(session =>
       session.items
-        .filter(item => item.isPaired && item.backtested && item.reported)
+        .filter(item =>
+          item.isPaired &&
+          item.backtested &&
+          item.reported &&
+          item.includedBacktested &&
+          item.includedReported
+        )
         .map(item => ({
           backtested: item.backtested!,
           reported: item.reported!,
@@ -29,15 +44,28 @@ export function SlippageDistributionChart({
       return { plotData: [], layout: {}, stats: null }
     }
 
+    const normalizePremium = (trade: NormalizedTrade) => {
+      if (!normalizeTo1Lot || !trade.contracts) {
+        return trade.totalPremium
+      }
+      return trade.totalPremium / trade.contracts
+    }
+
     // Calculate slippage for each pair (reported premium - backtested premium)
     const slippages = matchedPairs.map(
-      pair => pair.reported.totalPremium - pair.backtested.totalPremium
+      pair => normalizePremium(pair.reported) - normalizePremium(pair.backtested)
     )
 
     // Calculate statistics
     const sortedSlippages = [...slippages].sort((a, b) => a - b)
     const mean = slippages.reduce((sum, val) => sum + val, 0) / slippages.length
-    const median = sortedSlippages[Math.floor(sortedSlippages.length / 2)]
+    const median = (() => {
+      const mid = Math.floor(sortedSlippages.length / 2)
+      if (sortedSlippages.length % 2 === 0) {
+        return (sortedSlippages[mid - 1] + sortedSlippages[mid]) / 2
+      }
+      return sortedSlippages[mid]
+    })()
 
     // Calculate percentiles
     const getPercentile = (arr: number[], percentile: number) => {
@@ -49,39 +77,77 @@ export function SlippageDistributionChart({
       return arr[lower] * (1 - weight) + arr[upper] * weight
     }
 
-    const p25 = getPercentile(sortedSlippages, 25)
-    const p75 = getPercentile(sortedSlippages, 75)
     const p10 = getPercentile(sortedSlippages, 10)
     const p90 = getPercentile(sortedSlippages, 90)
+    const p25 = getPercentile(sortedSlippages, 25)
+    const p75 = getPercentile(sortedSlippages, 75)
 
-    // Create histogram with color gradient
-    const histogramTrace: Partial<PlotData> = {
-      x: slippages,
-      type: "histogram",
-      nbinsx: 20,
-      name: "Slippage Distribution",
-      marker: {
-        color: slippages.map(s => {
-          if (s > 0) return "#10b981" // Green for positive slippage
-          if (s < 0) return "#ef4444" // Red for negative slippage
-          return "#6b7280" // Gray for zero
-        }),
-        line: { color: "#ffffff", width: 0.5 },
-      },
-      hovertemplate:
-        "<b>Slippage Range:</b> $%{x:.2f}<br>" +
-        "<b>Trade Count:</b> %{y}<br>" +
-        "<extra></extra>",
-    }
-
-    const traces: Partial<PlotData>[] = [histogramTrace]
+    const traces: Partial<PlotData>[] = []
 
     // Smart x-axis range
     const minSlippage = Math.min(...slippages)
     const maxSlippage = Math.max(...slippages)
-    const rangePadding = Math.max(Math.abs(maxSlippage), Math.abs(minSlippage)) * 0.15
+    const maxMagnitude = Math.max(Math.abs(maxSlippage), Math.abs(minSlippage))
+    const rangePadding = maxMagnitude === 0 ? 1 : maxMagnitude * 0.15
     const xMin = minSlippage - rangePadding
     const xMax = maxSlippage + rangePadding
+
+    const binCount = Math.min(40, Math.max(10, Math.ceil(Math.sqrt(slippages.length))))
+    const binSize = xMax - xMin === 0 ? 1 : (xMax - xMin) / binCount
+    const xbins = {
+      start: xMin,
+      end: xMax,
+      size: binSize,
+    }
+
+    const positiveSlippages = slippages.filter((s) => s > 0)
+    const negativeSlippages = slippages.filter((s) => s < 0)
+    const neutralSlippages = slippages.filter((s) => s === 0)
+
+    if (negativeSlippages.length > 0) {
+      traces.push({
+        x: negativeSlippages,
+        type: "histogram",
+        name: "Negative (worse execution)",
+        marker: { color: "#ef4444" },
+        opacity: 0.75,
+        xbins,
+        hovertemplate:
+          "<b>Slippage:</b> $%{x:.2f}<br>" +
+          "<b>Trades:</b> %{y}<br>" +
+          "<extra></extra>",
+      })
+    }
+
+    if (positiveSlippages.length > 0) {
+      traces.push({
+        x: positiveSlippages,
+        type: "histogram",
+        name: "Positive (better execution)",
+        marker: { color: "#10b981" },
+        opacity: 0.75,
+        xbins,
+        hovertemplate:
+          "<b>Slippage:</b> $%{x:.2f}<br>" +
+          "<b>Trades:</b> %{y}<br>" +
+          "<extra></extra>",
+      })
+    }
+
+    if (neutralSlippages.length > 0) {
+      traces.push({
+        x: neutralSlippages,
+        type: "histogram",
+        name: "Neutral",
+        marker: { color: "#6b7280" },
+        opacity: 0.75,
+        xbins,
+        hovertemplate:
+          "<b>Slippage:</b> $%{x:.2f}<br>" +
+          "<b>Trades:</b> %{y}<br>" +
+          "<extra></extra>",
+      })
+    }
 
     // Add mean line
     traces.push({
@@ -109,18 +175,19 @@ export function SlippageDistributionChart({
       hovertemplate: `<b>Median Slippage</b><br>$${median.toFixed(2)}<extra></extra>`,
     })
 
-    // Add zero line for reference
-    traces.push({
-      x: [0, 0],
-      y: [0, 1],
-      type: "scatter",
-      mode: "lines",
-      line: { color: "#6b7280", width: 1.5, dash: "solid" },
-      name: "Zero",
-      showlegend: true,
-      yaxis: "y2",
-      hovertemplate: "<b>Zero Slippage</b><extra></extra>",
-    })
+    if (xMin < 0 && xMax > 0) {
+      traces.push({
+        x: [0, 0],
+        y: [0, 1],
+        type: "scatter",
+        mode: "lines",
+        line: { color: "#6b7280", width: 1.5 },
+        name: "Zero",
+        showlegend: true,
+        yaxis: "y2",
+        hovertemplate: "<b>Zero Slippage</b><extra></extra>",
+      })
+    }
 
     const chartLayout = {
       ...createHistogramLayout("", "Slippage ($)", "Number of Trades"),
@@ -136,7 +203,7 @@ export function SlippageDistributionChart({
         showgrid: true,
       },
       yaxis2: {
-        overlaying: "y",
+        overlaying: "y" as const,
         side: "right" as const,
         showgrid: false,
         showticklabels: false,
@@ -144,13 +211,15 @@ export function SlippageDistributionChart({
       },
       showlegend: true,
       legend: {
+        orientation: "h" as const,
+        yanchor: "bottom" as const,
+        y: 1.02,
+        xanchor: "right" as const,
         x: 1,
-        xanchor: "right",
-        y: 1,
-        yanchor: "top",
         bgcolor: "rgba(0,0,0,0)",
       },
       bargap: 0.05,
+      barmode: "overlay" as const,
     }
 
     return {
@@ -164,11 +233,12 @@ export function SlippageDistributionChart({
         p75,
         p90,
         count: slippages.length,
-        positiveCount: slippages.filter(s => s > 0).length,
-        negativeCount: slippages.filter(s => s < 0).length,
+        positiveCount: positiveSlippages.length,
+        neutralCount: neutralSlippages.length,
+        negativeCount: negativeSlippages.length,
       },
     }
-  }, [alignment])
+  }, [alignment, normalizeTo1Lot])
 
   if (plotData.length === 0) {
     return (
@@ -184,22 +254,37 @@ export function SlippageDistributionChart({
     <div className={className}>
       <ChartWrapper
         title="Slippage Distribution"
-        description={`Analysis of ${stats?.count} matched trades`}
+        description={`Distribution of slippage for ${stats?.count ?? 0} matched trades (${normalizeTo1Lot ? "per contract" : "per trade"})`}
         tooltip={{
           flavor: "Distribution of slippage across all matched trades",
-          detailed: "Slippage is the difference between backtested premium and actual reported premium. Positive slippage (green) indicates better execution than expected, while negative slippage (red) indicates worse execution. The distribution helps identify systematic biases and execution quality patterns."
+          detailed: "Slippage measures reported premium minus backtested premium for each matched trade. Positive slippage (green) indicates better execution than expected, while negative slippage (red) indicates worse execution."
         }}
         data={plotData}
         layout={layout}
+        style={{ height: "320px" }}
       >
         {/* Stats Summary */}
         {stats && (
-          <div className="flex gap-3 text-xs">
-            <div className="text-green-600 dark:text-green-400">
-              +{stats.positiveCount} favorable
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs text-muted-foreground">
+            <div>
+              <span className="block font-semibold text-foreground">Mean</span>
+              {currencyFormatter.format(stats.mean)}
             </div>
-            <div className="text-red-600 dark:text-red-400">
-              {stats.negativeCount} unfavorable
+            <div>
+              <span className="block font-semibold text-foreground">Median</span>
+              {currencyFormatter.format(stats.median)}
+            </div>
+            <div>
+              <span className="block font-semibold text-foreground">P25 / P75</span>
+              {currencyFormatter.format(stats.p25)} / {currencyFormatter.format(stats.p75)}
+            </div>
+            <div>
+              <span className="block font-semibold text-foreground">P10 / P90</span>
+              {currencyFormatter.format(stats.p10)} / {currencyFormatter.format(stats.p90)}
+            </div>
+            <div>
+              <span className="block font-semibold text-foreground">Favorable / Neutral / Unfavorable</span>
+              +{stats.positiveCount} / {stats.neutralCount} / {stats.negativeCount}
             </div>
           </div>
         )}

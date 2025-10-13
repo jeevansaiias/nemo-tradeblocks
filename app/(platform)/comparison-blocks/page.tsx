@@ -1015,7 +1015,10 @@ export default function ComparisonBlocksPage() {
                 <ReconciliationMetrics metrics={selectedAlignment.metrics} alignment={selectedAlignment} />
 
                 {/* Slippage Distribution Chart */}
-                <SlippageDistributionChart alignment={selectedAlignment} />
+                <SlippageDistributionChart
+                  alignment={selectedAlignment}
+                  normalizeTo1Lot={normalizeTo1Lot}
+                />
               </CardContent>
             </Card>
           </div>

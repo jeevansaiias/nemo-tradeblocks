@@ -609,6 +609,11 @@ function buildMetrics(
       ? matchedBacktestedTotalPremium / matchedBacktestedContractBaseline
       : 0
 
+  const normalizedPairs: StatMatchedPair[] = matchedPairs.map(pair => ({
+    backtested: normalizeTradeForStats(pair.backtested, normalizeTo1Lot),
+    reported: normalizeTradeForStats(pair.reported, normalizeTo1Lot),
+  }))
+
   const sizeVariance =
     matchedBacktestedContractsRaw > 0
       ? matchedPairs.reduce(
@@ -626,13 +631,8 @@ function buildMetrics(
     : 0
 
   // Calculate statistical metrics for matched pairs
-  const statPairs: StatMatchedPair[] = matchedPairs.map(pair => ({
-    backtested: pair.backtested,
-    reported: pair.reported,
-  }))
-
-  const tTest = calculatePairedTTest(statPairs)
-  const correlation = calculateCorrelationMetrics(statPairs)
+  const tTest = calculatePairedTTest(normalizedPairs)
+  const correlation = calculateCorrelationMetrics(normalizedPairs)
 
   return {
     backtested: backtestedTotals,
@@ -649,6 +649,22 @@ function buildMetrics(
       backtestedAvgPremiumPerContract: matchedBacktestedAvgPremiumPerContract,
       backtestedContractBaseline: matchedBacktestedContractBaseline,
     },
+  }
+}
+
+function normalizeTradeForStats(trade: NormalizedTrade, normalizeTo1Lot: boolean): NormalizedTrade {
+  if (!normalizeTo1Lot || trade.contracts === 0) {
+    return trade
+  }
+
+  return {
+    ...trade,
+    pl: trade.pl / trade.contracts,
+    totalPremium: trade.totalPremium / trade.contracts,
+    premiumPerContract: trade.premiumPerContract,
+    openingFees: trade.openingFees / trade.contracts,
+    closingFees: trade.closingFees / trade.contracts,
+    contracts: 1,
   }
 }
 

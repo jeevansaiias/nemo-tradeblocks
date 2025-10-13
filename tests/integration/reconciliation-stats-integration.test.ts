@@ -447,6 +447,14 @@ describe('Reconciliation Statistics Integration', () => {
 
       expect(avgSlippagePerTradeActual).toBeCloseTo(15.5, 6)
       expect(avgSlippagePerTradeNormalized).toBeCloseTo(4, 6)
+
+      expect(metricsActual.tTest).not.toBeNull()
+      expect(metricsNormalized.tTest).not.toBeNull()
+
+      if (metricsActual.tTest && metricsNormalized.tTest) {
+        expect(metricsActual.tTest.meanDifference).toBeCloseTo(3.5, 6)
+        expect(metricsNormalized.tTest.meanDifference).toBeCloseTo(1, 6)
+      }
     })
   })
 })
