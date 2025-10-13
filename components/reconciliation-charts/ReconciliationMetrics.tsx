@@ -6,7 +6,6 @@ import { AlignedTradeSet, AlignmentMetrics } from "@/lib/services/trade-reconcil
 import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SlippageDistributionChart, computeSlippageDistribution } from "./SlippageDistributionChart"
-import { useMemo } from "react"
 
 interface ReconciliationMetricsProps {
   metrics: AlignmentMetrics
@@ -64,10 +63,7 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
   const matchedAvgPremiumDisplay = formatCurrency(matched.backtestedAvgPremiumPerContract)
   const slippagePerContractDisplay = formatCurrency(slippagePerContract)
   const avgSlippagePerTradeDisplay = avgSlippagePerTrade != null ? formatCurrency(avgSlippagePerTrade) : null
-  const slippageDistribution = useMemo(
-    () => computeSlippageDistribution(alignment, normalizeTo1Lot),
-    [alignment, normalizeTo1Lot]
-  )
+  const slippageDistribution = computeSlippageDistribution(alignment, normalizeTo1Lot)
 
   const slippageMeanDisplay = slippageDistribution ? formatCurrency(slippageDistribution.mean) : "N/A"
   const slippageMedianDisplay = slippageDistribution ? formatCurrency(slippageDistribution.median) : "N/A"

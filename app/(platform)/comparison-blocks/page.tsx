@@ -242,6 +242,23 @@ export default function ComparisonBlocksPage() {
     resetComparison,
   ]);
 
+  useEffect(() => {
+    if (!comparisonData || comparisonData.alignments.length === 0) {
+      if (selectedAlignmentId !== null) {
+        setSelectedAlignmentId(null);
+      }
+      return;
+    }
+
+    const stillValid = comparisonData.alignments.some(
+      (alignment) => alignment.alignmentId === selectedAlignmentId
+    );
+
+    if (!stillValid) {
+      setSelectedAlignmentId(comparisonData.alignments[0].alignmentId);
+    }
+  }, [comparisonData, selectedAlignmentId]);
+
   const alignmentCoverage = useMemo(() => {
     const reportingCovered = new Set<string>();
     const backtestedCovered = new Set<string>();
@@ -937,15 +954,10 @@ export default function ComparisonBlocksPage() {
       )}
 
       {/* Statistical Analysis Section - Show detailed metrics for selected alignment */}
-      {comparisonData && comparisonData.alignments.length > 0 && (() => {
+      {comparisonData && comparisonData.alignments.length > 0 && comparisonLastBlockId === activeBlockId && (() => {
         const selectedAlignment = selectedAlignmentId
           ? comparisonData.alignments.find(a => a.alignmentId === selectedAlignmentId)
           : comparisonData.alignments[0];
-
-        // Auto-select first alignment if none selected
-        if (!selectedAlignmentId && comparisonData.alignments[0]) {
-          setSelectedAlignmentId(comparisonData.alignments[0].alignmentId);
-        }
 
         if (!selectedAlignment) return null;
 
@@ -1012,6 +1024,7 @@ export default function ComparisonBlocksPage() {
               <CardContent className="space-y-6">
                 {/* Reconciliation Metrics Dashboard */}
                 <ReconciliationMetrics
+                  key={`${selectedAlignment.alignmentId}-${normalizeTo1Lot ? "norm" : "raw"}`}
                   metrics={selectedAlignment.metrics}
                   alignment={selectedAlignment}
                   normalizeTo1Lot={normalizeTo1Lot}
