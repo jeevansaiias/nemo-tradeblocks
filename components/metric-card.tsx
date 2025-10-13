@@ -92,7 +92,7 @@ export function MetricCard({
         className
       )}
     >
-      <CardContent className={cn("px-0", sizeClasses[size])}>
+      <CardContent className={cn("px-0 flex flex-col justify-center min-h-[80px]", sizeClasses[size])}>
         <div className="space-y-1 text-center">
           {/* Title Row */}
           <div className="flex items-center justify-center gap-1">

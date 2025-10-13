@@ -1,6 +1,8 @@
 "use client";
 
 import { MatchReviewDialog } from "@/components/match-review-dialog";
+import { ReconciliationMetrics } from "@/components/reconciliation-charts/ReconciliationMetrics";
+import { SlippageDistributionChart } from "@/components/reconciliation-charts/SlippageDistributionChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +22,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,6 +102,9 @@ export default function ComparisonBlocksPage() {
   const [matchDialogAlignmentId, setMatchDialogAlignmentId] = useState<
     string | null
   >(null);
+  const [selectedAlignmentId, setSelectedAlignmentId] = useState<string | null>(
+    null
+  );
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -685,34 +697,13 @@ export default function ComparisonBlocksPage() {
 
       {(summaryRows.length > 0 || comparisonLoading || isLoading) && (
         <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Reconciliation Summary</CardTitle>
-              <CardDescription>
-                Keep reconciliations aligned by monitoring matched trades,
-                sessions needing review, and outstanding differences between
-                backtested and reported executions.
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="normalize-1lot"
-                checked={normalizeTo1Lot}
-                onCheckedChange={setNormalizeTo1Lot}
-                disabled={comparisonLoading || isLoading}
-              />
-              <Label
-                htmlFor="normalize-1lot"
-                className="cursor-pointer text-sm"
-              >
-                Normalize to 1-lot
-              </Label>
-              <span className="text-xs text-muted-foreground">
-                {normalizeTo1Lot
-                  ? "Showing per-contract values"
-                  : "Showing actual trade values"}
-              </span>
-            </div>
+          <CardHeader>
+            <CardTitle>Reconciliation Summary</CardTitle>
+            <CardDescription>
+              Keep reconciliations aligned by monitoring matched trades,
+              sessions needing review, and outstanding differences between
+              backtested and reported executions.
+            </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto relative">
             {(comparisonLoading || isLoading) && (
@@ -945,6 +936,91 @@ export default function ComparisonBlocksPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Statistical Analysis Section - Show detailed metrics for selected alignment */}
+      {comparisonData && comparisonData.alignments.length > 0 && (() => {
+        const selectedAlignment = selectedAlignmentId
+          ? comparisonData.alignments.find(a => a.alignmentId === selectedAlignmentId)
+          : comparisonData.alignments[0];
+
+        // Auto-select first alignment if none selected
+        if (!selectedAlignmentId && comparisonData.alignments[0]) {
+          setSelectedAlignmentId(comparisonData.alignments[0].alignmentId);
+        }
+
+        if (!selectedAlignment) return null;
+
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Statistical Analysis</h2>
+                <p className="text-sm text-muted-foreground">
+                  Detailed performance metrics and statistical insights for each alignment
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="normalize-1lot"
+                    checked={normalizeTo1Lot}
+                    onCheckedChange={setNormalizeTo1Lot}
+                    disabled={comparisonLoading || isLoading}
+                  />
+                  <Label
+                    htmlFor="normalize-1lot"
+                    className="cursor-pointer text-sm"
+                  >
+                    Normalize to 1-lot
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    {normalizeTo1Lot
+                      ? "Showing per-contract values"
+                      : "Showing actual trade values"}
+                  </span>
+                </div>
+                <Separator orientation="vertical" className="h-8" />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Strategy:</span>
+                  <Select
+                    value={selectedAlignmentId ?? undefined}
+                    onValueChange={setSelectedAlignmentId}
+                  >
+                    <SelectTrigger className="w-[300px]">
+                      <SelectValue placeholder="Select alignment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {comparisonData.alignments.map((alignment) => (
+                        <SelectItem key={alignment.alignmentId} value={alignment.alignmentId}>
+                          {alignment.backtestedStrategy}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  {selectedAlignment.backtestedStrategy}
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Reporting: {selectedAlignment.reportedStrategy}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Reconciliation Metrics Dashboard */}
+                <ReconciliationMetrics metrics={selectedAlignment.metrics} alignment={selectedAlignment} />
+
+                {/* Slippage Distribution Chart */}
+                <SlippageDistributionChart alignment={selectedAlignment} />
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       <MatchReviewDialog
         alignment={activeMatchAlignment}

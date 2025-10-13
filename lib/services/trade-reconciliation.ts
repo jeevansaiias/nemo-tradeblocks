@@ -53,6 +53,12 @@ export interface AlignmentMetrics {
   sizeVariance: number
   tTest: TTestResult | null
   correlation: CorrelationMetrics | null
+  matched: {
+    tradeCount: number
+    totalSlippage: number
+    backtestedAvgPremiumPerContract: number
+    backtestedContractBaseline: number
+  }
   notes?: string
 }
 
@@ -562,27 +568,54 @@ function buildMetrics(
   const reportedTotals = calculateTradeTotals(selectedReported, normalizeTo1Lot)
   const deltaTotals = calculateDeltaTotals(backtestedTotals, reportedTotals)
 
-  const matchedBacktestedContracts = matchedPairs.reduce(
+  const matchedTradeCount = matchedPairs.length
+
+  const normalizedContractWeight = (trade: NormalizedTrade): number =>
+    normalizeTo1Lot ? 1 : trade.contracts
+
+  const normalizedPremium = (trade: NormalizedTrade): number =>
+    normalizeTo1Lot && trade.contracts !== 0
+      ? trade.totalPremium / trade.contracts
+      : trade.totalPremium
+
+  const matchedBacktestedContractBaseline = matchedPairs.reduce(
+    (sum, pair) => sum + normalizedContractWeight(pair.backtested),
+    0,
+  )
+
+  const matchedBacktestedContractsRaw = matchedPairs.reduce(
     (sum, pair) => sum + pair.backtested.contracts,
     0,
   )
 
+  const totalSlippage = matchedPairs.reduce(
+    (sum, pair) =>
+      sum + (normalizedPremium(pair.reported) - normalizedPremium(pair.backtested)),
+    0,
+  )
+
   const slippagePerContract =
-    matchedBacktestedContracts > 0
-      ? matchedPairs.reduce(
-          (sum, pair) =>
-            sum + (pair.reported.totalPremium - pair.backtested.totalPremium),
-          0,
-        ) / matchedBacktestedContracts
+    matchedBacktestedContractBaseline > 0
+      ? totalSlippage / matchedBacktestedContractBaseline
+      : 0
+
+  const matchedBacktestedTotalPremium = matchedPairs.reduce(
+    (sum, pair) => sum + normalizedPremium(pair.backtested),
+    0,
+  )
+
+  const matchedBacktestedAvgPremiumPerContract =
+    matchedBacktestedContractBaseline > 0
+      ? matchedBacktestedTotalPremium / matchedBacktestedContractBaseline
       : 0
 
   const sizeVariance =
-    matchedBacktestedContracts > 0
+    matchedBacktestedContractsRaw > 0
       ? matchedPairs.reduce(
           (sum, pair) =>
             sum + (pair.reported.contracts - pair.backtested.contracts),
           0,
-        ) / matchedBacktestedContracts
+        ) / matchedBacktestedContractsRaw
       : 0
 
   // Calculate match rate as percentage of matched pairs out of the larger dataset
@@ -610,6 +643,12 @@ function buildMetrics(
     sizeVariance,
     tTest,
     correlation,
+    matched: {
+      tradeCount: matchedTradeCount,
+      totalSlippage,
+      backtestedAvgPremiumPerContract: matchedBacktestedAvgPremiumPerContract,
+      backtestedContractBaseline: matchedBacktestedContractBaseline,
+    },
   }
 }
 

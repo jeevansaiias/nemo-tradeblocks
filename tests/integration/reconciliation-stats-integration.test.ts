@@ -16,10 +16,8 @@ import { buildTradeReconciliation } from '@/lib/services/trade-reconciliation'
 import { StrategyAlignment } from '@/lib/models/strategy-alignment'
 
 describe('Reconciliation Statistics Integration', () => {
-  let db: IDBDatabase
-
   beforeAll(async () => {
-    db = await initializeDatabase()
+    await initializeDatabase()
   })
 
   afterAll(async () => {
@@ -351,6 +349,104 @@ describe('Reconciliation Statistics Integration', () => {
         expect(alignment.metrics.tTest).toBeNull()
         expect(alignment.metrics.correlation).toBeNull()
       }
+    })
+  })
+
+  describe('Normalization Behaviour', () => {
+    it('normalizes matched slippage metrics to per-contract values', async () => {
+      const blockId = 'stats-normalize-slippage-block'
+
+      const baseDate = new Date(2024, 0, 2, 9, 30, 0)
+      const laterDate = new Date(2024, 0, 3, 11, 15, 0)
+
+      await addTrades(blockId, [
+        {
+          dateOpened: baseDate,
+          timeOpened: '09:30:00',
+          openingPrice: 100,
+          legs: 'Test Spread A',
+          premium: 500,
+          pl: 200,
+          numContracts: 5,
+          fundsAtClose: 10000,
+          marginReq: 5000,
+          strategy: 'NormalizationTest',
+          openingCommissionsFees: 5,
+          closingCommissionsFees: 5,
+          openingShortLongRatio: 0.5,
+          closingShortLongRatio: 0.5,
+        },
+        {
+          dateOpened: laterDate,
+          timeOpened: '11:15:00',
+          openingPrice: 120,
+          legs: 'Test Spread B',
+          premium: 400,
+          pl: 150,
+          numContracts: 2,
+          fundsAtClose: 15000,
+          marginReq: 6000,
+          strategy: 'NormalizationTest',
+          openingCommissionsFees: 4,
+          closingCommissionsFees: 4,
+          openingShortLongRatio: 0.6,
+          closingShortLongRatio: 0.55,
+        },
+      ])
+
+      await addReportingTrades(blockId, [
+        {
+          strategy: 'NormalizationTest',
+          dateOpened: baseDate,
+          openingPrice: 100,
+          legs: 'Test Spread A',
+          initialPremium: 525,
+          numContracts: 5,
+          pl: 205,
+        },
+        {
+          strategy: 'NormalizationTest',
+          dateOpened: laterDate,
+          openingPrice: 120,
+          legs: 'Test Spread B',
+          initialPremium: 406,
+          numContracts: 2,
+          pl: 152,
+        },
+      ])
+
+      const alignments: StrategyAlignment[] = [{
+        id: 'alignment-normalization',
+        liveStrategies: ['NormalizationTest'],
+        reportingStrategies: ['NormalizationTest'],
+      }]
+
+      const reconciliationActual = await buildTradeReconciliation(blockId, alignments, false)
+      const reconciliationNormalized = await buildTradeReconciliation(blockId, alignments, true)
+
+      expect(reconciliationActual.alignments).toHaveLength(1)
+      expect(reconciliationNormalized.alignments).toHaveLength(1)
+
+      const metricsActual = reconciliationActual.alignments[0].metrics
+      const metricsNormalized = reconciliationNormalized.alignments[0].metrics
+
+      expect(metricsActual.matched.tradeCount).toBe(2)
+      expect(metricsActual.matched.totalSlippage).toBeCloseTo(31, 6)
+      expect(metricsActual.slippagePerContract).toBeCloseTo(31 / 7, 6)
+      expect(metricsActual.matched.backtestedAvgPremiumPerContract).toBeCloseTo((500 + 400) / 7, 6)
+      expect(metricsActual.matched.backtestedContractBaseline).toBeCloseTo(7)
+
+      expect(metricsNormalized.matched.tradeCount).toBe(2)
+      expect(metricsNormalized.matched.totalSlippage).toBeCloseTo(8, 6)
+      expect(metricsNormalized.slippagePerContract).toBeCloseTo(4, 6)
+      expect(metricsNormalized.matched.backtestedAvgPremiumPerContract).toBeCloseTo((100 + 200) / 2, 6)
+      expect(metricsNormalized.matched.backtestedContractBaseline).toBeCloseTo(2)
+
+      const avgSlippagePerTradeActual = metricsActual.matched.totalSlippage / metricsActual.matched.tradeCount
+      const avgSlippagePerTradeNormalized = metricsNormalized.matched.totalSlippage / metricsNormalized.matched.tradeCount
+
+      expect(avgSlippagePerTradeActual).toBeCloseTo(15.5, 6)
+      expect(avgSlippagePerTradeNormalized).toBeCloseTo(4, 6)
     })
   })
 })
