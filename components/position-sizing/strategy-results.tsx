@@ -125,6 +125,16 @@ export function StrategyResults({
                 })}`
               : "--";
 
+          // Calculate applied capital based on display mode
+          const appliedCapitalDollars = useNormalizedDisplay
+            ? (startingCapital * strategy.appliedPct) / 100
+            : strategy.allocationDollars;
+
+          // Calculate recommended allocation dollars based on display mode
+          const recommendedAllocationDollars = useNormalizedDisplay
+            ? (startingCapital * strategy.appliedPct) / 100
+            : strategy.allocationDollars;
+
           return (
             <Card key={strategy.name} className="p-4">
               <div className="space-y-4">
@@ -381,10 +391,7 @@ export function StrategyResults({
                     </div>
                     <p className="text-sm font-semibold">
                       $
-                      {(useNormalizedDisplay
-                        ? (startingCapital * strategy.appliedPct) / 100
-                        : strategy.allocationDollars
-                      ).toLocaleString(undefined, {
+                      {appliedCapitalDollars.toLocaleString(undefined, {
                         maximumFractionDigits: 0,
                       })}
                     </p>
@@ -499,10 +506,7 @@ export function StrategyResults({
                     </div>
                     <p className="text-sm font-semibold">
                       $
-                      {(useNormalizedDisplay
-                        ? (startingCapital * strategy.appliedPct) / 100
-                        : strategy.allocationDollars
-                      ).toLocaleString(undefined, {
+                      {recommendedAllocationDollars.toLocaleString(undefined, {
                         maximumFractionDigits: 0,
                       })}
                     </p>
