@@ -63,12 +63,8 @@ export function computeSlippageDistribution(
     return null
   }
 
-  const normalizePremium = (trade: NormalizedTrade) => {
-    if (!normalizeTo1Lot || !trade.contracts) {
-      return trade.totalPremium
-    }
-    return trade.totalPremium / trade.contracts
-  }
+  const normalizePremium = (trade: NormalizedTrade) =>
+    normalizeTo1Lot ? trade.premiumPerContract : trade.totalPremium
 
   const slippages = matchedPairs.map(
     pair => normalizePremium(pair.reported) - normalizePremium(pair.backtested)
