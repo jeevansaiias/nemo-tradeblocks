@@ -76,6 +76,7 @@ import {
   normalizeHeaders,
   parseCsvLine,
 } from "@/lib/utils/csv-headers";
+import { cn } from "@/lib/utils";
 import {
   Activity,
   AlertCircle,
@@ -1438,7 +1439,7 @@ export function BlockDialog({
 
         <div
           className={`
-            relative border-2 border-dashed rounded-lg p-4 sm:p-5 transition-all cursor-pointer
+            relative border-2 border-dashed rounded-lg ${mode === "new" ? "p-3 sm:p-4" : "p-4 sm:p-5"} transition-all cursor-pointer
             ${
               fileState.status === "dragover"
                 ? "border-primary bg-primary/5"
@@ -1621,17 +1622,17 @@ export function BlockDialog({
             </div>
           ) : (
             <div className="text-center">
-              <div className="p-3 bg-muted rounded-full w-fit mx-auto mb-4">
-                <Icon className="w-6 h-6 text-muted-foreground" />
+              <div className={`${mode === "new" ? "p-2" : "p-3"} bg-muted rounded-full w-fit mx-auto ${mode === "new" ? "mb-2" : "mb-4"}`}>
+                <Icon className={`${mode === "new" ? "w-5 h-5" : "w-6 h-6"} text-muted-foreground`} />
               </div>
-              <p className="font-medium">
+              <p className={`font-medium ${mode === "new" ? "text-sm" : ""}`}>
                 {mode === "edit" && fileState.existingFileName
                   ? `Replace ${label}`
                   : mode === "edit" && !fileState.existingFileName
                   ? `Add ${label}`
                   : `Upload ${label}`}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className={`text-sm text-muted-foreground ${mode === "new" ? "mt-0.5" : "mt-1"}`}>
                 Drag & drop your CSV file here or click to browse
               </p>
             </div>
@@ -1701,15 +1702,18 @@ export function BlockDialog({
           }
         }}
       >
-        <DialogContent className="max-w-2xl lg:max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{getDialogTitle()}</DialogTitle>
-            <DialogDescription>{getDialogDescription()}</DialogDescription>
+        <DialogContent className={cn(
+          "max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto",
+          mode === "new" && "p-5 gap-3"
+        )}>
+          <DialogHeader className={mode === "new" ? "gap-1.5" : undefined}>
+            <DialogTitle className={mode === "new" ? "text-base" : undefined}>{getDialogTitle()}</DialogTitle>
+            <DialogDescription className={mode === "new" ? "text-xs" : undefined}>{getDialogDescription()}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
+          <div className={mode === "new" ? "space-y-3" : "space-y-6"}>
             {/* Block Details */}
-            <div className="space-y-4">
+            <div className={mode === "new" ? "space-y-3" : "space-y-4"}>
               <div className="space-y-2">
                 <Label htmlFor="block-name">Block Name</Label>
                 <Input
@@ -1729,7 +1733,7 @@ export function BlockDialog({
                   placeholder="Brief description of this trading block..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
+                  rows={mode === "new" ? 1 : 2}
                 />
               </div>
             </div>
@@ -1737,7 +1741,7 @@ export function BlockDialog({
             {mode === "edit" && <Separator />}
 
             {/* File Uploads */}
-            <div className="space-y-4">
+            <div className={mode === "new" ? "space-y-3" : "space-y-4"}>
               {mode === "edit" && (
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium">File Management</h3>
@@ -1810,9 +1814,9 @@ export function BlockDialog({
             )}
           </div>
 
-          <Separator />
+          {mode === "edit" && <Separator />}
 
-          <DialogFooter>
+          <DialogFooter className={mode === "new" ? "pt-1" : undefined}>
             <div className="flex w-full justify-between items-center">
               {mode === "edit" ? (
                 <Button
