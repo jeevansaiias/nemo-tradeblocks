@@ -5,14 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlignedTradeSet, AlignmentMetrics } from "@/lib/services/trade-reconciliation"
 import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SlippageDistributionChart, computeSlippageDistribution } from "./SlippageDistributionChart"
+import { useMemo } from "react"
 
 interface ReconciliationMetricsProps {
   metrics: AlignmentMetrics
   alignment: AlignedTradeSet // Need full alignment to calculate session-based match rate
+  normalizeTo1Lot?: boolean
   className?: string
 }
 
-export function ReconciliationMetrics({ metrics, alignment, className }: ReconciliationMetricsProps) {
+export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = false, className }: ReconciliationMetricsProps) {
   const {
     backtested,
     reported,
@@ -61,6 +64,20 @@ export function ReconciliationMetrics({ metrics, alignment, className }: Reconci
   const matchedAvgPremiumDisplay = formatCurrency(matched.backtestedAvgPremiumPerContract)
   const slippagePerContractDisplay = formatCurrency(slippagePerContract)
   const avgSlippagePerTradeDisplay = avgSlippagePerTrade != null ? formatCurrency(avgSlippagePerTrade) : null
+  const slippageDistribution = useMemo(
+    () => computeSlippageDistribution(alignment, normalizeTo1Lot),
+    [alignment, normalizeTo1Lot]
+  )
+
+  const slippageMeanDisplay = slippageDistribution ? formatCurrency(slippageDistribution.mean) : "N/A"
+  const slippageMedianDisplay = slippageDistribution ? formatCurrency(slippageDistribution.median) : "N/A"
+  const slippageP25Display = slippageDistribution ? formatCurrency(slippageDistribution.p25) : "N/A"
+  const slippageP75Display = slippageDistribution ? formatCurrency(slippageDistribution.p75) : "N/A"
+  const slippageP10Display = slippageDistribution ? formatCurrency(slippageDistribution.p10) : "N/A"
+  const slippageP90Display = slippageDistribution ? formatCurrency(slippageDistribution.p90) : "N/A"
+  const slippageCountDisplay = slippageDistribution
+    ? `+${slippageDistribution.positiveCount} / ${slippageDistribution.neutralCount} / ${slippageDistribution.negativeCount}`
+    : "N/A"
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -181,6 +198,52 @@ export function ReconciliationMetrics({ metrics, alignment, className }: Reconci
           }}
         />
       </div>
+
+      {slippageDistribution && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <MetricCard
+            title="Slippage Mean"
+            value={slippageMeanDisplay}
+            size="sm"
+            tooltip={{
+              flavor: "Average slippage across matched trades",
+              detailed: "Represents the average difference between reported and backtested premium with the current normalization setting."
+            }}
+          />
+
+          <MetricCard
+            title="Slippage Median"
+            value={slippageMedianDisplay}
+            size="sm"
+            tooltip={{
+              flavor: "Middle slippage value",
+              detailed: "Half of matched trades have slippage above this value and half below it."
+            }}
+          />
+
+          <MetricCard
+            title="P10 / P90"
+            value={`${slippageP10Display} / ${slippageP90Display}`}
+            size="sm"
+            tooltip={{
+              flavor: "Tail slippage",
+              detailed: "Shows the outer 20% of slippage outcomes: 10% of trades were worse than the first value, 10% were better than the second value."
+            }}
+          />
+
+          <MetricCard
+            title="Favorable / Neutral / Unfavorable"
+            value={slippageCountDisplay}
+            size="sm"
+            tooltip={{
+              flavor: "Execution outcome breakdown",
+              detailed: "Counts of matched trades with positive, zero, and negative slippage respectively."
+            }}
+          />
+        </div>
+      )}
+
+      <SlippageDistributionChart data={slippageDistribution} normalizeTo1Lot={normalizeTo1Lot} />
 
       {/* Statistical Significance Card */}
       {tTest && (

@@ -2,7 +2,6 @@
 
 import { MatchReviewDialog } from "@/components/match-review-dialog";
 import { ReconciliationMetrics } from "@/components/reconciliation-charts/ReconciliationMetrics";
-import { SlippageDistributionChart } from "@/components/reconciliation-charts/SlippageDistributionChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1012,10 +1011,8 @@ export default function ComparisonBlocksPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Reconciliation Metrics Dashboard */}
-                <ReconciliationMetrics metrics={selectedAlignment.metrics} alignment={selectedAlignment} />
-
-                {/* Slippage Distribution Chart */}
-                <SlippageDistributionChart
+                <ReconciliationMetrics
+                  metrics={selectedAlignment.metrics}
                   alignment={selectedAlignment}
                   normalizeTo1Lot={normalizeTo1Lot}
                 />
