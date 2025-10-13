@@ -4,7 +4,7 @@ import {
   IconChartHistogram,
   IconGauge,
   IconLayoutDashboard,
-  IconReportAnalytics,
+  IconLink,
   IconRouteSquare,
   IconStack2,
 } from "@tabler/icons-react";
@@ -40,9 +40,10 @@ const navData = {
       icon: IconLayoutDashboard,
     },
     {
-      title: "Performance Blocks",
-      href: "/performance-blocks",
-      icon: IconReportAnalytics,
+      title: "Comparison Blocks",
+      href: "/comparison-blocks",
+      icon: IconLink,
+      badge: "Beta",
     },
     {
       title: "Position Sizing",
