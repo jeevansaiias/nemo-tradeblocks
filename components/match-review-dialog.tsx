@@ -961,7 +961,11 @@ function formatCurrency(value: number): string {
 
 function formatSessionDate(session: string): string {
   // Session format is typically "YYYY-MM-DD"
-  const date = new Date(session);
+  const [year, month, day] = session.split("-").map(Number);
+  const hasValidParts = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day);
+  const date = hasValidParts
+    ? new Date(year, month - 1, day)
+    : new Date(session);
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
