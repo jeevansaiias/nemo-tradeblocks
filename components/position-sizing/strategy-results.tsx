@@ -108,7 +108,8 @@ export function StrategyResults({
 
           // Always show percentage returns when normalized Kelly is available
           const avgWinDisplay =
-            useNormalizedDisplay && strategy.kellyMetrics.avgWinPct !== undefined
+            useNormalizedDisplay &&
+            strategy.kellyMetrics.avgWinPct !== undefined
               ? `${strategy.kellyMetrics.avgWinPct.toFixed(1)}% ROI`
               : strategy.kellyMetrics.avgWin > 0
               ? `$${strategy.kellyMetrics.avgWin.toLocaleString(undefined, {
@@ -117,7 +118,8 @@ export function StrategyResults({
               : "--";
 
           const avgLossDisplay =
-            useNormalizedDisplay && strategy.kellyMetrics.avgLossPct !== undefined
+            useNormalizedDisplay &&
+            strategy.kellyMetrics.avgLossPct !== undefined
               ? `${strategy.kellyMetrics.avgLossPct.toFixed(1)}% ROI`
               : strategy.kellyMetrics.avgLoss > 0
               ? `-$${strategy.kellyMetrics.avgLoss.toLocaleString(undefined, {
@@ -229,14 +231,18 @@ export function StrategyResults({
                     </div>
                     {hasValidKelly &&
                       hasNormalizedKelly &&
-                      Math.abs(strategy.kellyMetrics.percent - displayKellyPct) > 0.1 && (
+                      Math.abs(
+                        strategy.kellyMetrics.percent - displayKellyPct
+                      ) > 0.1 && (
                         <div className="flex items-center gap-1">
                           <p className="text-xs text-muted-foreground">
-                            Full Kelly (absolute): {strategy.kellyMetrics.percent.toFixed(1)}%
+                            Full Kelly (absolute):{" "}
+                            {strategy.kellyMetrics.percent.toFixed(1)}%
                           </p>
                           {Math.abs(
                             strategy.kellyMetrics.percent - displayKellyPct
-                          ) > displayKellyPct * 0.2 && (
+                          ) >
+                            displayKellyPct * 0.2 && (
                             <HoverCard>
                               <HoverCardTrigger asChild>
                                 <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
@@ -250,14 +256,15 @@ export function StrategyResults({
                                   </div>
                                   <div className="px-4 pb-4 space-y-3">
                                     <p className="text-sm text-foreground leading-relaxed">
-                                      Normalized Kelly may use a different sample
-                                      of trades (only those with margin data).
+                                      Normalized Kelly may use a different
+                                      sample of trades (only those with margin
+                                      data).
                                     </p>
                                     <p className="text-xs text-muted-foreground leading-relaxed">
                                       For compounding backtests, use the{" "}
                                       <strong>Normalized Kelly</strong> value as
-                                      it's calculated from percentage returns
-                                      rather than absolute P&L.
+                                      it&apos;s calculated from percentage
+                                      returns rather than absolute P&L.
                                     </p>
                                   </div>
                                 </div>
@@ -425,10 +432,13 @@ export function StrategyResults({
                                     risk multipliers).
                                   </p>
                                   <p className="text-xs text-muted-foreground leading-relaxed">
-                                    <strong>Use this value in Option Omega&apos;s
-                                    allocation % field</strong> when re-running your
-                                    backtest. This is your Kelly-optimal position size
-                                    adjusted for your risk tolerance.
+                                    <strong>
+                                      Use this value in Option Omega&apos;s
+                                      allocation % field
+                                    </strong>{" "}
+                                    when re-running your backtest. This is your
+                                    Kelly-optimal position size adjusted for
+                                    your risk tolerance.
                                   </p>
                                 </>
                               ) : (
@@ -451,7 +461,8 @@ export function StrategyResults({
                     <p className="text-sm font-semibold">
                       {useNormalizedDisplay
                         ? strategy.appliedPct.toFixed(1)
-                        : strategy.allocationPct.toFixed(1)}%
+                        : strategy.allocationPct.toFixed(1)}
+                      %
                     </p>
                   </div>
 
@@ -483,8 +494,8 @@ export function StrategyResults({
                                   </p>
                                   <p className="text-xs text-muted-foreground leading-relaxed">
                                     The total dollar amount allocated to this
-                                    strategy based on Kelly-optimal sizing and your
-                                    risk tolerance settings.
+                                    strategy based on Kelly-optimal sizing and
+                                    your risk tolerance settings.
                                   </p>
                                 </>
                               ) : (
@@ -493,9 +504,10 @@ export function StrategyResults({
                                     Starting capital × reference allocation %.
                                   </p>
                                   <p className="text-xs text-muted-foreground leading-relaxed">
-                                    Map this dollar amount to your backtest&apos;s
-                                    per-trade allocation limit so it mirrors the
-                                    Kelly-based guidance above.
+                                    Map this dollar amount to your
+                                    backtest&apos;s per-trade allocation limit
+                                    so it mirrors the Kelly-based guidance
+                                    above.
                                   </p>
                                 </>
                               )}
