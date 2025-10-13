@@ -5,36 +5,36 @@ import { ReconciliationMetrics } from "@/components/reconciliation-charts/Reconc
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  getReportingTradesByBlock,
-  getTradesByBlock,
-  updateBlock as updateProcessedBlock,
+    getReportingTradesByBlock,
+    getTradesByBlock,
+    updateBlock as updateProcessedBlock,
 } from "@/lib/db";
 import { StrategyAlignment } from "@/lib/models/strategy-alignment";
 import { useBlockStore } from "@/lib/stores/block-store";
@@ -201,10 +201,13 @@ export default function ComparisonBlocksPage() {
           console.debug("[comparison] loaded alignments", existingAlignments);
         }
         setAlignments(
-          existingAlignments.map((mapping) => ({
-            ...mapping,
-            createdAt: new Date(mapping.createdAt),
-            updatedAt: new Date(mapping.updatedAt),
+          existingAlignments.map((mapping, index) => ({
+            id: `alignment-${index}`,
+            reportingStrategies: mapping.reportingStrategies,
+            liveStrategies: mapping.liveStrategies,
+            note: mapping.note,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           }))
         );
       } catch (err) {

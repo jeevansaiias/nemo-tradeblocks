@@ -27,6 +27,13 @@ export interface Block {
     avgWin: number
     avgLoss: number
   }
+  strategyAlignment?: {
+    mappings: Array<{
+      reportingStrategies: string[]
+      liveStrategies: string[]
+      note?: string
+    }>
+  }
 }
 
 interface BlockStore {

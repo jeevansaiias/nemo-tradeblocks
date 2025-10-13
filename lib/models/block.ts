@@ -1,4 +1,4 @@
-import { PortfolioStats, StrategyStats, PerformanceMetrics } from './portfolio-stats'
+import { PerformanceMetrics, PortfolioStats, StrategyStats } from './portfolio-stats'
 // import { Trade } from './trade'
 // import { DailyLog } from './daily-log'
 
@@ -56,6 +56,15 @@ export interface ProcessedBlock {
     annualizationFactor: number
     confidenceLevel: number
   }
+
+  // Strategy alignment for comparison workflows
+  strategyAlignment?: {
+    mappings: Array<{
+      reportingStrategies: string[]
+      liveStrategies: string[]
+      note?: string
+    }>
+  }
 }
 
 /**
@@ -84,6 +93,13 @@ export interface Block {
     totalTrades: number
     avgWin: number
     avgLoss: number
+  }
+  strategyAlignment?: {
+    mappings: Array<{
+      reportingStrategies: string[]
+      liveStrategies: string[]
+      note?: string
+    }>
   }
 }
 

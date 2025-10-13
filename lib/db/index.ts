@@ -21,6 +21,7 @@ export const STORES = {
   TRADES: 'trades',
   DAILY_LOGS: 'dailyLogs',
   CALCULATIONS: 'calculations',
+  REPORTING_LOGS: 'reportingLogs',
 } as const
 
 // Index names
@@ -31,6 +32,7 @@ export const INDEXES = {
   DAILY_LOGS_BY_BLOCK: 'blockId',
   DAILY_LOGS_BY_DATE: 'date',
   CALCULATIONS_BY_BLOCK: 'blockId',
+  REPORTING_LOGS_BY_BLOCK: 'blockId',
 } as const
 
 /**
@@ -96,6 +98,15 @@ export async function initializeDatabase(): Promise<IDBDatabase> {
         calculationsStore.createIndex(INDEXES.CALCULATIONS_BY_BLOCK, 'blockId', { unique: false })
         calculationsStore.createIndex('calculationType', 'calculationType', { unique: false })
         calculationsStore.createIndex('calculatedAt', 'calculatedAt', { unique: false })
+      }
+
+      // Create reporting logs store
+      if (!db.objectStoreNames.contains(STORES.REPORTING_LOGS)) {
+        const reportingLogsStore = db.createObjectStore(STORES.REPORTING_LOGS, { autoIncrement: true })
+        reportingLogsStore.createIndex(INDEXES.REPORTING_LOGS_BY_BLOCK, 'blockId', { unique: false })
+        reportingLogsStore.createIndex('dateOpened', 'dateOpened', { unique: false })
+        reportingLogsStore.createIndex('strategy', 'strategy', { unique: false })
+        reportingLogsStore.createIndex('composite_block_date', ['blockId', 'dateOpened'], { unique: false })
       }
 
       transaction.oncomplete = () => {
@@ -256,4 +267,6 @@ export class TransactionError extends DatabaseError {
 // Re-export functions from individual stores
 export { createBlock, deleteBlock, getActiveBlock, getAllBlocks, getBlock, updateBlock, updateBlockStats } from './blocks-store'
 export { addDailyLogEntries, deleteDailyLogsByBlock, getDailyLogCountByBlock, getDailyLogsByBlock } from './daily-logs-store'
+export { addReportingTrades, deleteReportingTradesByBlock, getReportingStrategiesByBlock, getReportingTradeCountByBlock, getReportingTradesByBlock, updateReportingTradesForBlock } from './reporting-logs-store'
 export { addTrades, deleteTradesByBlock, getTradeCountByBlock, getTradesByBlock } from './trades-store'
+
