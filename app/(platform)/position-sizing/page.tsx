@@ -115,11 +115,11 @@ export default function PositionSizingPage() {
   const results = useMemo(() => {
     if (!hasRun || trades.length === 0) return null;
 
-    // Calculate portfolio-level Kelly metrics
-    const portfolioMetrics = calculateKellyMetrics(trades);
+    // Calculate portfolio-level Kelly metrics with starting capital for validation
+    const portfolioMetrics = calculateKellyMetrics(trades, startingCapital);
 
-    // Calculate per-strategy Kelly metrics
-    const strategyMetricsMap = calculateStrategyKellyMetrics(trades);
+    // Calculate per-strategy Kelly metrics with starting capital for validation
+    const strategyMetricsMap = calculateStrategyKellyMetrics(trades, startingCapital);
 
     // Get strategy names sorted by trade count
     const strategyNames = strategyData.map((s) => s.name);
@@ -147,9 +147,13 @@ export default function PositionSizingPage() {
     for (const strategy of strategyData) {
       const metrics = strategyMetricsMap.get(strategy.name)!;
       const inputPct = kellyValues[strategy.name] ?? 100;
+
+      // Use normalized Kelly when available (more accurate for position sizing)
+      const effectiveKellyPct = metrics.normalizedKellyPct ?? metrics.percent;
+
       // Apply BOTH Portfolio Kelly and Strategy Kelly multipliers
       const appliedPct =
-        metrics.percent * (portfolioKellyPct / 100) * (inputPct / 100);
+        effectiveKellyPct * (portfolioKellyPct / 100) * (inputPct / 100);
       const maxMarginPct = calculateMaxMarginPct(marginTimeline, strategy.name);
       const allocationPct =
         maxMarginPct * (portfolioKellyPct / 100) * (inputPct / 100);
@@ -566,7 +570,10 @@ export default function PositionSizingPage() {
 
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Strategy Analysis</h2>
-            <StrategyResults strategies={results.strategyAnalysis} />
+            <StrategyResults
+              strategies={results.strategyAnalysis}
+              startingCapital={startingCapital}
+            />
           </div>
 
           <MarginChart
