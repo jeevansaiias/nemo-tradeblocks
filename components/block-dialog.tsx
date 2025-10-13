@@ -200,6 +200,7 @@ export function BlockDialog({
   };
 
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [processedFileName, setProcessedFileName] = useState<string | null>(null);
   const [processingErrors, setProcessingErrors] = useState<string[]>([]);
   const [missingStrategyCount, setMissingStrategyCount] = useState(0);
   const [strategyOverride, setStrategyOverride] = useState("");
@@ -232,6 +233,7 @@ export function BlockDialog({
       setIsProcessing(false);
       setProcessingStep("");
       setPreviewData(null);
+      setProcessedFileName(null);
       setProcessingErrors([]);
       setMissingStrategyCount(0);
       setStrategyOverride("");
@@ -493,6 +495,9 @@ export function BlockDialog({
 
       if (type === "trade") {
         resetStrategyOverrideState();
+        // Clear preview data when a new trade file is selected
+        setPreviewData(null);
+        setProcessedFileName(null);
       }
 
       if (!file) {
@@ -559,6 +564,9 @@ export function BlockDialog({
 
       if (type === "trade") {
         resetStrategyOverrideState();
+        // Clear preview data when a new trade file is selected
+        setPreviewData(null);
+        setProcessedFileName(null);
       }
 
       if (!file) {
@@ -859,6 +867,7 @@ export function BlockDialog({
       };
 
       setPreviewData(preview);
+      setProcessedFileName(tradeLog.file.name);
       setProcessingStep("");
 
       return { preview, missingStrategies: missingCount };
@@ -888,7 +897,9 @@ export function BlockDialog({
       // Process files if new files were uploaded
       let processedPreview = previewData;
       let missingStrategies = missingStrategyCount;
-      const needsProcessing = tradeLog.file && !processedPreview?.trades;
+      // Check if we need to process: either no preview exists OR the file changed
+      const needsProcessing = tradeLog.file &&
+        (!processedPreview?.trades || processedFileName !== tradeLog.file.name);
 
       if (mode === "new" && tradeLog.file) {
         const result = await processFiles();
