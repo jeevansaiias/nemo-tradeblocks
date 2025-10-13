@@ -246,7 +246,7 @@ export function StrategyResults({
                                     <p className="text-xs text-muted-foreground leading-relaxed">
                                       For compounding backtests, use the{" "}
                                       <strong>Normalized Kelly</strong> value as
-                                      it&apos;s calculated from percentage returns
+                                      it's calculated from percentage returns
                                       rather than absolute P&L.
                                     </p>
                                   </div>
