@@ -885,9 +885,11 @@ export function BlockDialog({
     try {
       setIsProcessing(true);
 
-      // For new blocks, process files if provided
+      // Process files if new files were uploaded
       let processedPreview = previewData;
       let missingStrategies = missingStrategyCount;
+      const needsProcessing = tradeLog.file && !processedPreview?.trades;
+
       if (mode === "new" && tradeLog.file) {
         const result = await processFiles();
         if (!result) return; // Processing failed
@@ -896,6 +898,20 @@ export function BlockDialog({
         if (missingStrategies > 0 && strategyOverride.trim() === "") {
           toast.error(
             "Please provide a strategy name for unlabeled trades before creating the block."
+          );
+          setIsProcessing(false);
+          setProcessingStep("");
+          return;
+        }
+      } else if (mode === "edit" && needsProcessing) {
+        // In edit mode, process files if they were uploaded but not yet processed
+        const result = await processFiles();
+        if (!result) return; // Processing failed
+        processedPreview = result.preview;
+        missingStrategies = result.missingStrategies;
+        if (missingStrategies > 0 && strategyOverride.trim() === "") {
+          toast.error(
+            "Please provide a strategy name for unlabeled trades before saving changes."
           );
           setIsProcessing(false);
           setProcessingStep("");
@@ -1048,7 +1064,7 @@ export function BlockDialog({
         // Update existing block
         setProcessingStep("Updating block...");
 
-        let processedData = previewData;
+        let processedData = processedPreview;
 
         // Ensure we process the daily log if it was uploaded without running the full pipeline
         if (dailyLog.file && (!processedData || !processedData.dailyLogs)) {
