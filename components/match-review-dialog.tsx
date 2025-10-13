@@ -853,10 +853,8 @@ export function MatchReviewDialog({
 }
 
 function TradeCard({ trade, label, normalizeTo1Lot }: { trade: NormalizedTrade; label: string; normalizeTo1Lot: boolean }) {
-  // Normalize values if flag is set
-  const displayPremium = normalizeTo1Lot && trade.contracts > 0
-    ? trade.totalPremium / trade.contracts
-    : trade.totalPremium;
+  // Always display premium as the per-contract (per-share) value traders expect
+  const displayPremium = trade.premiumPerContract;
   const displayPl = normalizeTo1Lot && trade.contracts > 0
     ? trade.pl / trade.contracts
     : trade.pl;
@@ -899,10 +897,8 @@ function TradeCard({ trade, label, normalizeTo1Lot }: { trade: NormalizedTrade; 
 }
 
 function TradeListItem({ trade, normalizeTo1Lot }: { trade: NormalizedTrade; normalizeTo1Lot: boolean }) {
-  // Normalize values if flag is set
-  const displayPremium = normalizeTo1Lot && trade.contracts > 0
-    ? trade.totalPremium / trade.contracts
-    : trade.totalPremium;
+  // Always display premium as the per-contract (per-share) value traders expect
+  const displayPremium = trade.premiumPerContract;
   const displayPl = normalizeTo1Lot && trade.contracts > 0
     ? trade.pl / trade.contracts
     : trade.pl;
@@ -965,7 +961,11 @@ function formatCurrency(value: number): string {
 
 function formatSessionDate(session: string): string {
   // Session format is typically "YYYY-MM-DD"
-  const date = new Date(session);
+  const [year, month, day] = session.split("-").map(Number);
+  const hasValidParts = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day);
+  const date = hasValidParts
+    ? new Date(year, month - 1, day)
+    : new Date(session);
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",

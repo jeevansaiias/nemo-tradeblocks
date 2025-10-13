@@ -9,6 +9,11 @@ export interface Trade {
   openingPrice: number
   legs: string // Option legs description
   premium: number
+  /**
+   * Records how the premium value was encoded in the source CSV.
+   * Some exports (OptionOmega) provide cents as whole numbers without decimals.
+   */
+  premiumPrecision?: 'dollars' | 'cents'
 
   // Closing information (optional for open trades)
   closingPrice?: number

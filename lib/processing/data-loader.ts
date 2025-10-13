@@ -493,12 +493,19 @@ export class DataLoader {
       })
 
       try {
+        const rawPremiumValue = (row['Premium'] ?? '').replace(/[$,]/g, '').trim()
+        const parsedPremium = rawPremiumValue ? parseFloat(rawPremiumValue) : NaN
+        const premium = Number.isFinite(parsedPremium) ? parsedPremium : 0
+        const premiumPrecision: Trade['premiumPrecision'] =
+          rawPremiumValue && !rawPremiumValue.includes('.') ? 'cents' : 'dollars'
+
         const trade: Trade = {
           dateOpened: new Date(row['Date Opened'] || ''),
           timeOpened: row['Time Opened'] || '',
           openingPrice: parseFloat(row['Opening Price'] || '0'),
           legs: row['Legs'] || '',
-          premium: parseFloat(row['Premium'] || '0'),
+          premium,
+          premiumPrecision,
           closingPrice: row['Closing Price'] ? parseFloat(row['Closing Price']) : undefined,
           dateClosed: row['Date Closed'] ? new Date(row['Date Closed']) : undefined,
           timeClosed: row['Time Closed'] || undefined,
