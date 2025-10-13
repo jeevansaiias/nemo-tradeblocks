@@ -199,7 +199,7 @@ export function calculateKellyMetrics(
     avgWin,
     avgLoss,
     hasValidKelly: true,
-    calculationMethod: normalizedMetrics?.hasValidKelly ? 'percentage' : 'absolute',
+    calculationMethod: (normalizedMetrics && normalizedMetrics.hasValidKelly) ? 'percentage' : 'absolute',
     hasUnrealisticValues: unrealistic,
     avgWinPct: normalizedMetrics?.avgWinPct,
     avgLossPct: normalizedMetrics?.avgLossPct,
