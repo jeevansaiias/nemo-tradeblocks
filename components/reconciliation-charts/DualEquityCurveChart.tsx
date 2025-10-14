@@ -3,76 +3,150 @@
 import { ChartWrapper, createLineChartLayout } from "@/components/performance-charts/chart-wrapper"
 import { Badge } from "@/components/ui/badge"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { EquityCurvePoint } from "@/lib/calculations/reconciliation-stats"
+import { EquityCurvePoint, SeparateEquityCurvePoint } from "@/lib/calculations/reconciliation-stats"
 import type { Layout, PlotData } from "plotly.js"
 import { useState } from "react"
 
 interface DualEquityCurveChartProps {
-  data: EquityCurvePoint[] | null
+  matchedData: EquityCurvePoint[] | null
+  allTradesData: { backtested: SeparateEquityCurvePoint[]; reported: SeparateEquityCurvePoint[] } | null
   normalizeTo1Lot?: boolean
   className?: string
 }
 
-export function DualEquityCurveChart({ data, normalizeTo1Lot = false, className }: DualEquityCurveChartProps) {
+export function DualEquityCurveChart({
+  matchedData,
+  allTradesData,
+  normalizeTo1Lot = false,
+  className
+}: DualEquityCurveChartProps) {
   const [yAxisScale, setYAxisScale] = useState<"linear" | "log">("linear")
+  const [tradeMode, setTradeMode] = useState<"matched" | "all">("matched")
 
-  if (!data || data.length === 0) {
+  // Determine which data to use
+  const hasMatchedData = matchedData && matchedData.length > 0
+  const hasAllTradesData = allTradesData && (allTradesData.backtested.length > 0 || allTradesData.reported.length > 0)
+
+  if (!hasMatchedData && !hasAllTradesData) {
     return (
       <div className={className}>
         <div className="text-center p-8 text-muted-foreground">
-          No matched trades available for equity curve comparison
+          No trade data available for equity curve comparison
         </div>
       </div>
     )
   }
 
-  // Backtested equity curve
-  const backtestedTrace: Partial<PlotData> = {
-    x: data.map(point => point.date),
-    y: data.map(point => point.backtestedEquity),
-    type: "scatter",
-    mode: "lines",
-    name: "Backtested P/L",
-    line: {
-      color: "#3b82f6", // blue
-      width: 2,
-      shape: "hv", // Step function - equity changes at each trade
-    },
-    hovertemplate:
-      "<b>Date:</b> %{x}<br>" +
-      "<b>Backtested:</b> $%{y:,.2f}<br>" +
-      "<b>Trade #:</b> %{customdata}<br>" +
-      "<extra></extra>",
-    customdata: data.map(point => point.tradeNumber),
+  // Build traces based on mode
+  let traces: Partial<PlotData>[] = []
+  let allEquityValues: number[] = []
+  let finalInfo: { matchedCount?: number; backtestedCount?: number; reportedCount?: number; finalDifference?: number; finalPercentDiff?: number } = {}
+
+  if (tradeMode === "matched" && hasMatchedData) {
+    // Matched mode - show paired trades
+    const backtestedTrace: Partial<PlotData> = {
+      x: matchedData.map(point => point.date),
+      y: matchedData.map(point => point.backtestedEquity),
+      type: "scatter",
+      mode: "lines",
+      name: "Backtested P/L",
+      line: {
+        color: "#3b82f6", // blue
+        width: 2,
+        shape: "hv", // Step function
+      },
+      hovertemplate:
+        "<b>Date:</b> %{x}<br>" +
+        "<b>Backtested:</b> $%{y:,.2f}<br>" +
+        "<b>Trade #:</b> %{customdata}<br>" +
+        "<extra></extra>",
+      customdata: matchedData.map(point => point.tradeNumber),
+    }
+
+    const reportedTrace: Partial<PlotData> = {
+      x: matchedData.map(point => point.date),
+      y: matchedData.map(point => point.reportedEquity),
+      type: "scatter",
+      mode: "lines",
+      name: "Reported P/L",
+      line: {
+        color: "#10b981", // green
+        width: 2,
+        shape: "hv", // Step function
+      },
+      hovertemplate:
+        "<b>Date:</b> %{x}<br>" +
+        "<b>Reported:</b> $%{y:,.2f}<br>" +
+        "<b>Trade #:</b> %{customdata}<br>" +
+        "<extra></extra>",
+      customdata: matchedData.map(point => point.tradeNumber),
+    }
+
+    traces = [backtestedTrace, reportedTrace]
+    allEquityValues = [
+      ...matchedData.map(p => p.backtestedEquity),
+      ...matchedData.map(p => p.reportedEquity),
+    ]
+
+    const finalPoint = matchedData[matchedData.length - 1]
+    finalInfo = {
+      matchedCount: matchedData.length,
+      finalDifference: finalPoint.difference,
+      finalPercentDiff: finalPoint.percentDifference,
+    }
+  } else if (tradeMode === "all" && hasAllTradesData) {
+    // All trades mode - show separate curves
+    const backtestedTrace: Partial<PlotData> = {
+      x: allTradesData.backtested.map(point => point.date),
+      y: allTradesData.backtested.map(point => point.equity),
+      type: "scatter",
+      mode: "lines",
+      name: "Backtested P/L (All)",
+      line: {
+        color: "#3b82f6", // blue
+        width: 2,
+        shape: "hv",
+      },
+      hovertemplate:
+        "<b>Date:</b> %{x}<br>" +
+        "<b>Backtested:</b> $%{y:,.2f}<br>" +
+        "<b>Trade #:</b> %{customdata}<br>" +
+        "<extra></extra>",
+      customdata: allTradesData.backtested.map(point => point.tradeNumber),
+    }
+
+    const reportedTrace: Partial<PlotData> = {
+      x: allTradesData.reported.map(point => point.date),
+      y: allTradesData.reported.map(point => point.equity),
+      type: "scatter",
+      mode: "lines",
+      name: "Reported P/L (All)",
+      line: {
+        color: "#10b981", // green
+        width: 2,
+        shape: "hv",
+      },
+      hovertemplate:
+        "<b>Date:</b> %{x}<br>" +
+        "<b>Reported:</b> $%{y:,.2f}<br>" +
+        "<b>Trade #:</b> %{customdata}<br>" +
+        "<extra></extra>",
+      customdata: allTradesData.reported.map(point => point.tradeNumber),
+    }
+
+    traces = [backtestedTrace, reportedTrace]
+    allEquityValues = [
+      ...allTradesData.backtested.map(p => p.equity),
+      ...allTradesData.reported.map(p => p.equity),
+    ]
+
+    finalInfo = {
+      backtestedCount: allTradesData.backtested.length,
+      reportedCount: allTradesData.reported.length,
+    }
   }
 
-  // Reported equity curve
-  const reportedTrace: Partial<PlotData> = {
-    x: data.map(point => point.date),
-    y: data.map(point => point.reportedEquity),
-    type: "scatter",
-    mode: "lines",
-    name: "Reported P/L",
-    line: {
-      color: "#10b981", // green
-      width: 2,
-      shape: "hv", // Step function - equity changes at each trade
-    },
-    hovertemplate:
-      "<b>Date:</b> %{x}<br>" +
-      "<b>Reported:</b> $%{y:,.2f}<br>" +
-      "<b>Trade #:</b> %{customdata}<br>" +
-      "<extra></extra>",
-    customdata: data.map(point => point.tradeNumber),
-  }
-
-  const traces: Partial<PlotData>[] = [backtestedTrace, reportedTrace]
-
-  // Calculate y-axis range for better visualization
-  const allEquityValues = [
-    ...data.map(p => p.backtestedEquity),
-    ...data.map(p => p.reportedEquity),
-  ]
+  // Calculate y-axis range
   const minEquity = Math.min(...allEquityValues)
   const maxEquity = Math.max(...allEquityValues)
   const padding = (maxEquity - minEquity) * 0.1
@@ -115,6 +189,21 @@ export function DualEquityCurveChart({ data, normalizeTo1Lot = false, className 
       )}
       <ToggleGroup
         type="single"
+        value={tradeMode}
+        onValueChange={(value: "matched" | "all") => {
+          if (value) setTradeMode(value)
+        }}
+        className="border rounded-md p-1"
+      >
+        <ToggleGroupItem value="matched" className="text-xs px-3 py-1" disabled={!hasMatchedData}>
+          Matched
+        </ToggleGroupItem>
+        <ToggleGroupItem value="all" className="text-xs px-3 py-1" disabled={!hasAllTradesData}>
+          All Trades
+        </ToggleGroupItem>
+      </ToggleGroup>
+      <ToggleGroup
+        type="single"
         value={yAxisScale}
         onValueChange={(value: "linear" | "log") => {
           if (value) setYAxisScale(value)
@@ -131,9 +220,14 @@ export function DualEquityCurveChart({ data, normalizeTo1Lot = false, className 
     </div>
   )
 
-  const finalEquity = data[data.length - 1]
+  // Build description
   const normalizationNote = normalizeTo1Lot ? " (per contract)" : ""
-  const description = `Comparing ${data.length} matched trades${normalizationNote}. Final difference: $${finalEquity.difference.toFixed(2)} (${finalEquity.percentDifference > 0 ? "+" : ""}${finalEquity.percentDifference.toFixed(2)}%)`
+  let description = ""
+  if (tradeMode === "matched" && finalInfo.matchedCount) {
+    description = `Comparing ${finalInfo.matchedCount} matched trades${normalizationNote}. Final difference: $${finalInfo.finalDifference!.toFixed(2)} (${finalInfo.finalPercentDiff! > 0 ? "+" : ""}${finalInfo.finalPercentDiff!.toFixed(2)}%)`
+  } else if (tradeMode === "all") {
+    description = `Showing all trades${normalizationNote}: ${finalInfo.backtestedCount} backtested, ${finalInfo.reportedCount} reported`
+  }
 
   return (
     <div className={className}>
@@ -142,7 +236,9 @@ export function DualEquityCurveChart({ data, normalizeTo1Lot = false, className 
         description={description}
         tooltip={{
           flavor: "Side-by-side comparison of backtested vs reported performance over time",
-          detailed: "This chart shows how your actual (reported) performance compares to your backtested expectations. Divergence between the lines reveals slippage, commission differences, or execution variations accumulating over time.",
+          detailed: tradeMode === "matched"
+            ? "This chart shows how your actual (reported) performance compares to your backtested expectations for matched trades. Divergence between the lines reveals slippage, commission differences, or execution variations accumulating over time."
+            : "This chart shows all trades from both backtested and reported data, including unmatched trades. This gives you the complete picture of what was planned vs what actually executed.",
         }}
         data={traces}
         layout={layout}

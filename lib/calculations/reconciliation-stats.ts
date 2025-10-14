@@ -21,6 +21,13 @@ export interface EquityCurvePoint {
   percentDifference: number
 }
 
+export interface SeparateEquityCurvePoint {
+  date: string
+  tradeNumber: number
+  equity: number
+  tradeType: 'backtested' | 'reported'
+}
+
 export interface TTestResult {
   tStatistic: number
   pValue: number
@@ -596,4 +603,60 @@ export function calculateDualEquityCurves(
   })
 
   return equityCurve
+}
+
+/**
+ * Calculate separate equity curves from all trades (not just matched pairs)
+ *
+ * Builds independent cumulative P/L curves for backtested and reported trades.
+ * Unlike calculateDualEquityCurves, this shows the complete picture including
+ * unmatched trades, allowing users to see the full performance story.
+ *
+ * @param backtestedTrades - Array of all backtested trades
+ * @param reportedTrades - Array of all reported trades
+ * @param initialCapital - Starting capital for both curves
+ * @param normalizeTo1Lot - If true, normalize P/L to per-contract basis
+ * @returns Object with separate arrays for backtested and reported equity curves
+ */
+export function calculateSeparateEquityCurves(
+  backtestedTrades: NormalizedTrade[],
+  reportedTrades: NormalizedTrade[],
+  initialCapital = 0,
+  normalizeTo1Lot = false
+): { backtested: SeparateEquityCurvePoint[]; reported: SeparateEquityCurvePoint[] } {
+  const buildCurve = (
+    trades: NormalizedTrade[],
+    tradeType: 'backtested' | 'reported'
+  ): SeparateEquityCurvePoint[] => {
+    if (trades.length === 0) {
+      return []
+    }
+
+    // Sort trades by date
+    const sortedTrades = [...trades].sort(
+      (a, b) => a.dateOpened.getTime() - b.dateOpened.getTime()
+    )
+
+    const curve: SeparateEquityCurvePoint[] = []
+    let equity = initialCapital
+
+    sortedTrades.forEach((trade, index) => {
+      const pl = normalizeTo1Lot ? trade.pl / trade.contracts : trade.pl
+      equity += pl
+
+      curve.push({
+        date: trade.dateOpened.toISOString(),
+        tradeNumber: index + 1,
+        equity,
+        tradeType,
+      })
+    })
+
+    return curve
+  }
+
+  return {
+    backtested: buildCurve(backtestedTrades, 'backtested'),
+    reported: buildCurve(reportedTrades, 'reported'),
+  }
 }

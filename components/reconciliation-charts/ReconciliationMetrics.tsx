@@ -2,7 +2,7 @@
 
 import { MetricCard } from "@/components/metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { calculateDualEquityCurves, MatchedPair } from "@/lib/calculations/reconciliation-stats"
+import { calculateDualEquityCurves, calculateSeparateEquityCurves, MatchedPair } from "@/lib/calculations/reconciliation-stats"
 import { AlignedTradeSet, AlignmentMetrics } from "@/lib/services/trade-reconciliation"
 import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -91,6 +91,14 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
   const equityCurveData = sortedPairs.length > 0
     ? calculateDualEquityCurves(sortedPairs, 0, normalizeTo1Lot)
     : null
+
+  // Calculate separate equity curves for all trades (matched + unmatched)
+  const allTradesData = calculateSeparateEquityCurves(
+    alignment.backtestedTrades,
+    alignment.reportedTrades,
+    0,
+    normalizeTo1Lot
+  )
 
   const slippageMeanDisplay = slippageDistribution ? formatCurrency(slippageDistribution.mean) : "N/A"
   const slippageMedianDisplay = slippageDistribution ? formatCurrency(slippageDistribution.median) : "N/A"
@@ -268,7 +276,7 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
 
       <SlippageDistributionChart data={slippageDistribution} normalizeTo1Lot={normalizeTo1Lot} />
 
-      <DualEquityCurveChart data={equityCurveData} normalizeTo1Lot={normalizeTo1Lot} />
+      <DualEquityCurveChart matchedData={equityCurveData} allTradesData={allTradesData} normalizeTo1Lot={normalizeTo1Lot} />
 
       {/* Statistical Significance Card */}
       {tTest && (

@@ -8,6 +8,7 @@ import {
   calculateSpearmanCorrelation,
   calculateCorrelationMetrics,
   calculateDualEquityCurves,
+  calculateSeparateEquityCurves,
   MatchedPair,
 } from '@/lib/calculations/reconciliation-stats'
 import { NormalizedTrade } from '@/lib/services/trade-reconciliation'
@@ -557,6 +558,130 @@ describe('Reconciliation Statistics', () => {
       // Both trades should show +$10 difference per contract
       expect(result[0].difference).toBe(10) // 110 - 100
       expect(result[1].difference).toBe(20) // (110 + 110) - (100 + 100)
+    })
+  })
+
+  describe('calculateSeparateEquityCurves', () => {
+    it('should return empty arrays for no trades', () => {
+      const result = calculateSeparateEquityCurves([], [], 0, false)
+      expect(result.backtested).toEqual([])
+      expect(result.reported).toEqual([])
+    })
+
+    it('should calculate independent equity curves', () => {
+      const backtestedTrades = [
+        createTrade(100, 'bt1'),
+        createTrade(50, 'bt2'),
+        createTrade(-30, 'bt3'),
+      ]
+      const reportedTrades = [
+        createTrade(110, 'rpt1'),
+        createTrade(60, 'rpt2'),
+      ]
+
+      const result = calculateSeparateEquityCurves(backtestedTrades, reportedTrades, 0, false)
+
+      // Backtested curve
+      expect(result.backtested).toHaveLength(3)
+      expect(result.backtested[0].equity).toBe(100)
+      expect(result.backtested[1].equity).toBe(150)
+      expect(result.backtested[2].equity).toBe(120)
+      expect(result.backtested[0].tradeType).toBe('backtested')
+
+      // Reported curve
+      expect(result.reported).toHaveLength(2)
+      expect(result.reported[0].equity).toBe(110)
+      expect(result.reported[1].equity).toBe(170)
+      expect(result.reported[0].tradeType).toBe('reported')
+    })
+
+    it('should handle different trade counts (unmatched trades)', () => {
+      // More backtested trades than reported (some didn't execute)
+      const backtestedTrades = [
+        createTrade(100, 'bt1'),
+        createTrade(100, 'bt2'),
+        createTrade(100, 'bt3'),
+        createTrade(100, 'bt4'),
+      ]
+      const reportedTrades = [
+        createTrade(110, 'rpt1'),
+        createTrade(110, 'rpt2'),
+      ]
+
+      const result = calculateSeparateEquityCurves(backtestedTrades, reportedTrades, 0, false)
+
+      expect(result.backtested).toHaveLength(4)
+      expect(result.reported).toHaveLength(2)
+      expect(result.backtested[3].equity).toBe(400) // 4 trades
+      expect(result.reported[1].equity).toBe(220) // 2 trades
+    })
+
+    it('should normalize to per-contract when requested', () => {
+      const backtestedTrades = [
+        Object.assign(createTrade(200, 'bt1'), { contracts: 2 }),
+        Object.assign(createTrade(300, 'bt2'), { contracts: 3 }),
+      ]
+      const reportedTrades = [
+        Object.assign(createTrade(220, 'rpt1'), { contracts: 2 }),
+      ]
+
+      const result = calculateSeparateEquityCurves(backtestedTrades, reportedTrades, 0, true)
+
+      // Backtested: 200/2 + 300/3 = 100 + 100 = 200
+      expect(result.backtested[0].equity).toBe(100)
+      expect(result.backtested[1].equity).toBe(200)
+
+      // Reported: 220/2 = 110
+      expect(result.reported[0].equity).toBe(110)
+    })
+
+    it('should sort trades by date', () => {
+      const trade1 = createTrade(100, 'bt1')
+      trade1.dateOpened = new Date('2024-01-03')
+      const trade2 = createTrade(200, 'bt2')
+      trade2.dateOpened = new Date('2024-01-01')
+      const trade3 = createTrade(300, 'bt3')
+      trade3.dateOpened = new Date('2024-01-02')
+
+      const result = calculateSeparateEquityCurves([trade1, trade2, trade3], [], 0, false)
+
+      // Should be sorted: trade2 (01-01), trade3 (01-02), trade1 (01-03)
+      expect(result.backtested[0].equity).toBe(200) // trade2
+      expect(result.backtested[1].equity).toBe(500) // trade2 + trade3
+      expect(result.backtested[2].equity).toBe(600) // all three
+    })
+
+    it('should handle initial capital', () => {
+      const backtestedTrades = [createTrade(100, 'bt1')]
+      const reportedTrades = [createTrade(110, 'rpt1')]
+
+      const result = calculateSeparateEquityCurves(backtestedTrades, reportedTrades, 10000, false)
+
+      expect(result.backtested[0].equity).toBe(10100)
+      expect(result.reported[0].equity).toBe(10110)
+    })
+
+    it('should number trades sequentially', () => {
+      const backtestedTrades = [
+        createTrade(100, 'bt1'),
+        createTrade(200, 'bt2'),
+        createTrade(300, 'bt3'),
+      ]
+
+      const result = calculateSeparateEquityCurves(backtestedTrades, [], 0, false)
+
+      expect(result.backtested[0].tradeNumber).toBe(1)
+      expect(result.backtested[1].tradeNumber).toBe(2)
+      expect(result.backtested[2].tradeNumber).toBe(3)
+    })
+
+    it('should preserve date as ISO string', () => {
+      const trade = createTrade(100, 'bt1')
+      trade.dateOpened = new Date('2024-01-15T10:30:00Z')
+
+      const result = calculateSeparateEquityCurves([trade], [], 0, false)
+
+      expect(result.backtested[0].date).toBe('2024-01-15T10:30:00.000Z')
     })
   })
 })
