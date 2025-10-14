@@ -2,9 +2,11 @@
 
 import { MetricCard } from "@/components/metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { calculateDualEquityCurves, MatchedPair } from "@/lib/calculations/reconciliation-stats"
 import { AlignedTradeSet, AlignmentMetrics } from "@/lib/services/trade-reconciliation"
 import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { DualEquityCurveChart } from "./DualEquityCurveChart"
 import { SlippageDistributionChart, computeSlippageDistribution } from "./SlippageDistributionChart"
 
 interface ReconciliationMetricsProps {
@@ -64,6 +66,31 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
   const slippagePerContractDisplay = formatCurrency(slippagePerContract)
   const avgSlippagePerTradeDisplay = avgSlippagePerTrade != null ? formatCurrency(avgSlippagePerTrade) : null
   const slippageDistribution = computeSlippageDistribution(alignment, normalizeTo1Lot)
+
+  // Compute matched pairs for equity curve
+  const matchedPairs: MatchedPair[] = alignment.sessions.flatMap(session =>
+    session.items
+      .filter(item =>
+        item.isPaired &&
+        item.backtested &&
+        item.reported &&
+        item.includedBacktested &&
+        item.includedReported
+      )
+      .map(item => ({
+        backtested: item.backtested!,
+        reported: item.reported!,
+      }))
+  )
+
+  // Sort pairs by date for equity curve
+  const sortedPairs = matchedPairs.sort((a, b) =>
+    new Date(a.reported.dateOpened).getTime() - new Date(b.reported.dateOpened).getTime()
+  )
+
+  const equityCurveData = sortedPairs.length > 0
+    ? calculateDualEquityCurves(sortedPairs, 0, normalizeTo1Lot)
+    : null
 
   const slippageMeanDisplay = slippageDistribution ? formatCurrency(slippageDistribution.mean) : "N/A"
   const slippageMedianDisplay = slippageDistribution ? formatCurrency(slippageDistribution.median) : "N/A"
@@ -240,6 +267,8 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
       )}
 
       <SlippageDistributionChart data={slippageDistribution} normalizeTo1Lot={normalizeTo1Lot} />
+
+      <DualEquityCurveChart data={equityCurveData} normalizeTo1Lot={normalizeTo1Lot} />
 
       {/* Statistical Significance Card */}
       {tTest && (

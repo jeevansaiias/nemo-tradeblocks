@@ -12,6 +12,15 @@ export interface MatchedPair {
   reported: NormalizedTrade
 }
 
+export interface EquityCurvePoint {
+  date: string
+  tradeNumber: number
+  backtestedEquity: number
+  reportedEquity: number
+  difference: number
+  percentDifference: number
+}
+
 export interface TTestResult {
   tStatistic: number
   pValue: number
@@ -531,4 +540,60 @@ function getTCriticalValue(df: number): number {
 
   // For very large df (>120), use normal approximation
   return 1.96 // z-critical for 95% confidence
+}
+
+/**
+ * Calculate dual equity curves from matched trade pairs
+ *
+ * Builds cumulative P/L curves for both backtested and reported trades,
+ * allowing visualization of performance divergence over time.
+ *
+ * @param pairs - Array of matched trade pairs (must be sorted by date)
+ * @param initialCapital - Starting capital for both curves
+ * @param normalizeTo1Lot - If true, normalize P/L to per-contract basis
+ * @returns Array of equity curve points
+ */
+export function calculateDualEquityCurves(
+  pairs: MatchedPair[],
+  initialCapital = 0,
+  normalizeTo1Lot = false
+): EquityCurvePoint[] {
+  if (pairs.length === 0) {
+    return []
+  }
+
+  const equityCurve: EquityCurvePoint[] = []
+  let backtestedEquity = initialCapital
+  let reportedEquity = initialCapital
+
+  pairs.forEach((pair, index) => {
+    // Calculate P/L (normalized or total)
+    const backtestedPl = normalizeTo1Lot
+      ? pair.backtested.pl / pair.backtested.contracts
+      : pair.backtested.pl
+    const reportedPl = normalizeTo1Lot
+      ? pair.reported.pl / pair.reported.contracts
+      : pair.reported.pl
+
+    // Accumulate P/L
+    backtestedEquity += backtestedPl
+    reportedEquity += reportedPl
+
+    // Calculate difference metrics
+    const difference = reportedEquity - backtestedEquity
+    const percentDifference = backtestedEquity !== 0
+      ? ((reportedEquity - backtestedEquity) / Math.abs(backtestedEquity)) * 100
+      : 0
+
+    equityCurve.push({
+      date: pair.reported.dateOpened.toISOString(), // Use reported date (should match backtested)
+      tradeNumber: index + 1,
+      backtestedEquity,
+      reportedEquity,
+      difference,
+      percentDifference,
+    })
+  })
+
+  return equityCurve
 }

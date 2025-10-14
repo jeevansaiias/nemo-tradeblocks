@@ -7,6 +7,7 @@ import {
   calculatePearsonCorrelation,
   calculateSpearmanCorrelation,
   calculateCorrelationMetrics,
+  calculateDualEquityCurves,
   MatchedPair,
 } from '@/lib/calculations/reconciliation-stats'
 import { NormalizedTrade } from '@/lib/services/trade-reconciliation'
@@ -340,6 +341,222 @@ describe('Reconciliation Statistics', () => {
       // With this data pattern, correlation should be weak/moderate/negative
       // Just verify it doesn't claim "strong positive"
       expect(result!.interpretation).not.toContain('Strong positive')
+    })
+  })
+
+  describe('calculateDualEquityCurves', () => {
+    it('should return empty array for no pairs', () => {
+      const result = calculateDualEquityCurves([])
+      expect(result).toEqual([])
+    })
+
+    it('should calculate single trade equity curves', () => {
+      const pairs: MatchedPair[] = [
+        {
+          backtested: createTrade(100),
+          reported: createTrade(110),
+        },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0)
+      expect(result).toHaveLength(1)
+      expect(result[0].backtestedEquity).toBe(100)
+      expect(result[0].reportedEquity).toBe(110)
+      expect(result[0].difference).toBe(10)
+      expect(result[0].tradeNumber).toBe(1)
+    })
+
+    it('should accumulate P/L correctly over multiple trades', () => {
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(100), reported: createTrade(110) },
+        { backtested: createTrade(50), reported: createTrade(60) },
+        { backtested: createTrade(-30), reported: createTrade(-20) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0)
+      expect(result).toHaveLength(3)
+
+      // After trade 1: +100 backtested, +110 reported
+      expect(result[0].backtestedEquity).toBe(100)
+      expect(result[0].reportedEquity).toBe(110)
+      expect(result[0].difference).toBe(10)
+
+      // After trade 2: +150 backtested, +170 reported
+      expect(result[1].backtestedEquity).toBe(150)
+      expect(result[1].reportedEquity).toBe(170)
+      expect(result[1].difference).toBe(20)
+
+      // After trade 3: +120 backtested, +150 reported
+      expect(result[2].backtestedEquity).toBe(120)
+      expect(result[2].reportedEquity).toBe(150)
+      expect(result[2].difference).toBe(30)
+    })
+
+    it('should handle initial capital', () => {
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(100), reported: createTrade(110) },
+        { backtested: createTrade(50), reported: createTrade(60) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 10000)
+      expect(result).toHaveLength(2)
+
+      expect(result[0].backtestedEquity).toBe(10100)
+      expect(result[0].reportedEquity).toBe(10110)
+
+      expect(result[1].backtestedEquity).toBe(10150)
+      expect(result[1].reportedEquity).toBe(10170)
+    })
+
+    it('should handle losing trades', () => {
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(-100), reported: createTrade(-90) },
+        { backtested: createTrade(-50), reported: createTrade(-40) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 1000)
+      expect(result).toHaveLength(2)
+
+      expect(result[0].backtestedEquity).toBe(900)
+      expect(result[0].reportedEquity).toBe(910)
+      expect(result[0].difference).toBe(10)
+
+      expect(result[1].backtestedEquity).toBe(850)
+      expect(result[1].reportedEquity).toBe(870)
+      expect(result[1].difference).toBe(20)
+    })
+
+    it('should calculate percentage difference correctly', () => {
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(100), reported: createTrade(110) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0)
+      expect(result[0].percentDifference).toBeCloseTo(10, 1) // 10% difference
+    })
+
+    it('should handle zero backtested equity in percentage calculation', () => {
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(0), reported: createTrade(10) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0)
+      expect(result[0].percentDifference).toBe(0) // Avoid division by zero
+    })
+
+    it('should increment trade numbers correctly', () => {
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(10), reported: createTrade(10) },
+        { backtested: createTrade(20), reported: createTrade(20) },
+        { backtested: createTrade(30), reported: createTrade(30) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs)
+      expect(result[0].tradeNumber).toBe(1)
+      expect(result[1].tradeNumber).toBe(2)
+      expect(result[2].tradeNumber).toBe(3)
+    })
+
+    it('should preserve date information', () => {
+      const trade1 = createTrade(100)
+      trade1.dateOpened = new Date('2024-01-01')
+      const trade2 = createTrade(110)
+      trade2.dateOpened = new Date('2024-01-01')
+
+      const pairs: MatchedPair[] = [
+        { backtested: trade1, reported: trade2 },
+      ]
+
+      const result = calculateDualEquityCurves(pairs)
+      expect(result[0].date).toBe(trade2.dateOpened.toISOString())
+    })
+
+    it('should show divergence accumulating over time', () => {
+      // Backtested performance: +100, +100, +100
+      // Reported performance: +110, +110, +110 (consistently 10% better)
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(100), reported: createTrade(110) },
+        { backtested: createTrade(100), reported: createTrade(110) },
+        { backtested: createTrade(100), reported: createTrade(110) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0)
+
+      // Difference should grow over time
+      expect(result[0].difference).toBe(10)
+      expect(result[1].difference).toBe(20)
+      expect(result[2].difference).toBe(30)
+    })
+
+    it('should handle reported underperformance', () => {
+      // Reported consistently worse than backtested
+      const pairs: MatchedPair[] = [
+        { backtested: createTrade(100), reported: createTrade(90) },
+        { backtested: createTrade(100), reported: createTrade(90) },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0)
+
+      expect(result[0].difference).toBe(-10)
+      expect(result[1].difference).toBe(-20)
+      expect(result[0].reportedEquity).toBeLessThan(result[0].backtestedEquity)
+      expect(result[1].reportedEquity).toBeLessThan(result[1].backtestedEquity)
+    })
+
+    it('should normalize P/L to per-contract when normalizeTo1Lot is true', () => {
+      // Create trades with different contract sizes
+      const trade1 = createTrade(200) // 2 contracts = $100 per contract
+      trade1.contracts = 2
+      const trade2 = createTrade(220) // 2 contracts = $110 per contract
+      trade2.contracts = 2
+
+      const trade3 = createTrade(300) // 3 contracts = $100 per contract
+      trade3.contracts = 3
+      const trade4 = createTrade(360) // 3 contracts = $120 per contract
+      trade4.contracts = 3
+
+      const pairs: MatchedPair[] = [
+        { backtested: trade1, reported: trade2 },
+        { backtested: trade3, reported: trade4 },
+      ]
+
+      // Without normalization: uses total P/L
+      const resultTotal = calculateDualEquityCurves(pairs, 0, false)
+      expect(resultTotal[0].backtestedEquity).toBe(200)
+      expect(resultTotal[0].reportedEquity).toBe(220)
+      expect(resultTotal[1].backtestedEquity).toBe(500) // 200 + 300
+      expect(resultTotal[1].reportedEquity).toBe(580) // 220 + 360
+
+      // With normalization: uses per-contract P/L
+      const resultNormalized = calculateDualEquityCurves(pairs, 0, true)
+      expect(resultNormalized[0].backtestedEquity).toBe(100) // 200 / 2
+      expect(resultNormalized[0].reportedEquity).toBe(110) // 220 / 2
+      expect(resultNormalized[1].backtestedEquity).toBe(200) // 100 + (300 / 3)
+      expect(resultNormalized[1].reportedEquity).toBe(230) // 110 + (360 / 3)
+    })
+
+    it('should show consistent slippage per contract when normalized', () => {
+      // All trades have +$10 per contract slippage but different contract sizes
+      const trade1 = createTrade(100, 'bt1') // 1 contract
+      trade1.contracts = 1
+      const trade2 = createTrade(110, 'rpt1') // 1 contract, +$10
+      trade2.contracts = 1
+
+      const trade3 = createTrade(200, 'bt2') // 2 contracts
+      trade3.contracts = 2
+      const trade4 = createTrade(220, 'rpt2') // 2 contracts, +$20 total = +$10 per contract
+      trade4.contracts = 2
+
+      const pairs: MatchedPair[] = [
+        { backtested: trade1, reported: trade2 },
+        { backtested: trade3, reported: trade4 },
+      ]
+
+      const result = calculateDualEquityCurves(pairs, 0, true)
+
+      // Both trades should show +$10 difference per contract
+      expect(result[0].difference).toBe(10) // 110 - 100
+      expect(result[1].difference).toBe(20) // (110 + 110) - (100 + 100)
     })
   })
 })
