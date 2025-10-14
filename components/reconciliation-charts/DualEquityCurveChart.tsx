@@ -149,7 +149,9 @@ export function DualEquityCurveChart({
   // Calculate y-axis range
   const minEquity = Math.min(...allEquityValues)
   const maxEquity = Math.max(...allEquityValues)
-  const padding = (maxEquity - minEquity) * 0.1
+  const equityRange = maxEquity - minEquity
+  // Use at least 10% of max absolute value as padding to avoid zero range
+  const padding = equityRange > 0 ? equityRange * 0.1 : Math.max(Math.abs(maxEquity) * 0.1, 100)
 
   const layout: Partial<Layout> = {
     ...createLineChartLayout("", "Date", "Cumulative P/L ($)"),

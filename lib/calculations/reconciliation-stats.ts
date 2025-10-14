@@ -589,7 +589,7 @@ export function calculateDualEquityCurves(
     // Calculate difference metrics
     const difference = reportedEquity - backtestedEquity
     const percentDifference = backtestedEquity !== 0
-      ? ((reportedEquity - backtestedEquity) / Math.abs(backtestedEquity)) * 100
+      ? ((reportedEquity - backtestedEquity) / backtestedEquity) * 100
       : 0
 
     equityCurve.push({
