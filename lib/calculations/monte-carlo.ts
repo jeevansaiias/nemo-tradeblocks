@@ -490,21 +490,31 @@ function runSingleSimulation(
 /**
  * Calculate maximum drawdown from an equity curve
  *
- * @param equityCurve - Array of cumulative returns
- * @returns Maximum drawdown as a decimal (positive number for losses)
+ * @param equityCurve - Array of cumulative returns (as decimals, e.g., 0.5 = 50% gain)
+ * @returns Maximum drawdown as a decimal (positive number for losses, e.g., 0.2 = 20% drawdown)
  */
 function calculateMaxDrawdown(equityCurve: number[]): number {
   let maxDrawdown = 0;
   let peak = 0; // Treat initial capital (0% return) as the starting peak
 
-  for (const value of equityCurve) {
-    if (value > peak) {
-      peak = value;
+  for (const cumulativeReturn of equityCurve) {
+    if (cumulativeReturn > peak) {
+      peak = cumulativeReturn;
     }
 
-    const drawdown = peak - value;
-    if (drawdown > maxDrawdown) {
-      maxDrawdown = drawdown;
+    // Calculate drawdown as percentage decline from peak
+    // Convert cumulative returns to portfolio values for calculation
+    // portfolioValue = initialCapital * (1 + cumulativeReturn)
+    // peakValue = initialCapital * (1 + peak)
+    // drawdown = (peakValue - currentValue) / peakValue
+    //          = (1 + peak - 1 - cumulativeReturn) / (1 + peak)
+    //          = (peak - cumulativeReturn) / (1 + peak)
+
+    if (peak > -1) { // Avoid division by zero if portfolio goes to zero
+      const drawdown = (peak - cumulativeReturn) / (1 + peak);
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
     }
   }
 
