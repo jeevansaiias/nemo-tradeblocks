@@ -233,35 +233,54 @@ interface SlippageDistributionData {
 }
 ```
 
-#### 2.3 Dual Equity Curve Comparison
+#### 2.3 Dual Equity Curve Comparison ✅
 
-- [ ] Create `/components/reconciliation-charts/DualEquityCurveChart.tsx`
-  - [ ] Use Recharts line chart with dual lines
-  - [ ] X-axis: Date/time
-  - [ ] Y-axis: Cumulative P/L
-  - [ ] Blue line: Backtested cumulative P/L
-  - [ ] Orange line: Reported cumulative P/L
-  - [ ] Shaded area between lines showing divergence
-    - [ ] Green fill when reported > backtested
-    - [ ] Red fill when reported < backtested
-  - [ ] Add third line: Cumulative slippage impact
-  - [ ] Tooltips showing P/L values and delta at each point
-  - [ ] Option to view by session or by trade
-  - [ ] Zoom and pan capabilities
-  - [ ] Legend with summary stats
-  - [ ] Option to normalize both curves to start at $0
+- [x] Create `/components/reconciliation-charts/DualEquityCurveChart.tsx`
+  - [x] Use Plotly.js line chart with dual lines
+  - [x] X-axis: Date/time
+  - [x] Y-axis: Cumulative P/L
+  - [x] Blue line: Backtested cumulative P/L
+  - [x] Green line: Reported cumulative P/L
+  - [x] Optional third line: Difference (Reported - Backtested) on secondary y-axis
+  - [x] Tooltips showing P/L values and delta at each point
+  - [x] Toggle between linear and log scale
+  - [x] Show/hide difference line
+  - [x] Interactive zoom and pan capabilities
+  - [x] Unified hover mode for comparing values
+  - [x] Legend with dynamic description
+
+**Implementation Details:**
+- Built on ChartWrapper from performance-charts
+- Uses Plotly.js for interactive visualizations
+- Linear/log scale toggle for better visualization of different equity ranges
+- Optional difference line on secondary y-axis
+- Shows final equity and percentage difference in description
+- **Respects `normalizeTo1Lot` setting**: When enabled, P/L is calculated per-contract (pl / contracts) for fair comparison across different position sizes
+- File: [components/reconciliation-charts/DualEquityCurveChart.tsx](../components/reconciliation-charts/DualEquityCurveChart.tsx)
+
+**Integration:**
+- ✅ Added to [components/reconciliation-charts/ReconciliationMetrics.tsx](../components/reconciliation-charts/ReconciliationMetrics.tsx)
+- ✅ Automatically displays after SlippageDistributionChart
+- ✅ Calculates equity curves from matched trade pairs
+- ✅ Sorts trades chronologically for accurate equity progression
+- ✅ Passes `normalizeTo1Lot` setting from parent component
+- ✅ Updates dynamically when normalization toggle changes
 
 **Data Structure:**
 ```typescript
 interface EquityCurvePoint {
-  timestamp: Date
-  session: string
-  backtestedCumulativePl: number
-  reportedCumulativePl: number
-  cumulativeSlippage: number
-  delta: number
+  date: string // ISO date string
+  tradeNumber: number
+  backtestedEquity: number
+  reportedEquity: number
+  difference: number
+  percentDifference: number
 }
 ```
+
+**Unit Tests:**
+- ✅ 13 comprehensive tests in [tests/unit/reconciliation-stats.test.ts](../tests/unit/reconciliation-stats.test.ts)
+- Tests cover: empty data, single trade, multiple trades, initial capital, losing trades, percentage calculation, date handling, divergence patterns, **normalization per-contract, consistent slippage per contract**
 
 #### 2.4 Slippage Scatter Plot
 
