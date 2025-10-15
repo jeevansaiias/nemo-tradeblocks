@@ -9,6 +9,7 @@ import {
   IconReportAnalytics,
   IconRouteSquare,
   IconStack2,
+  IconUser,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +36,7 @@ const navData = {
       title: "Block Management",
       href: "/blocks",
       icon: IconStack2,
+  IconUser,
     },
     {
       title: "Block Stats",
@@ -71,6 +73,11 @@ const navData = {
       title: "P/L Calendar", // 🆕 Added new Calendar navigation
       href: "/calendar",
       icon: IconCalendarMonth,
+    },
+    {
+      title: "Personal Dashboard",
+      href: "/personal-dashboard",
+      icon: IconUser,
     },
   ],
 };
