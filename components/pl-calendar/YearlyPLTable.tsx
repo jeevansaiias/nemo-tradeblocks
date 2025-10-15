@@ -22,6 +22,7 @@ interface YearlyPLTableProps {
   trades: StoredTrade[]
   currentYear: number
   onYearChange: (year: number) => void
+  onMonthClick?: (year: number, month: number) => void
 }
 
 interface MonthData {
@@ -41,7 +42,7 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ]
 
-export function YearlyPLTable({ trades, currentYear, onYearChange }: YearlyPLTableProps) {
+export function YearlyPLTable({ trades, currentYear, onYearChange, onMonthClick }: YearlyPLTableProps) {
   // Aggregate data by year and month
   const yearlyData = useMemo(() => {
     const data: { [year: number]: YearData } = {}
@@ -191,6 +192,10 @@ export function YearlyPLTable({ trades, currentYear, onYearChange }: YearlyPLTab
                                   "h-12 w-full rounded-md cursor-pointer transition-all duration-200 hover:scale-105 flex flex-col items-center justify-center text-xs",
                                   getColorClass(data.pl, data.trades)
                                 )}
+                                onClick={() => {
+                                  const monthIndex = MONTHS.indexOf(month)
+                                  onMonthClick?.(year, monthIndex)
+                                }}
                               >
                                 <div className="font-semibold">
                                   {formatPL(data.pl)}
