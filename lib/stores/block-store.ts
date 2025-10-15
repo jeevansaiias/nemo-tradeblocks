@@ -1,17 +1,18 @@
 import { create } from "zustand";
 import { PortfolioStatsCalculator } from "../calculations/portfolio-stats";
 import {
-  deleteBlock as dbDeleteBlock,
-  updateBlock as dbUpdateBlock,
-  getAllBlocks,
-  getBlock,
-  getDailyLogsByBlock,
-  getReportingTradesByBlock,
-  getTradesByBlock,
-  updateBlockStats,
+    deleteBlock as dbDeleteBlock,
+    updateBlock as dbUpdateBlock,
+    getAllBlocks,
+    getBlock,
+    getDailyLogsByBlock,
+    getReportingTradesByBlock,
+    getTradesByBlock,
+    updateBlockStats,
 } from "../db";
 import { ProcessedBlock } from "../models/block";
 import { StrategyAlignment } from "../models/strategy-alignment";
+import { generateUUID } from "../utils/uuid";
 
 export interface Block {
   id: string;
@@ -258,7 +259,7 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
     try {
       const newBlock: Block = {
         ...blockData,
-        id: "id" in blockData ? blockData.id : crypto.randomUUID(), // Use provided ID or generate new one
+        id: "id" in blockData ? blockData.id : generateUUID(), // Use provided ID or generate new one
         created: new Date(),
         lastModified: new Date(),
       };

@@ -5,41 +5,42 @@ import { ReconciliationMetrics } from "@/components/reconciliation-charts/Reconc
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  getReportingTradesByBlock,
-  getTradesByBlock,
-  updateBlock as updateProcessedBlock,
+    getReportingTradesByBlock,
+    getTradesByBlock,
+    updateBlock as updateProcessedBlock,
 } from "@/lib/db";
 import { StrategyAlignment } from "@/lib/models/strategy-alignment";
 import { useBlockStore } from "@/lib/stores/block-store";
 import { useComparisonStore } from "@/lib/stores/comparison-store";
 import { cn } from "@/lib/utils";
+import { generateUUID } from "@/lib/utils/uuid";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -552,7 +553,7 @@ export default function ComparisonBlocksPage() {
       await persistAlignments(next);
     } else {
       const newMapping: StrategyAlignment = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         reportingStrategies: [selectedReporting],
         liveStrategies: [selectedBacktested],
         note: dialogNote.trim() || undefined,

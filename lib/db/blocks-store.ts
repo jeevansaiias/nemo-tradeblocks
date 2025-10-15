@@ -2,8 +2,9 @@
  * Blocks Store - CRUD operations for trading blocks
  */
 
-import { ProcessedBlock, Block } from '../models/block'
-import { STORES, withReadTransaction, withWriteTransaction, promisifyRequest, DatabaseError } from './index'
+import { Block, ProcessedBlock } from '../models/block'
+import { generateUUID } from '../utils/uuid'
+import { DatabaseError, promisifyRequest, STORES, withReadTransaction, withWriteTransaction } from './index'
 
 /**
  * Create a new block
@@ -11,7 +12,7 @@ import { STORES, withReadTransaction, withWriteTransaction, promisifyRequest, Da
 export async function createBlock(blockData: Omit<ProcessedBlock, 'id' | 'created' | 'lastModified'>): Promise<ProcessedBlock> {
   const block: ProcessedBlock = {
     ...blockData,
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     created: new Date(),
     lastModified: new Date(),
   }
