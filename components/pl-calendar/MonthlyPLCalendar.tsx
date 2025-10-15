@@ -1,32 +1,32 @@
 "use client"
 
 import {
-    eachDayOfInterval,
-    endOfMonth,
-    endOfWeek,
-    format,
-    getWeek,
-    isSameDay,
-    isSameMonth,
-    startOfMonth,
-    startOfWeek
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  getWeek,
+  isSameDay,
+  isSameMonth,
+  startOfMonth,
+  startOfWeek
 } from "date-fns"
 import { useMemo, useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card"
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
@@ -147,53 +147,54 @@ export function MonthlyPLCalendar({ trades, dailyPL, currentDate, onDateChange }
   }
 
   return (
-    <div className="flex gap-6">
-      {/* Main Calendar */}
-      <div className="flex-1">
-        {/* Month Navigation */}
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={previousMonth}
-            className="flex items-center gap-2"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Button>
-          
-          <h2 className="text-2xl font-bold text-primary">
-            {format(currentDate, 'MMMM yyyy')}
-          </h2>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={nextMonth}
-            className="flex items-center gap-2"
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="space-y-6">
+      {/* Month Navigation */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={previousMonth}
+          className="flex items-center gap-2"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        
+        <h2 className="text-2xl font-bold text-primary">
+          {format(currentDate, 'MMMM yyyy')}
+        </h2>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={nextMonth}
+          className="flex items-center gap-2"
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
 
-        {/* Calendar Grid */}
-        <Card className="monthly-calendar">
-          <CardContent className="p-6">
-            {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-2 mb-2">
-              {WEEKDAYS.map(day => (
-                <div
-                  key={day}
-                  className="text-center text-sm font-medium text-muted-foreground py-2"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
+      {/* Main Container with Proper Alignment */}
+      <div className="flex flex-col md:flex-row items-start gap-6">
+        {/* Calendar Grid Container */}
+        <div className="w-full md:w-3/4">
+          <Card className="monthly-calendar">
+            <CardContent className="p-6">
+              {/* Weekday Headers */}
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {WEEKDAYS.map(day => (
+                  <div
+                    key={day}
+                    className="text-center text-sm font-medium text-muted-foreground py-2"
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
 
-            {/* Calendar Days */}
-            <div className="grid grid-cols-7 gap-2">
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7 gap-2">
               {calendarDays.map((dayData, index) => {
                 const isCurrentMonth = isSameMonth(dayData.date, currentDate)
                 const hasData = dayData.tradeCount > 0
@@ -242,53 +243,48 @@ export function MonthlyPLCalendar({ trades, dailyPL, currentDate, onDateChange }
       </div>
 
       {/* Weekly Summary Sidebar */}
-      <div className="w-80">
+      <div className="w-full md:w-1/4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Weekly Summary</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {weekSummaries.map((week) => (
               <div
                 key={week.weekNumber}
-                className="p-3 rounded-lg border bg-card/50 space-y-2"
+                className="flex justify-between items-center p-3 rounded-lg bg-card/50 border border-border"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">
+                <div>
+                  <p className="text-sm text-foreground font-medium">
                     Week {week.weekNumber}
-                  </span>
-                  <Badge variant={week.totalPL >= 0 ? "default" : "destructive"}>
-                    {formatPL(week.totalPL)}
-                  </Badge>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(week.weekStart, 'MMM d')} - {format(week.weekEnd, 'MMM d')} · {week.daysTraded} days
+                  </p>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {format(week.weekStart, 'MMM d')} - {format(week.weekEnd, 'MMM d')}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {week.daysTraded} days traded
-                  </span>
-                  <span className="text-muted-foreground">
-                    {week.totalTrades} trades
-                  </span>
-                </div>
+                <p className={`font-semibold ${
+                  week.totalPL >= 0 ? "text-primary" : "text-destructive"
+                }`}>
+                  {formatPL(week.totalPL)}
+                </p>
               </div>
             ))}
           </CardContent>
         </Card>
       </div>
+    </div>
 
-      {/* Trade Details Drawer */}
-      <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="w-[400px] sm:w-[540px]">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
-            </SheetTitle>
-            <SheetDescription>
-              {selectedTrades.length} trade{selectedTrades.length !== 1 ? 's' : ''} executed on this day
-            </SheetDescription>
-          </SheetHeader>
+    {/* Trade Details Drawer */}
+    <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+      <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            {selectedDate && format(selectedDate, 'MMMM d, yyyy')}
+          </SheetTitle>
+          <SheetDescription>
+            {selectedTrades.length} trade{selectedTrades.length !== 1 ? 's' : ''} executed on this day
+          </SheetDescription>
+        </SheetHeader>
           
           <div className="mt-6 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto">
             {selectedTrades.length === 0 ? (

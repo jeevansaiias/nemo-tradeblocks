@@ -231,7 +231,7 @@
     border-color: var(--comparison-primary);
   }
 
-  /* Calendar Heatmap Styling */
+  /* Calendar Heatmap Styling (Legacy - keeping for compatibility) */
   .calendar-heatmap-container .react-calendar-heatmap {
     line-height: 1;
   }
@@ -247,68 +247,38 @@
     font-weight: 500;
   }
 
-  .calendar-heatmap-container .react-calendar-heatmap-small-text {
-    font-size: 5px;
+  /* Yearly P/L Table Styling */
+  .yearly-pl-table {
+    border-spacing: 0;
   }
 
-  /* Heatmap color classes */
-  .calendar-heatmap-container .color-empty {
-    fill: #2A2A2A;
-    stroke: #3A3A3A;
-    stroke-width: 1px;
-    cursor: pointer;
+  .yearly-pl-table th {
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-weight: 600;
+    text-align: center;
+    padding: 12px 8px;
+    border-bottom: 2px solid var(--border);
   }
 
-  .calendar-heatmap-container .color-positive {
-    fill: #FF8A3D;
-    stroke: #FFB266;
-    stroke-width: 1px;
-    cursor: pointer;
+  .yearly-pl-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
   }
 
-  .calendar-heatmap-container .color-negative {
-    fill: #ef4444;
-    stroke: #f87171;
-    stroke-width: 1px;
-    cursor: pointer;
+  .yearly-pl-table tbody tr:hover {
+    background: var(--muted)/30;
   }
 
-  /* Hover effects */
-  .calendar-heatmap-container rect:hover {
-    stroke-width: 2px;
-    filter: brightness(1.2);
-  }
-
-  .calendar-heatmap-container .color-empty:hover {
-    fill: #3A3A3A;
-  }
-
-  .calendar-heatmap-container .color-positive:hover {
-    fill: #FFB266;
-  }
-
-  .calendar-heatmap-container .color-negative:hover {
-    fill: #f87171;
-  }
-
-  /* Monthly Calendar Styling */
-  .monthly-calendar {
-    background: var(--card);
-    border: 1px solid var(--border);
-  }
-
-  .monthly-calendar .grid {
-    gap: 2px;
-  }
-
-  /* Day cell styling for monthly view */
+  /* Monthly calendar cell styling */
   .monthly-day-cell {
     min-height: 80px;
     padding: 8px;
     border-radius: 8px;
-    border: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
   }
 
   .monthly-day-cell:hover {
@@ -319,6 +289,7 @@
   .monthly-day-profit {
     background: #0F3D2E;
     border-color: #16A085;
+    color: #A7F3D0;
   }
 
   .monthly-day-profit:hover {
@@ -328,6 +299,7 @@
   .monthly-day-loss {
     background: #3D0F0F;
     border-color: #E74C3C;
+    color: #FCA5A5;
   }
 
   .monthly-day-loss:hover {
@@ -337,6 +309,7 @@
   .monthly-day-empty {
     background: #1E1E1E;
     border-color: #2A2A2A;
+    color: #6B7280;
   }
 
   .monthly-day-empty:hover {

@@ -1,12 +1,11 @@
 "use client"
 
-import { endOfYear, format, startOfYear } from "date-fns"
+import { format } from "date-fns"
 import { useEffect, useState } from "react"
-import CalendarHeatmap from "react-calendar-heatmap"
 
 import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
+import { YearlyPLTable } from "@/components/pl-calendar/YearlyPLTable"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import {
     Card,
     CardContent,
@@ -94,9 +93,6 @@ export default function CalendarPage() {
     setSelectedTrades(dayTrades)
     setSelectedDate(dateString)
   }
-
-  const startDate = startOfYear(new Date(currentYear, 0, 1))
-  const endDate = endOfYear(new Date(currentYear, 11, 31))
 
   if (!activeBlock) {
     return (
@@ -206,74 +202,18 @@ export default function CalendarPage() {
       {/* Calendar Views */}
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "yearly" | "monthly")}>
         <TabsContent value="yearly" className="space-y-6">
-          {/* Year Navigation */}
-          <div className="flex items-center justify-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentYear(currentYear - 1)}
-            >
-              {currentYear - 1}
-            </Button>
-            <div className="text-lg font-semibold text-primary">
-              {currentYear}
+          {/* Yearly P/L Table */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-sm text-muted-foreground">Loading calendar...</div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentYear(currentYear + 1)}
-            >
-              {currentYear + 1}
-            </Button>
-          </div>
-
-          {/* Yearly Calendar Heatmap */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Trading Calendar</CardTitle>
-              <CardDescription>
-                Click on any date to see detailed trade information. Orange indicates profitable days, red indicates losses.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-sm text-muted-foreground">Loading calendar...</div>
-                </div>
-              ) : (
-                <div className="calendar-heatmap-container">
-                  <CalendarHeatmap
-                    startDate={startDate}
-                    endDate={endDate}
-                    values={dailyPL}
-                    classForValue={(value: { date: string; value?: number; count?: number } | null) => {
-                      if (!value || typeof value.value !== 'number') return "color-empty"
-                      if (value.value > 0) return "color-positive"
-                      if (value.value < 0) return "color-negative"
-                      return "color-empty"
-                    }}
-                    onClick={handleDateClick}
-                  />
-                  
-                  {/* Legend */}
-                  <div className="flex items-center justify-center gap-4 mt-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-sm bg-muted"></div>
-                      <span>No trades</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-sm bg-destructive/60"></div>
-                      <span>Loss day</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-sm bg-primary"></div>
-                      <span>Profit day</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          ) : (
+            <YearlyPLTable
+              trades={trades}
+              currentYear={currentYear}
+              onYearChange={setCurrentYear}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="monthly" className="space-y-6">
