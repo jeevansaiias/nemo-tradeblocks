@@ -1,14 +1,15 @@
 "use client";
 
 import {
-    IconCalendarStats,
-    IconChartHistogram,
-    IconGauge,
-    IconGitCompare,
-    IconLayoutDashboard,
-    IconReportAnalytics,
-    IconRouteSquare,
-    IconStack2,
+  IconCalendarStats,
+  IconChartHistogram,
+  IconGauge,
+  IconGitCompare,
+  IconLayoutDashboard,
+  IconReportAnalytics,
+  IconRouteSquare,
+  IconStack2,
+  IconUser,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -20,13 +21,13 @@ import { NavMain } from "@/components/nav-main";
 import { SidebarActiveBlocks } from "@/components/sidebar-active-blocks";
 import { SidebarFooterLegal } from "@/components/sidebar-footer-legal";
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
 const navData = {
@@ -56,6 +57,11 @@ const navData = {
       title: "P/L Calendar",
       href: "/calendar",
       icon: IconCalendarStats,
+    },
+    {
+      title: "Personal Dashboard",
+      href: "/personal-dashboard",
+      icon: IconUser,
     },
     {
       title: "Position Sizing",
