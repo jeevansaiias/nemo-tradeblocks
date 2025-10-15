@@ -94,6 +94,13 @@ export default function CalendarPage() {
     setSelectedDate(dateString)
   }
 
+  const handleMonthClick = (year: number, month: number) => {
+    // Create a date for the selected month and year
+    const selectedDate = new Date(year, month, 1)
+    setCurrentMonth(selectedDate)
+    setViewMode("monthly")
+  }
+
   if (!activeBlock) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -212,6 +219,7 @@ export default function CalendarPage() {
               trades={trades}
               currentYear={currentYear}
               onYearChange={setCurrentYear}
+              onMonthClick={handleMonthClick}
             />
           )}
         </TabsContent>
