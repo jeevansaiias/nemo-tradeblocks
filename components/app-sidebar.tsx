@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  IconCalendarMonth,
   IconChartHistogram,
   IconGauge,
   IconLayoutDashboard,
@@ -45,7 +46,6 @@ const navData = {
       href: "/performance-blocks",
       icon: IconReportAnalytics,
     },
-
     {
       title: "Position Sizing",
       href: "/position-sizing",
@@ -66,6 +66,11 @@ const navData = {
       href: "/comparison-blocks",
       icon: IconLink,
       badge: "Beta",
+    },
+    {
+      title: "P/L Calendar", // 🆕 Added new Calendar navigation
+      href: "/calendar",
+      icon: IconCalendarMonth,
     },
   ],
 };
