@@ -1,0 +1,19 @@
+  const handleDataParsed = (trades: PersonalTrade[], dailyPL: DailyPersonalPL[]) => {
+    setError(null)
+    
+    try {
+      if (trades.length === 0) {
+        throw new Error("No trades found in the CSV file")
+      }
+      
+      const calculatedStats = calculatePersonalStats(dailyPL)
+      
+      setTrades(trades)
+      setStats(calculatedStats)
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to process trade data")
+      setTrades([])
+      setStats(null)
+    }
+  }

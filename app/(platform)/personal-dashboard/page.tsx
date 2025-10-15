@@ -12,45 +12,45 @@ import { Button } from "@/components/ui/button"
 import { RefreshCw, Download, Upload, FileText } from "lucide-react"
 import {
   type PersonalTrade,
-  type PersonalStats,
+  type PersonalTradeStats,
+  type DailyPersonalPL,
   parsePersonalTradeCSV,
+  groupTradesByDate,
   calculatePersonalStats
 } from "@/lib/processing/personal-trade-parser"
 
 export default function PersonalDashboardPage() {
   const [trades, setTrades] = useState<PersonalTrade[]>([])
-  const [stats, setStats] = useState<PersonalStats | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [dailyPL, setDailyPL] = useState<DailyPersonalPL[]>([])
+  const [stats, setStats] = useState<PersonalTradeStats | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [currentDate, setCurrentDate] = useState<Date>(new Date())
 
-  const handleFileUpload = async (file: File) => {
-    setLoading(true)
+  const handleDataParsed = (trades: PersonalTrade[], parsedDailyPL: DailyPersonalPL[]) => {
     setError(null)
     
     try {
-      const text = await file.text()
-      const parsedTrades = parsePersonalTradeCSV(text)
-      
-      if (parsedTrades.length === 0) {
+      if (trades.length === 0) {
         throw new Error("No trades found in the CSV file")
       }
       
-      const calculatedStats = calculatePersonalStats(parsedTrades)
+      const calculatedStats = calculatePersonalStats(parsedDailyPL)
       
-      setTrades(parsedTrades)
+      setTrades(trades)
+      setDailyPL(parsedDailyPL)
       setStats(calculatedStats)
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse CSV file")
+      setError(err instanceof Error ? err.message : "Failed to process trade data")
       setTrades([])
+      setDailyPL([])
       setStats(null)
-    } finally {
-      setLoading(false)
     }
   }
 
   const handleClearData = () => {
     setTrades([])
+    setDailyPL([])
     setStats(null)
     setError(null)
   }
@@ -115,7 +115,7 @@ export default function PersonalDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PersonalUploader onFileSelect={handleFileUpload} loading={loading} />
+            <PersonalUploader onDataParsed={handleDataParsed} />
             {error && (
               <div className="mt-4 p-4 border border-red-200 bg-red-50 rounded-lg">
                 <p className="text-red-600 text-sm">{error}</p>
@@ -126,14 +126,18 @@ export default function PersonalDashboardPage() {
       )}
 
       {/* Dashboard Content */}
-      {trades.length > 0 && stats && (
+      {trades.length > 0 && stats && dailyPL.length > 0 && (
         <>
           {/* Summary Cards */}
-          <PersonalSummary stats={stats} />
+          <PersonalSummary dailyPL={dailyPL} />
           
           {/* Calendar and Analysis Row */}
           <div className="grid gap-6 lg:grid-cols-2">
-            <PersonalPLCalendar trades={trades} />
+            <PersonalPLCalendar 
+              dailyPL={dailyPL} 
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+            />
             
             {/* Quick Stats Card */}
             <Card>
@@ -151,7 +155,7 @@ export default function PersonalDashboardPage() {
                   
                   <div className="text-center p-4 border rounded-lg">
                     <div className="text-2xl font-bold">
-                      {stats.profitFactor.toFixed(2)}
+                      {stats.avgWin > 0 && stats.avgLoss < 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : '0.00'}
                     </div>
                     <div className="text-sm text-muted-foreground">Profit Factor</div>
                   </div>
@@ -169,7 +173,7 @@ export default function PersonalDashboardPage() {
                   
                   <div className="text-center p-4 border rounded-lg">
                     <div className="text-2xl font-bold">
-                      {stats.averageWin > 0 ? (stats.averageWin / Math.abs(stats.averageLoss)).toFixed(2) : '0.00'}
+                      {stats.avgWin > 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : '0.00'}
                     </div>
                     <div className="text-sm text-muted-foreground">Risk/Reward</div>
                   </div>
@@ -182,7 +186,7 @@ export default function PersonalDashboardPage() {
                     {stats.winRate < 50 && (
                       <li>• Consider improving your entry strategy (win rate below 50%)</li>
                     )}
-                    {stats.profitFactor < 1.5 && (
+                    {stats.avgWin > 0 && stats.avgLoss < 0 && (stats.avgWin / Math.abs(stats.avgLoss)) < 1.5 && (
                       <li>• Focus on improving profit factor (target: 1.5+)</li>
                     )}
                     {stats.maxDrawdown < -1000 && (
@@ -209,7 +213,7 @@ export default function PersonalDashboardPage() {
               <div className="text-sm text-muted-foreground mb-4">
                 Upload a new CSV file to replace the current data or analyze a different time period.
               </div>
-              <PersonalUploader onFileSelect={handleFileUpload} loading={loading} />
+              <PersonalUploader onDataParsed={handleDataParsed} />
               {error && (
                 <div className="mt-4 p-4 border border-red-200 bg-red-50 rounded-lg">
                   <p className="text-red-600 text-sm">{error}</p>
