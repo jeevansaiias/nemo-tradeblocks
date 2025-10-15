@@ -76,14 +76,14 @@
   --card-foreground: oklch(0.2101 0.0318 264.6645);
   --popover: oklch(1.0000 0 0);
   --popover-foreground: oklch(0.2101 0.0318 264.6645);
-  --primary: oklch(0.6716 0.1368 48.5130);
-  --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.5360 0.0398 196.0280);
-  --secondary-foreground: oklch(1.0000 0 0);
-  --muted: oklch(0.9670 0.0029 264.5419);
-  --muted-foreground: oklch(0.5510 0.0234 264.3637);
-  --accent: oklch(0.9491 0 0);
-  --accent-foreground: oklch(0.2101 0.0318 264.6645);
+  --primary: #FF8A3D;
+  --primary-foreground: #FFFFFF;
+  --secondary: #121212;
+  --secondary-foreground: #E0E0E0;
+  --muted: #2A2A2A;
+  --muted-foreground: #A0A0A0;
+  --accent: #FFB266;
+  --accent-foreground: #121212;
   --destructive: oklch(0.6368 0.2078 25.3313);
   --border: oklch(0.9276 0.0058 264.5313);
   --input: oklch(0.9276 0.0058 264.5313);
@@ -95,12 +95,12 @@
   --chart-5: oklch(0.6830 0 0);
   --sidebar: oklch(0.9670 0.0029 264.5419);
   --sidebar-foreground: oklch(0.2101 0.0318 264.6645);
-  --sidebar-primary: oklch(0.6716 0.1368 48.5130);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(1.0000 0 0);
-  --sidebar-accent-foreground: oklch(0.2101 0.0318 264.6645);
-  --sidebar-border: oklch(0.9276 0.0058 264.5313);
-  --sidebar-ring: oklch(0.6716 0.1368 48.5130);
+  --sidebar-primary: #FF8A3D;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #FFB266;
+  --sidebar-accent-foreground: #121212;
+  --sidebar-border: #2A2A2A;
+  --sidebar-ring: #FF8A3D;
   --destructive-foreground: oklch(0.9851 0 0);
   --font-sans: Geist Mono, ui-monospace, monospace;
   --font-serif: serif;
@@ -125,20 +125,20 @@
 }
 
 .dark {
-  --background: oklch(0.1797 0.0043 308.1928);
-  --foreground: oklch(0.8109 0 0);
-  --card: oklch(0.1822 0 0);
-  --card-foreground: oklch(0.8109 0 0);
-  --popover: oklch(0.1797 0.0043 308.1928);
-  --popover-foreground: oklch(0.8109 0 0);
-  --primary: oklch(0.7214 0.1337 49.9802);
-  --primary-foreground: oklch(0.1797 0.0043 308.1928);
-  --secondary: oklch(0.5940 0.0443 196.0233);
-  --secondary-foreground: oklch(0.1797 0.0043 308.1928);
-  --muted: oklch(0.2520 0 0);
-  --muted-foreground: oklch(0.6268 0 0);
-  --accent: oklch(0.3211 0 0);
-  --accent-foreground: oklch(0.8109 0 0);
+  --background: #121212;
+  --foreground: #E0E0E0;
+  --card: #1A1A1A;
+  --card-foreground: #E0E0E0;
+  --popover: #121212;
+  --popover-foreground: #E0E0E0;
+  --primary: #FF8A3D;
+  --primary-foreground: #FFFFFF;
+  --secondary: #121212;
+  --secondary-foreground: #E0E0E0;
+  --muted: #2A2A2A;
+  --muted-foreground: #A0A0A0;
+  --accent: #FFB266;
+  --accent-foreground: #121212;
   --destructive: oklch(0.5940 0.0443 196.0233);
   --border: oklch(0.2520 0 0);
   --input: oklch(0.2520 0 0);
@@ -148,14 +148,14 @@
   --chart-3: oklch(0.8721 0.0864 68.5474);
   --chart-4: oklch(0.6268 0 0);
   --chart-5: oklch(0.6830 0 0);
-  --sidebar: oklch(0.1822 0 0);
-  --sidebar-foreground: oklch(0.8109 0 0);
-  --sidebar-primary: oklch(0.7214 0.1337 49.9802);
-  --sidebar-primary-foreground: oklch(0.1797 0.0043 308.1928);
-  --sidebar-accent: oklch(0.3211 0 0);
-  --sidebar-accent-foreground: oklch(0.8109 0 0);
-  --sidebar-border: oklch(0.2520 0 0);
-  --sidebar-ring: oklch(0.7214 0.1337 49.9802);
+  --sidebar: #1A1A1A;
+  --sidebar-foreground: #E0E0E0;
+  --sidebar-primary: #FF8A3D;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #FFB266;
+  --sidebar-accent-foreground: #121212;
+  --sidebar-border: #2A2A2A;
+  --sidebar-ring: #FF8A3D;
   --destructive-foreground: oklch(0.1797 0.0043 308.1928);
   --radius: 0.75rem;
   --font-sans: Geist Mono, ui-monospace, monospace;
@@ -183,8 +183,181 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+  }
+}
+
+/* NemoBlocks Custom Styling */
+@layer components {
+
+  /* Beta badge styling for sidebar */
+  .nemoblocks-beta-badge {
+    background: rgba(255, 138, 61, 0.1);
+    color: #FF8A3D;
+    border: 1px solid rgba(255, 138, 61, 0.3);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Enhanced hover states for navigation */
+  .nemoblocks-nav-item:hover {
+    background: rgba(255, 138, 61, 0.1);
+    color: #FFB266;
+  }
+
+  /* Comparison blocks specific styling */
+  .comparison-blocks-container {
+    --comparison-primary: #FF8A3D;
+    --comparison-secondary: #121212;
+    --comparison-text: #E0E0E0;
+    --comparison-highlight: #FFB266;
+    --comparison-muted: #2A2A2A;
+  }
+
+  .comparison-blocks-container .bg-primary {
+    background-color: var(--comparison-primary);
+  }
+
+  .comparison-blocks-container .text-primary {
+    color: var(--comparison-primary);
+  }
+
+  .comparison-blocks-container .border-primary {
+    border-color: var(--comparison-primary);
+  }
+
+  /* Calendar Heatmap Styling */
+  .calendar-heatmap-container .react-calendar-heatmap {
+    line-height: 1;
+  }
+
+  .calendar-heatmap-container .react-calendar-heatmap .react-calendar-heatmap-weekday-label {
+    fill: #A0A0A0;
+    font-size: 10px;
+  }
+
+  .calendar-heatmap-container .react-calendar-heatmap .react-calendar-heatmap-month-label {
+    fill: #E0E0E0;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .calendar-heatmap-container .react-calendar-heatmap-small-text {
+    font-size: 5px;
+  }
+
+  /* Heatmap color classes */
+  .calendar-heatmap-container .color-empty {
+    fill: #2A2A2A;
+    stroke: #3A3A3A;
+    stroke-width: 1px;
+    cursor: pointer;
+  }
+
+  .calendar-heatmap-container .color-positive {
+    fill: #FF8A3D;
+    stroke: #FFB266;
+    stroke-width: 1px;
+    cursor: pointer;
+  }
+
+  .calendar-heatmap-container .color-negative {
+    fill: #ef4444;
+    stroke: #f87171;
+    stroke-width: 1px;
+    cursor: pointer;
+  }
+
+  /* Hover effects */
+  .calendar-heatmap-container rect:hover {
+    stroke-width: 2px;
+    filter: brightness(1.2);
+  }
+
+  .calendar-heatmap-container .color-empty:hover {
+    fill: #3A3A3A;
+  }
+
+  .calendar-heatmap-container .color-positive:hover {
+    fill: #FFB266;
+  }
+
+  .calendar-heatmap-container .color-negative:hover {
+    fill: #f87171;
+  }
+
+  /* Monthly Calendar Styling */
+  .monthly-calendar {
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+
+  .monthly-calendar .grid {
+    gap: 2px;
+  }
+
+  /* Day cell styling for monthly view */
+  .monthly-day-cell {
+    min-height: 80px;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .monthly-day-cell:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 138, 61, 0.3);
+  }
+
+  .monthly-day-profit {
+    background: #0F3D2E;
+    border-color: #16A085;
+  }
+
+  .monthly-day-profit:hover {
+    background: #1E5A4A;
+  }
+
+  .monthly-day-loss {
+    background: #3D0F0F;
+    border-color: #E74C3C;
+  }
+
+  .monthly-day-loss:hover {
+    background: #5A1F1F;
+  }
+
+  .monthly-day-empty {
+    background: #1E1E1E;
+    border-color: #2A2A2A;
+  }
+
+  .monthly-day-empty:hover {
+    background: #252525;
+  }
+
+  .monthly-day-inactive {
+    opacity: 0.4;
+  }
+
+  /* Weekly summary styling */
+  .weekly-summary-card {
+    background: rgba(255, 138, 61, 0.05);
+    border: 1px solid rgba(255, 138, 61, 0.2);
+  }
+
+  .weekly-summary-positive {
+    border-left: 4px solid #16A085;
+  }
+
+  .weekly-summary-negative {
+    border-left: 4px solid #E74C3C;
   }
 }

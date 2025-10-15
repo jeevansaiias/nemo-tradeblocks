@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    IconCalendarStats,
     IconChartHistogram,
     IconGauge,
     IconGitCompare,
@@ -49,6 +50,12 @@ const navData = {
       title: "Comparison Blocks",
       href: "/comparison-blocks",
       icon: IconGitCompare,
+      badge: "Beta",
+    },
+    {
+      title: "P/L Calendar",
+      href: "/calendar",
+      icon: IconCalendarStats,
     },
     {
       title: "Position Sizing",

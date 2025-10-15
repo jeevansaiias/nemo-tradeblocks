@@ -586,7 +586,7 @@ export default function ComparisonBlocksPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="comparison-blocks-container space-y-6">
       {combinedError && (
         <Card className="border-destructive bg-destructive/5">
           <CardHeader className="pb-2">
