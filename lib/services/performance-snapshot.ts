@@ -527,16 +527,16 @@ function calculateRollingMetrics(trades: Trade[]) {
   return metrics
 }
 
+function getFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && isFinite(value) ? value : undefined
+}
+
 function calculateVolatilityRegimes(trades: Trade[]) {
   const regimes: SnapshotChartData['volatilityRegimes'] = []
 
   trades.forEach(trade => {
-    const openingVix = typeof trade.openingVix === 'number' && isFinite(trade.openingVix)
-      ? trade.openingVix
-      : undefined
-    const closingVix = typeof trade.closingVix === 'number' && isFinite(trade.closingVix)
-      ? trade.closingVix
-      : undefined
+    const openingVix = getFiniteNumber(trade.openingVix)
+    const closingVix = getFiniteNumber(trade.closingVix)
 
     if (openingVix === undefined && closingVix === undefined) {
       return
@@ -560,23 +560,15 @@ function calculatePremiumEfficiency(trades: Trade[]) {
   const efficiency: SnapshotChartData['premiumEfficiency'] = []
 
   trades.forEach((trade, index) => {
-    const premium = typeof trade.premium === 'number' && isFinite(trade.premium)
-      ? trade.premium
-      : undefined
-    const avgClosingCost = typeof trade.avgClosingCost === 'number' && isFinite(trade.avgClosingCost)
-      ? trade.avgClosingCost
-      : undefined
-    const maxProfit = typeof trade.maxProfit === 'number' && isFinite(trade.maxProfit)
-      ? trade.maxProfit
-      : undefined
-    const maxLoss = typeof trade.maxLoss === 'number' && isFinite(trade.maxLoss)
-      ? trade.maxLoss
-      : undefined
+    const premium = getFiniteNumber(trade.premium)
+    const avgClosingCost = getFiniteNumber(trade.avgClosingCost)
+    const maxProfit = getFiniteNumber(trade.maxProfit)
+    const maxLoss = getFiniteNumber(trade.maxLoss)
 
     const totalCommissions =
-      typeof trade.openingCommissionsFees === 'number' && isFinite(trade.openingCommissionsFees) &&
-      typeof trade.closingCommissionsFees === 'number' && isFinite(trade.closingCommissionsFees)
-        ? trade.openingCommissionsFees + trade.closingCommissionsFees
+      getFiniteNumber(trade.openingCommissionsFees) !== undefined &&
+      getFiniteNumber(trade.closingCommissionsFees) !== undefined
+        ? (trade.openingCommissionsFees ?? 0) + (trade.closingCommissionsFees ?? 0)
         : undefined
 
     const efficiencyResult = calculatePremiumEfficiencyPercent(trade)
@@ -605,15 +597,9 @@ function calculateMarginUtilization(trades: Trade[]) {
   const utilization: SnapshotChartData['marginUtilization'] = []
 
   trades.forEach(trade => {
-    const marginReq = typeof trade.marginReq === 'number' && isFinite(trade.marginReq)
-      ? trade.marginReq
-      : 0
-    const fundsAtClose = typeof trade.fundsAtClose === 'number' && isFinite(trade.fundsAtClose)
-      ? trade.fundsAtClose
-      : 0
-    const numContracts = typeof trade.numContracts === 'number' && isFinite(trade.numContracts)
-      ? trade.numContracts
-      : 0
+    const marginReq = getFiniteNumber(trade.marginReq) ?? 0
+    const fundsAtClose = getFiniteNumber(trade.fundsAtClose) ?? 0
+    const numContracts = getFiniteNumber(trade.numContracts) ?? 0
 
     if (marginReq === 0 && fundsAtClose === 0 && numContracts === 0) {
       return

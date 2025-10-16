@@ -1,7 +1,24 @@
 import { Trade } from '@/lib/models/trade'
 
+/**
+ * Standard options multiplier used to convert per-contract values into notional dollars.
+ * Equity and index option contracts typically control 100 shares, so premium/max profit
+ * values need to be scaled by 100 to reflect the total economic exposure.
+ */
 const OPTION_CONTRACT_MULTIPLIER = 100
+
+/**
+ * Margin-to-notional ratio threshold that indicates a trade is lightly margined.
+ * When gross notional is less than 50% of the posted margin requirement we treat
+ * the trade as an option-style structure and apply the contract multiplier.
+ */
 const MARGIN_RATIO_THRESHOLD = 0.5
+
+/**
+ * Notional dollar threshold under which trades are considered "small". These trades
+ * likely represent single-lot option structures, so we apply the option multiplier
+ * even if there is no explicit margin requirement to compare against.
+ */
 const SMALL_NOTIONAL_THRESHOLD = 5_000
 
 function getNormalizedContractCount(trade: Trade): number {
@@ -83,6 +100,21 @@ export interface PremiumEfficiencyResult {
   basis: EfficiencyBasis
 }
 
+/**
+ * Calculates a trade's premium efficiency percentage.
+ *
+ * The function searches for the most appropriate denominator to express trade performance:
+ * 1. Total premium collected (preferred when available)
+ * 2. Total maximum profit
+ * 3. Margin requirement
+ *
+ * Once a denominator is selected, it normalizes the trade's P/L against that value to
+ * compute an efficiency percentage. If no denominator can be derived or the resulting
+ * ratio is not finite, only the basis is reported.
+ *
+ * @param trade Trade record including premium, max profit, margin requirement, and P/L.
+ * @returns Object describing the efficiency percentage, denominator, and basis used.
+ */
 export function calculatePremiumEfficiencyPercent(trade: Trade): PremiumEfficiencyResult {
   const totalPremium = computeTotalPremium(trade)
   const totalMaxProfit = computeTotalMaxProfit(trade)

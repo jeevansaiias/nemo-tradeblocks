@@ -17,6 +17,12 @@ interface VixRegimeChartProps {
   className?: string
 }
 
+/**
+ * Volatility regimes derived from long-run VIX observations.
+ * - Low volatility: VIX ≤ 18 (below long-term average of ~19)
+ * - Medium volatility: 18 < VIX ≤ 25 (historically elevated)
+ * - High volatility: VIX > 25 (stress conditions)
+ */
 const VIX_BUCKETS = [
   { name: '≤ 18', min: -Infinity, max: 18 },
   { name: '18 - 25', min: 18, max: 25 },

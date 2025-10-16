@@ -18,8 +18,7 @@ export function PremiumEfficiencyChart({ className }: PremiumEfficiencyChartProp
     }
 
     const validEntries = data.premiumEfficiency.filter(entry =>
-      typeof entry.pl === 'number' &&
-      typeof entry.totalCommissions === 'number'
+      typeof entry.pl === 'number'
     )
 
     if (validEntries.length === 0) {
