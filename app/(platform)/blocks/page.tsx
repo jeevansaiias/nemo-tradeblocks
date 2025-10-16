@@ -5,8 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useBlockStore, type Block } from "@/lib/stores/block-store";
-import { Activity, Calendar, Grid3X3, List, Plus, Search, RotateCcw } from "lucide-react";
+import { Activity, Calendar, ChevronDown, Download, Grid3X3, Info, List, Plus, Search, RotateCcw } from "lucide-react";
 import React, { useState } from "react";
 
 function BlockCard({
@@ -131,6 +137,14 @@ function BlockCard({
   );
 }
 
+const COMPLETE_TEMPLATE_CSV = `Date Opened,Time Opened,Opening Price,Legs,Premium,Closing Price,Date Closed,Time Closed,Avg. Closing Cost,Reason For Close,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy
+2024-01-15,09:30:00,4535.25,SPX 15JAN24 4500P/4450P,2.50,1.25,2024-01-15,15:45:00,1.25,Profit Target,125.00,1,10125.00,1000.00,Bull Put Spread
+2024-01-16,10:15:00,4542.75,SPX 19JAN24 4600C/4650C,3.25,0.50,2024-01-18,14:30:00,0.50,Profit Target,275.00,1,10400.00,1200.00,Bear Call Spread`;
+
+const MINIMAL_TEMPLATE_CSV = `Date Opened,Time Opened,Opening Price,Legs,Premium,Closing Price,Date Closed,Time Closed,Avg. Closing Cost,Reason For Close,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy
+2024-01-15,09:30:00,4535.25,SPX 15JAN24 4500P/4450P,2.50,,,,,,125.00,1,10125.00,1000.00,Bull Put Spread
+2024-01-16,09:30:00,4542.75,SPX 19JAN24 4600C/4650C,3.25,,,,,,275.00,1,10400.00,1200.00,Bear Call Spread`;
+
 export default function BlockManagementPage() {
   const blocks = useBlockStore(state => state.blocks);
   const isInitialized = useBlockStore(state => state.isInitialized);
@@ -154,6 +168,23 @@ export default function BlockManagementPage() {
     setIsBlockDialogOpen(true);
   };
 
+  const handleDownloadTemplate = (type: 'complete' | 'minimal') => {
+    const content = type === 'complete' ? COMPLETE_TEMPLATE_CSV : MINIMAL_TEMPLATE_CSV;
+    const filename = type === 'complete'
+      ? 'tradeblocks-template-complete.csv'
+      : 'tradeblocks-template-minimal.csv';
+
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {/* Search and Controls */}
@@ -163,6 +194,33 @@ export default function BlockManagementPage() {
           <Input placeholder="Search blocks..." className="pl-10" />
         </div>
         <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Template</span>
+                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuItem onClick={() => handleDownloadTemplate('minimal')}>
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">Minimal Template</span>
+                  <span className="text-xs text-muted-foreground">
+                    Only required fields filled, closing fields empty
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownloadTemplate('complete')}>
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">Complete Template</span>
+                  <span className="text-xs text-muted-foreground">
+                    All fields filled with example closed trades
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm">
             <Grid3X3 className="w-4 h-4" />
           </Button>
@@ -219,16 +277,59 @@ export default function BlockManagementPage() {
             ))}
           </div>
         ) : blocks.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 max-w-2xl mx-auto">
             <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No trading blocks yet</h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-6">
               Create your first trading block to start analyzing your performance.
             </p>
-            <Button onClick={handleNewBlock}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create First Block
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+              <Button onClick={handleNewBlock}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create First Block
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Template
+                    <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-72">
+                  <DropdownMenuItem onClick={() => handleDownloadTemplate('minimal')}>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">Minimal Template</span>
+                      <span className="text-xs text-muted-foreground">
+                        Only required fields filled, closing fields empty
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadTemplate('complete')}>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">Complete Template</span>
+                      <span className="text-xs text-muted-foreground">
+                        All fields filled with example closed trades
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4 text-left text-sm space-y-2">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium mb-1">Required CSV Fields</p>
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    <span className="font-medium">Must have values:</span> Date Opened, Time Opened (HH:mm:ss), Opening Price, Legs, Premium, P/L, No. of Contracts, Funds at Close, Margin Req., Strategy
+                  </p>
+                  <p className="text-muted-foreground text-xs leading-relaxed mt-1">
+                    <span className="font-medium">Optional:</span> All closing fields can be empty for open trades
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
