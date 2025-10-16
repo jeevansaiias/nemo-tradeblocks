@@ -236,8 +236,7 @@ export function VixRegimeChart({ className }: VixRegimeChartProps) {
         rows: 2,
         columns: 1,
         pattern: 'independent',
-        roworder: 'top to bottom',
-        subplots: [['xy'], ['x2y2']]
+        roworder: 'top to bottom'
       },
       xaxis: {
         title: { text: 'VIX' },

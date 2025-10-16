@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useBlockStore } from '@/lib/stores/block-store'
 import { usePerformanceStore, type DateRange } from '@/lib/stores/performance-store'
 import { AlertTriangle, Loader2, Calendar } from 'lucide-react'
@@ -35,8 +35,6 @@ import {
 } from '@/components/ui/select'
 
 export default function PerformanceBlocksPage() {
-  const [isInitialized, setIsInitialized] = useState(false)
-
   // Block store
   const activeBlock = useBlockStore(state => {
     const activeBlockId = state.activeBlockId
@@ -65,28 +63,13 @@ export default function PerformanceBlocksPage() {
   }, [blockIsInitialized, loadBlocks])
 
   // Fetch performance data when active block changes
+  const activeBlockId = activeBlock?.id
+
   useEffect(() => {
-    if (!activeBlock) {
-      setIsInitialized(false)
-      return
-    }
+    if (!activeBlockId) return
 
-    setIsInitialized(false)
-
-    let isCancelled = false
-
-    fetchPerformanceData(activeBlock.id)
-      .then(() => {
-        if (!isCancelled) {
-          setIsInitialized(true)
-        }
-      })
-      .catch(console.error)
-
-    return () => {
-      isCancelled = true
-    }
-  }, [activeBlock?.id, fetchPerformanceData])
+    fetchPerformanceData(activeBlockId).catch(console.error)
+  }, [activeBlockId, fetchPerformanceData])
 
   // Helper functions
   const getDateRange = () => {

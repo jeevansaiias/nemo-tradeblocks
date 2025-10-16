@@ -25,6 +25,12 @@ export function HoldingDurationChart({ className }: HoldingDurationChartProps) {
       return { plotData: [], layout: {} }
     }
 
+    const minDuration = Math.min(...durations)
+    const maxDuration = Math.max(...durations)
+    const binCount = Math.min(30, Math.max(10, Math.floor(Math.sqrt(durations.length))))
+    const range = maxDuration - minDuration
+    const binSize = range > 0 ? range / binCount : 1
+
     const histogramTrace: Partial<PlotData> = {
       x: durations,
       type: 'histogram',
@@ -33,7 +39,11 @@ export function HoldingDurationChart({ className }: HoldingDurationChartProps) {
         color: '#0ea5e9',
         opacity: 0.75
       },
-      nbinsx: Math.min(30, Math.max(10, Math.floor(Math.sqrt(durations.length)))),
+      xbins: {
+        size: binSize,
+        start: minDuration,
+        end: maxDuration
+      },
       hovertemplate: 'Duration: %{x:.1f} hours<extra></extra>'
     }
 

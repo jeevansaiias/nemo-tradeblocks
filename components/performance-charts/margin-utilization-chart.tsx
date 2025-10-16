@@ -36,8 +36,9 @@ export function MarginUtilizationChart({ className }: MarginUtilizationChartProp
         colorscale: 'Portland',
         showscale: true,
         colorbar: {
-          title: 'Funds at Close ($)',
-          titleside: 'right'
+          title: {
+            text: 'Funds at Close ($)'
+          }
         }
       },
       hovertemplate:
