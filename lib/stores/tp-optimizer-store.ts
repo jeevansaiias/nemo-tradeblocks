@@ -30,6 +30,10 @@ export interface TPOptimizerState {
   best: TPResult | null;
   objective: "totalPnL" | "expectancy" | "profitFactor";
   
+  // Scope state
+  scope: "overall" | "byStrategy";
+  selectedStrategy?: string;
+  
   // UI state
   isOptimizing: boolean;
   error: string | null;
@@ -38,6 +42,8 @@ export interface TPOptimizerState {
   // Actions
   setData: (data: TradeRecord[]) => void;
   setObjective: (objective: "totalPnL" | "expectancy" | "profitFactor") => void;
+  setScope: (scope: "overall" | "byStrategy") => void;
+  setSelectedStrategy: (strategy?: string) => void;
   setResults: (results: TPResult[]) => void;
   setBaseline: (baseline: TPResult) => void;
   setBest: (best: TPResult) => void;
@@ -45,6 +51,8 @@ export interface TPOptimizerState {
   setActiveTab: (tab: string) => void;
   runOptimization: () => Promise<void>;
   clearData: () => void;
+  getStrategies: () => string[];
+  getScopedData: () => TradeRecord[];
 }
 
 export const useTPOptimizerStore = create<TPOptimizerState>()(
@@ -58,6 +66,10 @@ export const useTPOptimizerStore = create<TPOptimizerState>()(
       best: null,
       objective: "totalPnL",
       
+      // Scope state
+      scope: "overall",
+      selectedStrategy: undefined,
+      
       // UI state
       isOptimizing: false,
       error: null,
@@ -66,15 +78,33 @@ export const useTPOptimizerStore = create<TPOptimizerState>()(
       // Actions
       setData: (data) => set({ data, error: null }),
       setObjective: (objective) => set({ objective }),
+      setScope: (scope) => set({ scope }),
+      setSelectedStrategy: (strategy) => set({ selectedStrategy: strategy }),
       setResults: (results) => set({ results }),
       setBaseline: (baseline) => set({ baseline }),
       setBest: (best) => set({ best }),
       setCandidates: (candidates) => set({ candidates }),
       setActiveTab: (activeTab) => set({ activeTab }),
       
+      getStrategies: () => {
+        const { data } = get();
+        const strategies = Array.from(new Set(data.map(trade => trade.strategy)));
+        return strategies.sort();
+      },
+      
+      getScopedData: () => {
+        const { data, scope, selectedStrategy } = get();
+        if (scope === "byStrategy" && selectedStrategy) {
+          return data.filter(trade => trade.strategy === selectedStrategy);
+        }
+        return data;
+      },
+      
       runOptimization: async () => {
-        const { data, objective } = get();
-        if (data.length === 0) {
+        const { getScopedData, objective } = get();
+        const scopedData = getScopedData();
+        
+        if (scopedData.length === 0) {
           set({ error: "No data available for optimization" });
           return;
         }
@@ -85,14 +115,14 @@ export const useTPOptimizerStore = create<TPOptimizerState>()(
           // Import the optimization functions dynamically
           const { autoTPCandidates, simulateTP, summarizeBaseline, pickBest } = await import("@/lib/processing/auto-tp");
           
-          // Generate candidates
-          const candidates = autoTPCandidates(data);
+          // Generate candidates using scoped data
+          const candidates = autoTPCandidates(scopedData);
           
-          // Calculate baseline
-          const baseline = summarizeBaseline(data);
+          // Calculate baseline using scoped data
+          const baseline = summarizeBaseline(scopedData);
           
-          // Calculate results for all candidates
-          const results = candidates.map((tpPct: number) => simulateTP(data, tpPct));
+          // Calculate results for all candidates using scoped data
+          const results = candidates.map((tpPct: number) => simulateTP(scopedData, tpPct));
           
           // Pick the best result
           const best = pickBest(results, objective);
@@ -121,6 +151,8 @@ export const useTPOptimizerStore = create<TPOptimizerState>()(
         baseline: null,
         best: null,
         error: null,
+        scope: "overall",
+        selectedStrategy: undefined,
         activeTab: "upload"
       })
     }),

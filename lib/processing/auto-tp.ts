@@ -1,39 +1,60 @@
 import { TradeRecord, TPResult } from "@/lib/stores/tp-optimizer-store";
 
 /**
+ * Coerce value to clean number, stripping % and whitespace
+ */
+export function pct(x: string | number): number {
+  if (typeof x === 'number') return x;
+  const cleaned = String(x).replace(/[%\s,]/g, '').trim();
+  return parseFloat(cleaned) || 0;
+}
+
+/**
  * Generate auto TP candidates from trade data
- * Combines percentiles from maxProfitPct with fixed anchors
+ * Tests every possible TP% from 1% to 15,000% for comprehensive analysis
  */
 export function autoTPCandidates(trades: TradeRecord[]): number[] {
   if (trades.length === 0) return [];
   
-  // Get all maxProfitPct values, sorted
-  const maxProfits = trades
-    .map(t => t.maxProfitPct)
-    .filter(p => p > 0)
-    .sort((a, b) => a - b);
-  
-  if (maxProfits.length === 0) return [10, 15, 20, 25, 30, 40, 50];
-  
   const candidates = new Set<number>();
   
-  // Add percentiles (10th, 20th, ..., 90th)
-  for (let i = 1; i <= 9; i++) {
-    const percentileIndex = Math.floor((i / 10) * (maxProfits.length - 1));
-    const percentileValue = Math.round(maxProfits[percentileIndex]);
-    if (percentileValue >= 1 && percentileValue <= 100) {
-      candidates.add(percentileValue);
-    }
+  // Test every 1% increment from 1% to 100%
+  for (let tp = 1; tp <= 100; tp++) {
+    candidates.add(tp);
   }
   
-  // Add anchor points
-  const anchors = [10, 15, 20, 25, 30, 40, 50];
-  anchors.forEach(anchor => candidates.add(anchor));
+  // Test every 5% increment from 105% to 500% 
+  for (let tp = 105; tp <= 500; tp += 5) {
+    candidates.add(tp);
+  }
   
-  // Convert to sorted array, clamped to [1, 100]
-  return Array.from(candidates)
-    .filter(tp => tp >= 1 && tp <= 100)
-    .sort((a, b) => a - b);
+  // Test every 10% increment from 510% to 1000%
+  for (let tp = 510; tp <= 1000; tp += 10) {
+    candidates.add(tp);
+  }
+  
+  // Test every 25% increment from 1025% to 2500%
+  for (let tp = 1025; tp <= 2500; tp += 25) {
+    candidates.add(tp);
+  }
+  
+  // Test every 50% increment from 2550% to 5000%
+  for (let tp = 2550; tp <= 5000; tp += 50) {
+    candidates.add(tp);
+  }
+  
+  // Test every 100% increment from 5100% to 10000%
+  for (let tp = 5100; tp <= 10000; tp += 100) {
+    candidates.add(tp);
+  }
+  
+  // Test every 250% increment from 10250% to 15000%
+  for (let tp = 10250; tp <= 15000; tp += 250) {
+    candidates.add(tp);
+  }
+  
+  // Convert to sorted array
+  return Array.from(candidates).sort((a, b) => a - b);
 }
 
 /**
@@ -72,9 +93,18 @@ export function simulateTP(trades: TradeRecord[], tpPct: number): TPResult {
   
   const grossProfit = winners.reduce((sum, w) => sum + w, 0);
   const grossLoss = Math.abs(losers.reduce((sum, l) => sum + l, 0));
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0;
   
-  const expectancy = (winRate * avgWin) - ((1 - winRate) * avgLoss);
+  // Handle edge cases for profit factor
+  let profitFactor: number;
+  if (grossLoss === 0) {
+    profitFactor = grossProfit > 0 ? Number.POSITIVE_INFINITY : 0;
+  } else {
+    profitFactor = grossProfit / grossLoss;
+  }
+  
+  // Handle edge cases for expectancy
+  const expectancy = winners.length === 0 && losers.length === 0 ? 0 : 
+    (winRate * avgWin) - ((1 - winRate) * avgLoss);
   
   return {
     tpPct,
@@ -88,8 +118,8 @@ export function simulateTP(trades: TradeRecord[], tpPct: number): TPResult {
 }
 
 /**
- * Summarize baseline performance (hold to expiry)
- * Uses the resultPct field as-is
+ * Summarize baseline performance (actual results from trading log)
+ * Uses the resultPct field as-is (do NOT force expiry)
  */
 export function summarizeBaseline(trades: TradeRecord[]): TPResult {
   if (trades.length === 0) {
@@ -104,7 +134,7 @@ export function summarizeBaseline(trades: TradeRecord[]): TPResult {
     };
   }
   
-  // Use original results
+  // Use original results (baseline = actual trade results)
   const results = trades.map(trade => trade.resultPct);
   
   // Calculate metrics
@@ -120,9 +150,18 @@ export function summarizeBaseline(trades: TradeRecord[]): TPResult {
   
   const grossProfit = winners.reduce((sum, w) => sum + w, 0);
   const grossLoss = Math.abs(losers.reduce((sum, l) => sum + l, 0));
-  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0;
   
-  const expectancy = (winRate * avgWin) - ((1 - winRate) * avgLoss);
+  // Handle edge cases for profit factor
+  let profitFactor: number;
+  if (grossLoss === 0) {
+    profitFactor = grossProfit > 0 ? Number.POSITIVE_INFINITY : 0;
+  } else {
+    profitFactor = grossProfit / grossLoss;
+  }
+  
+  // Handle edge cases for expectancy
+  const expectancy = winners.length === 0 && losers.length === 0 ? 0 : 
+    (winRate * avgWin) - ((1 - winRate) * avgLoss);
   
   return {
     tpPct: 0, // N/A for baseline
