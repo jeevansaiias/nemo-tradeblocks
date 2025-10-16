@@ -29,6 +29,7 @@ export function PersonalUploader({ onDataParsed }: PersonalUploaderProps) {
     const file = event.target.files?.[0]
     if (!file) return
 
+    console.log('🔥 FILE UPLOAD STARTED:', file.name, 'Size:', file.size)
     setIsUploading(true)
     setError(null)
     setSuccess(null)
@@ -36,26 +37,48 @@ export function PersonalUploader({ onDataParsed }: PersonalUploaderProps) {
 
     try {
       const content = await file.text()
+      console.clear() // Clear previous console output
+      console.log('🔥 REAL CSV FILE PROCESSING:', file.name)
+      console.log('🔥 File size:', file.size, 'bytes')
+      console.log('🔥 Content preview:', content.substring(0, 300))
+      
       const trades = parsePersonalTradeCSV(content)
       
       if (trades.length === 0) {
         throw new Error("No valid trades found in the CSV file")
       }
 
+      console.log('🔥 PARSED TRADES COUNT:', trades.length)
       const dailyPL = groupTradesByDate(trades)
       
       // Show preview of first 5 trades
       setPreviewData(trades.slice(0, 5))
-      setSuccess(`Successfully parsed ${trades.length} trades across ${dailyPL.length} trading days`)
+      setSuccess(`✅ Successfully parsed ${trades.length} REAL trades from ${file.name}`)
       
       // Pass data to parent component
+      console.log('🔥 SENDING DATA TO PARENT - REAL CSV DATA')
       onDataParsed(trades, dailyPL)
       
     } catch (err) {
+      console.error('🔥 CSV PARSING ERROR:', err)
       setError(err instanceof Error ? err.message : "Failed to parse CSV file")
     } finally {
       setIsUploading(false)
+      // Clear the file input to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
+  }
+
+  // COMPLETELY DISABLE SAMPLE DATA
+  const handleLoadSampleData = () => {
+    alert('Sample data is disabled. Please upload your real CSV file.')
+    return
+  }
+
+  const generateSampleTrades = (): PersonalTrade[] => {
+    throw new Error('Sample data generation is disabled')
   }
 
   const handleUploadClick = () => {
@@ -114,6 +137,21 @@ export function PersonalUploader({ onDataParsed }: PersonalUploaderProps) {
           <Button disabled={isUploading} variant="outline">
             {isUploading ? "Processing..." : "Select File"}
           </Button>
+          
+          {/* Sample Data Button - DISABLED */}
+          <div className="mt-4 pt-4 border-t border-muted-foreground/20">
+            <p className="text-xs text-red-600 mb-2 text-center">
+              Sample data disabled - Upload your real CSV file only
+            </p>
+            <Button 
+              disabled={true}
+              variant="secondary" 
+              size="sm" 
+              className="w-full opacity-50"
+            >
+              Sample Data Disabled
+            </Button>
+          </div>
         </div>
 
         {/* Error Message */}

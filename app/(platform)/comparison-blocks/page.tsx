@@ -40,6 +40,7 @@ import { StrategyAlignment } from "@/lib/models/strategy-alignment";
 import { useBlockStore } from "@/lib/stores/block-store";
 import { useComparisonStore } from "@/lib/stores/comparison-store";
 import { cn } from "@/lib/utils";
+import { generateUUID } from "@/lib/utils/uuid";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -555,7 +556,7 @@ export default function ComparisonBlocksPage() {
       await persistAlignments(next);
     } else {
       const newMapping: StrategyAlignment = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         reportingStrategies: [selectedReporting],
         liveStrategies: [selectedBacktested],
         note: dialogNote.trim() || undefined,

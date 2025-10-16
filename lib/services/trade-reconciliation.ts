@@ -325,8 +325,27 @@ function normalizeBacktestedTrade(trade: Trade): NormalizedTrade {
   const dateOpened = new Date(trade.dateOpened)
   const sortTime = resolveSortTime(dateOpened, trade.timeOpened)
   const contracts = trade.numContracts || 1
-  const premiumPerContract =
-    contracts !== 0 ? trade.premium / contracts : trade.premium
+
+  // OptionOmega-style CSV exports encode premium in cents (e.g. 1360 -> $13.60).
+  // Prefer the precision flag captured during CSV parsing; fall back to legacy detection
+  // for trades saved before that metadata existed.
+  const isPremiumInCents = trade.premiumPrecision === 'cents'
+    || (
+      trade.premiumPrecision === undefined
+      && (trade.maxProfit !== undefined || trade.maxLoss !== undefined)
+      && Number.isInteger(trade.premium)
+      && Math.abs(trade.premium) >= 100
+    )
+  let premiumPerContract: number
+  let totalPremium: number
+
+  if (isPremiumInCents) {
+    premiumPerContract = trade.premium / 100
+    totalPremium = premiumPerContract * contracts
+  } else {
+    totalPremium = trade.premium
+    premiumPerContract = contracts !== 0 ? totalPremium / contracts : totalPremium
+  }
 
   return {
     id: buildTradeId(trade.strategy, dateOpened, trade.timeOpened, contracts, trade.pl),
@@ -337,7 +356,7 @@ function normalizeBacktestedTrade(trade: Trade): NormalizedTrade {
     session: formatSession(dateOpened),
     dateClosed: trade.dateClosed ? new Date(trade.dateClosed) : undefined,
     premiumPerContract,
-    totalPremium: trade.premium,
+    totalPremium,
     contracts,
     pl: trade.pl,
     openingFees: trade.openingCommissionsFees ?? 0,
@@ -349,8 +368,8 @@ function normalizeBacktestedTrade(trade: Trade): NormalizedTrade {
 function normalizeReportedTrade(trade: ReportingTrade): NormalizedTrade {
   const dateOpened = new Date(trade.dateOpened)
   const contracts = trade.numContracts || 1
-  const premiumPerContract =
-    contracts !== 0 ? trade.initialPremium / contracts : trade.initialPremium
+  const premiumPerContract = trade.initialPremium
+  const totalPremium = premiumPerContract * contracts
 
   return {
     id: buildTradeId(trade.strategy, dateOpened, undefined, contracts, trade.pl),
@@ -360,7 +379,7 @@ function normalizeReportedTrade(trade: ReportingTrade): NormalizedTrade {
     session: formatSession(dateOpened),
     dateClosed: trade.dateClosed ? new Date(trade.dateClosed) : undefined,
     premiumPerContract,
-    totalPremium: trade.initialPremium,
+    totalPremium,
     contracts,
     pl: trade.pl,
     openingFees: 0,
@@ -598,9 +617,7 @@ function buildMetrics(
     normalizeTo1Lot ? 1 : trade.contracts
 
   const normalizedPremium = (trade: NormalizedTrade): number =>
-    normalizeTo1Lot && trade.contracts !== 0
-      ? trade.totalPremium / trade.contracts
-      : trade.totalPremium
+    normalizeTo1Lot ? trade.premiumPerContract : trade.totalPremium
 
   const matchedBacktestedContractBaseline = matchedPairs.reduce(
     (sum, pair) => sum + normalizedContractWeight(pair.backtested),
@@ -684,7 +701,7 @@ function normalizeTradeForStats(trade: NormalizedTrade, normalizeTo1Lot: boolean
   return {
     ...trade,
     pl: trade.pl / trade.contracts,
-    totalPremium: trade.totalPremium / trade.contracts,
+    totalPremium: trade.premiumPerContract,
     premiumPerContract: trade.premiumPerContract,
     openingFees: trade.openingFees / trade.contracts,
     closingFees: trade.closingFees / trade.contracts,
@@ -703,7 +720,7 @@ function calculateTradeTotals(trades: NormalizedTrade[], normalizeTo1Lot: boolea
 
   const totalPremium = trades.reduce((acc, trade) => {
     const premium = normalizeTo1Lot && trade.contracts > 0
-      ? trade.totalPremium / trade.contracts
+      ? trade.premiumPerContract
       : trade.totalPremium
     return acc + premium
   }, 0)

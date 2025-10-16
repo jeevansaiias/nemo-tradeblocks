@@ -16,15 +16,19 @@ interface PersonalSummaryProps {
 }
 
 export function PersonalSummary({ dailyPL }: PersonalSummaryProps) {
-  const stats = useMemo(() => calculatePersonalStats(dailyPL), [dailyPL])
+  const stats = useMemo(() => {
+    console.log('PersonalSummary recalculating stats for', dailyPL.length, 'days')
+    return calculatePersonalStats(dailyPL)
+  }, [dailyPL])
 
   const summaryCards = [
     {
       title: "Total P/L",
-      value: formatCurrency(stats.totalPL),
+      value: formatCurrency(stats.completedPositionsPL && stats.completedPositionsPL !== 0 ? stats.completedPositionsPL : stats.totalPL),
       change: `${stats.totalTrades} trades`,
       icon: Target,
-      color: stats.totalPL >= 0 ? "text-green-600" : "text-red-600"
+      color: (stats.completedPositionsPL && stats.completedPositionsPL !== 0 ? stats.completedPositionsPL : stats.totalPL) >= 0 ? "text-green-600" : "text-red-600",
+      subtitle: stats.completedPositionsPL && stats.completedPositionsPL !== 0 ? "Completed positions" : "Total cash flow"
     },
     {
       title: "Win Rate",
@@ -94,6 +98,11 @@ export function PersonalSummary({ dailyPL }: PersonalSummaryProps) {
               <p className="text-xs text-muted-foreground">
                 {card.change}
               </p>
+              {card.subtitle && (
+                <p className="text-xs text-muted-foreground italic mt-1">
+                  {card.subtitle}
+                </p>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -116,6 +125,30 @@ export function PersonalSummary({ dailyPL }: PersonalSummaryProps) {
                   {formatCurrency(stats.currentBalance)}
                 </span>
               </div>
+              
+              {/* Show breakdown if we have completed positions data */}
+              {stats.completedPositionsPL !== undefined && stats.openPositionsPL !== undefined && (
+                <div className="border-t pt-4">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Completed Positions P/L</span>
+                    <span className={`text-sm font-medium ${stats.completedPositionsPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(stats.completedPositionsPL)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-muted-foreground">Open Positions P/L</span>
+                    <span className={`text-sm font-medium ${stats.openPositionsPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(stats.openPositionsPL)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-sm font-medium">Total Cash Flow</span>
+                    <span className={`text-sm font-medium ${stats.totalPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(stats.totalPL)}
+                    </span>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="space-y-2">

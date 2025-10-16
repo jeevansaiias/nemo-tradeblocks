@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 
 import { PersonalUploader } from "@/components/personal-dashboard/PersonalUploader"
 import { PersonalSummary } from "@/components/personal-dashboard/PersonalSummary"
@@ -25,34 +25,120 @@ export default function PersonalDashboardPage() {
   const [stats, setStats] = useState<PersonalTradeStats | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
+  const [dataKey, setDataKey] = useState<string>(Date.now().toString()) // Force re-render key
+
+  // Clear any potential localStorage or sessionStorage
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('personalTrades')
+      localStorage.removeItem('personalStats')
+      sessionStorage.removeItem('personalTrades')
+      sessionStorage.removeItem('personalStats')
+    }
+  }, [])
 
   const handleDataParsed = (trades: PersonalTrade[], parsedDailyPL: DailyPersonalPL[]) => {
-    setError(null)
-    
-    try {
-      if (trades.length === 0) {
-        throw new Error("No trades found in the CSV file")
-      }
-      
-      const calculatedStats = calculatePersonalStats(parsedDailyPL)
-      
-      setTrades(trades)
-      setDailyPL(parsedDailyPL)
-      setStats(calculatedStats)
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process trade data")
-      setTrades([])
-      setDailyPL([])
-      setStats(null)
-    }
-  }
-
-  const handleClearData = () => {
+    // Force complete reset
     setTrades([])
     setDailyPL([])
     setStats(null)
     setError(null)
+    
+    // Small delay to ensure state is cleared
+    setTimeout(() => {
+      try {
+        if (trades.length === 0) {
+          throw new Error("No trades found in the CSV file")
+        }
+        
+        console.log('Calculating stats for', trades.length, 'trades')
+        console.log('First few trades:', trades.slice(0, 3))
+        
+        const calculatedStats = calculatePersonalStats(parsedDailyPL)
+        console.log('Calculated stats:', calculatedStats)
+        
+        setTrades(trades)
+        setDailyPL(parsedDailyPL)
+        setStats(calculatedStats)
+        setDataKey(Date.now().toString()) // Update key to force re-render
+        
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to process trade data")
+        setTrades([])
+        setDailyPL([])
+        setStats(null)
+        setDataKey(Date.now().toString())
+      }
+    }, 100)
+  }
+
+  const handleClearData = () => {
+    console.log('Clearing all data...')
+    setTrades([])
+    setDailyPL([])
+    setStats(null)
+    setError(null)
+    setDataKey(Date.now().toString()) // Update key to force re-render
+  }
+
+  const handleHardReset = () => {
+    if (typeof window !== 'undefined') {
+      window.location.reload()
+    }
+  }
+
+  const forceClearAll = () => {
+    console.log('🔥 FORCE CLEARING ALL DATA')
+    setTrades([])
+    setDailyPL([])
+    setStats(null)
+    setError(null)
+    setCurrentDate(new Date())
+    setDataKey(Date.now().toString())
+    
+    // Clear any browser storage
+    if (typeof window !== 'undefined') {
+      localStorage.clear()
+      sessionStorage.clear()
+      console.log('🔥 CLEARED ALL BROWSER STORAGE')
+    }
+  }
+
+  // Nuclear reset - force complete page reload and clear everything
+  const nuclearReset = () => {
+    console.log('🚀 NUCLEAR RESET - CLEARING EVERYTHING')
+    
+    // Clear all React state
+    setTrades([])
+    setDailyPL([])
+    setStats(null)
+    setError(null)
+    setCurrentDate(new Date())
+    setDataKey(Date.now().toString())
+    
+    if (typeof window !== 'undefined') {
+      // Clear all storage
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // Clear all cookies
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      })
+      
+      // Force reload without cache
+      window.location.reload()
+    }
+  }
+
+  const debugCurrentData = () => {
+    console.log('=== DEBUG CURRENT DATA ===')
+    console.log('Trades count:', trades.length)
+    console.log('First 3 trades:', trades.slice(0, 3))
+    console.log('Stats:', stats)
+    console.log('Daily P/L count:', dailyPL.length)
+    console.log('Data key:', dataKey)
+    alert(`Current data: ${trades.length} trades, Stats: ${stats ? 'loaded' : 'null'}`)
   }
 
   const exportData = () => {
@@ -101,6 +187,19 @@ export default function PersonalDashboardPage() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Clear
             </Button>
+            <Button variant="destructive" size="sm" onClick={forceClearAll}>
+              🗑️ Force Clear
+            </Button>
+            <Button variant="destructive" size="sm" onClick={nuclearReset}>
+              ☢️ Nuclear Reset
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleHardReset}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Hard Reset
+            </Button>
+            <Button variant="secondary" size="sm" onClick={debugCurrentData}>
+              🐛 Debug
+            </Button>
           </div>
         )}
       </div>
@@ -127,7 +226,7 @@ export default function PersonalDashboardPage() {
 
       {/* Dashboard Content */}
       {trades.length > 0 && stats && dailyPL.length > 0 && (
-        <>
+        <div key={dataKey}>
           {/* Summary Cards */}
           <PersonalSummary dailyPL={dailyPL} />
           
@@ -221,7 +320,7 @@ export default function PersonalDashboardPage() {
               )}
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </div>
   )

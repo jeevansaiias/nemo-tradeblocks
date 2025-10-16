@@ -160,6 +160,7 @@ export function BlockDialog({
   };
 
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [processedFileName, setProcessedFileName] = useState<string | null>(null);
   const [processingErrors, setProcessingErrors] = useState<string[]>([]);
   const [missingStrategyCount, setMissingStrategyCount] = useState(0);
   const [strategyOverride, setStrategyOverride] = useState("");
@@ -190,6 +191,7 @@ export function BlockDialog({
       setIsProcessing(false);
       setProcessingStep("");
       setPreviewData(null);
+      setProcessedFileName(null);
       setProcessingErrors([]);
       setMissingStrategyCount(0);
       setStrategyOverride("");
@@ -403,6 +405,9 @@ export function BlockDialog({
 
       if (type === "trade") {
         resetStrategyOverrideState();
+        // Clear preview data when a new trade file is selected
+        setPreviewData(null);
+        setProcessedFileName(null);
       }
 
       if (!file) {
@@ -464,6 +469,9 @@ export function BlockDialog({
 
       if (type === "trade") {
         resetStrategyOverrideState();
+        // Clear preview data when a new trade file is selected
+        setPreviewData(null);
+        setProcessedFileName(null);
       }
 
       if (!file) {
@@ -666,6 +674,7 @@ export function BlockDialog({
       };
 
       setPreviewData(preview);
+      setProcessedFileName(tradeLog.file.name);
       setProcessingStep("");
 
       return { preview, missingStrategies: missingCount };
@@ -692,9 +701,13 @@ export function BlockDialog({
     try {
       setIsProcessing(true);
 
-      // For new blocks, process files if provided
+      // Process files if new files were uploaded
       let processedPreview = previewData;
       let missingStrategies = missingStrategyCount;
+      // Check if we need to process: either no preview exists OR the file changed
+      const needsProcessing = tradeLog.file &&
+        (!processedPreview?.trades || processedFileName !== tradeLog.file.name);
+
       if (mode === "new" && tradeLog.file) {
         const result = await processFiles();
         if (!result) return; // Processing failed
@@ -703,6 +716,20 @@ export function BlockDialog({
         if (missingStrategies > 0 && strategyOverride.trim() === "") {
           toast.error(
             "Please provide a strategy name for unlabeled trades before creating the block."
+          );
+          setIsProcessing(false);
+          setProcessingStep("");
+          return;
+        }
+      } else if (mode === "edit" && needsProcessing) {
+        // In edit mode, process files if they were uploaded but not yet processed
+        const result = await processFiles();
+        if (!result) return; // Processing failed
+        processedPreview = result.preview;
+        missingStrategies = result.missingStrategies;
+        if (missingStrategies > 0 && strategyOverride.trim() === "") {
+          toast.error(
+            "Please provide a strategy name for unlabeled trades before saving changes."
           );
           setIsProcessing(false);
           setProcessingStep("");
@@ -829,7 +856,55 @@ export function BlockDialog({
         // Update existing block
         setProcessingStep("Updating block...");
 
-        const processedData = previewData;
+        let processedData = previewData;
+
+        // Ensure we process the daily log if it was uploaded without running the full pipeline
+        if (dailyLog.file && (!processedData || !processedData.dailyLogs)) {
+          setProcessingStep("Processing daily log...");
+          setDailyLog((prev) => ({
+            ...prev,
+            status: "processing",
+            progress: 0,
+          }));
+
+          const dailyProcessor = new DailyLogProcessor({
+            progressCallback: (progress: DailyLogProcessingProgress) => {
+              setDailyLog((prev) => ({
+                ...prev,
+                progress: progress.progress,
+                processedData: {
+                  rowCount: progress.validEntries + progress.invalidEntries,
+                },
+              }));
+            },
+          });
+
+          const dailyResult = await dailyProcessor.processFile(dailyLog.file);
+
+          if (dailyResult.errors.length > 0) {
+            const dailyErrors = dailyResult.errors.map((e) => e.message);
+            setProcessingErrors((prev) => [...prev, ...dailyErrors]);
+          }
+
+          setDailyLog((prev) => ({
+            ...prev,
+            status: "uploaded",
+            progress: 100,
+            processedData: {
+              rowCount: dailyResult.validEntries,
+              dateRange: dailyResult.stats.dateRange,
+              stats: {
+                ...dailyResult.stats,
+                strategies: [],
+              },
+            },
+          }));
+
+          processedData = {
+            ...processedData,
+            dailyLogs: dailyResult,
+          } as PreviewData;
+        }
 
         const updates: Partial<Block> = {
           name: name.trim(),
