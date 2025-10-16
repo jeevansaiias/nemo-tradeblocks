@@ -13,6 +13,7 @@ import {
   Calendar,
   Target,
   TrendingUp,
+  Gauge,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useBlockStore } from "@/lib/stores/block-store";
@@ -22,6 +23,10 @@ import { DailyLogEntry } from "@/lib/models/daily-log";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import { buildPerformanceSnapshot } from "@/lib/services/performance-snapshot";
 import { PortfolioStats, StrategyStats } from "@/lib/models/portfolio-stats";
+import {
+  calculatePremiumEfficiencyPercent,
+  computeTotalPremium
+} from "@/lib/metrics/trade-efficiency";
 
 // Strategy options will be dynamically generated from trades
 
@@ -197,6 +202,67 @@ export default function BlockStatsPage() {
 
     return worstTrade;
   };
+
+  const getCommissionShareOfPremium = () => {
+    if (filteredTrades.length === 0) return 0;
+
+    const totals = filteredTrades.reduce((acc, trade) => {
+      const totalPremium = computeTotalPremium(trade) ?? 0;
+      const commissions = (trade.openingCommissionsFees ?? 0) + (trade.closingCommissionsFees ?? 0);
+
+      return {
+        premium: acc.premium + totalPremium,
+        commissions: acc.commissions + commissions
+      };
+    }, { premium: 0, commissions: 0 });
+
+    if (totals.premium === 0) return 0;
+
+    return (totals.commissions / totals.premium) * 100;
+  };
+
+  const getAvgPremiumEfficiency = () => {
+    if (filteredTrades.length === 0) return 0;
+
+    const efficiencies = filteredTrades
+      .map(trade => calculatePremiumEfficiencyPercent(trade).percentage)
+      .filter((value): value is number => typeof value === 'number' && isFinite(value));
+
+    if (efficiencies.length === 0) return 0;
+
+    const total = efficiencies.reduce((sum, value) => sum + value, 0);
+    return total / efficiencies.length;
+  };
+
+  const getAvgHoldingPeriodHours = () => {
+    const tradesWithClose = filteredTrades.filter(trade => trade.dateClosed);
+
+    if (tradesWithClose.length === 0) return 0;
+
+    const totalHours = tradesWithClose.reduce((sum, trade) => {
+      const openDate = new Date(trade.dateOpened);
+      const closeDate = trade.dateClosed ? new Date(trade.dateClosed) : openDate;
+      if (isNaN(openDate.getTime()) || isNaN(closeDate.getTime())) {
+        return sum;
+      }
+      const hours = (closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60);
+      return sum + Math.max(0, hours);
+    }, 0);
+
+    return totalHours / tradesWithClose.length;
+  };
+
+  const getAvgContracts = () => {
+    if (filteredTrades.length === 0) return 0;
+
+    const totalContracts = filteredTrades.reduce((sum, trade) => sum + (trade.numContracts ?? 0), 0);
+    return totalContracts / filteredTrades.length;
+  };
+
+  const commissionShare = getCommissionShareOfPremium();
+  const avgPremiumEfficiency = getAvgPremiumEfficiency();
+  const avgHoldingHours = Number(getAvgHoldingPeriodHours().toFixed(1));
+  const avgContracts = Number(getAvgContracts().toFixed(2));
 
   const getStrategyOptions = () => {
     if (trades.length === 0) return [];
@@ -544,14 +610,62 @@ export default function BlockStatsPage() {
             detailed: "Percentage of weeks that were profitable. Weekly win rate shows shorter-term consistency and can help identify if your strategy works better in certain market conditions or time frames. Useful for weekly review cycles."
           }}
         />
+      <MetricCard
+        title="Kelly %"
+        value={portfolioStats?.kellyPercentage || 0}
+        format="percentage"
+        isPositive={(portfolioStats?.kellyPercentage || 0) > 0}
+        tooltip={{
+          flavor: "Optimal foundation size - theoretical best percentage of capital per building project.",
+          detailed: "Kelly Criterion suggests the optimal position size based on your win rate and average win/loss sizes. Positive values suggest profitable strategies, while negative values indicate unprofitable ones. Most traders use a fraction of Kelly due to its aggressive nature."
+        }}
+      />
+    </MetricSection>
+
+      {/* Execution Efficiency */}
+      <MetricSection
+        title="Execution Efficiency"
+        icon={<Gauge className="w-4 h-4" />}
+        badge="TRADE-LEVEL INSIGHTS"
+        badgeVariant="outline"
+        gridCols={4}
+      >
         <MetricCard
-          title="Kelly %"
-          value={portfolioStats?.kellyPercentage || 0}
+          title="Commission vs Premium"
+          value={commissionShare}
           format="percentage"
-          isPositive={(portfolioStats?.kellyPercentage || 0) > 0}
+          isPositive={commissionShare < 20}
           tooltip={{
-            flavor: "Optimal foundation size - theoretical best percentage of capital per building project.",
-            detailed: "Kelly Criterion suggests the optimal position size based on your win rate and average win/loss sizes. Positive values suggest profitable strategies, while negative values indicate unprofitable ones. Most traders use a fraction of Kelly due to its aggressive nature."
+            flavor: "Fee drag relative to the premium collected.",
+            detailed: "Tracks how much of the collected option premium gets consumed by commissions and fees. High values suggest scaling, broker, or strategy adjustments to regain edge."
+          }}
+        />
+        <MetricCard
+          title="Avg Premium Capture"
+          value={avgPremiumEfficiency}
+          format="percentage"
+          isPositive={avgPremiumEfficiency > 0}
+          tooltip={{
+            flavor: "Realized edge compared to max profit or collected credit.",
+            detailed: "Measures how efficiently trades harvest their theoretical upside. Values near 100% show excellent execution, while negative values signal leaving gains on the table or overpaying to exit."
+          }}
+        />
+        <MetricCard
+          title="Avg Holding (hrs)"
+          value={avgHoldingHours}
+          format="number"
+          tooltip={{
+            flavor: "Typical time capital stays tied up.",
+            detailed: "Average hours from entry to close. Helps align expectations, monitor for drift in playbook cadence, and coordinate with capital allocation plans."
+          }}
+        />
+        <MetricCard
+          title="Avg Contracts"
+          value={avgContracts}
+          format="number"
+          tooltip={{
+            flavor: "Standard position size deployed per trade.",
+            detailed: "Average contract count gives quick feedback on sizing discipline and how it scales across wins and losses."
           }}
         />
       </MetricSection>

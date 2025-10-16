@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useBlockStore } from '@/lib/stores/block-store'
 import { usePerformanceStore, type DateRange } from '@/lib/stores/performance-store'
 import { AlertTriangle, Loader2, Calendar } from 'lucide-react'
@@ -16,6 +16,11 @@ import { TradeSequenceChart } from '@/components/performance-charts/trade-sequen
 import { RollingMetricsChart } from '@/components/performance-charts/rolling-metrics-chart'
 import { RiskEvolutionChart } from '@/components/performance-charts/risk-evolution-chart'
 import { ROMTimelineChart } from '@/components/performance-charts/rom-timeline-chart'
+import { VixRegimeChart } from '@/components/performance-charts/vix-regime-chart'
+import { PremiumEfficiencyChart } from '@/components/performance-charts/premium-efficiency-chart'
+import { MarginUtilizationChart } from '@/components/performance-charts/margin-utilization-chart'
+import { ExitReasonChart } from '@/components/performance-charts/exit-reason-chart'
+import { HoldingDurationChart } from '@/components/performance-charts/holding-duration-chart'
 
 // UI Components
 import { MultiSelect } from '@/components/multi-select'
@@ -30,8 +35,6 @@ import {
 } from '@/components/ui/select'
 
 export default function PerformanceBlocksPage() {
-  const [isInitialized, setIsInitialized] = useState(false)
-
   // Block store
   const activeBlock = useBlockStore(state => {
     const activeBlockId = state.activeBlockId
@@ -60,13 +63,13 @@ export default function PerformanceBlocksPage() {
   }, [blockIsInitialized, loadBlocks])
 
   // Fetch performance data when active block changes
+  const activeBlockId = activeBlock?.id
+
   useEffect(() => {
-    if (activeBlock && !isInitialized) {
-      fetchPerformanceData(activeBlock.id)
-        .then(() => setIsInitialized(true))
-        .catch(console.error)
-    }
-  }, [activeBlock?.id, activeBlock, fetchPerformanceData, isInitialized])
+    if (!activeBlockId) return
+
+    fetchPerformanceData(activeBlockId).catch(console.error)
+  }, [activeBlockId, fetchPerformanceData])
 
   // Helper functions
   const getDateRange = () => {
@@ -210,6 +213,9 @@ export default function PerformanceBlocksPage() {
       {/* Return on Margin Timeline - Full Width */}
       <ROMTimelineChart />
 
+      {/* Margin Utilization - Full Width */}
+      <MarginUtilizationChart />
+
       {/* Distribution and Pattern Analysis - Two Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ReturnDistributionChart />
@@ -227,6 +233,16 @@ export default function PerformanceBlocksPage() {
         <RollingMetricsChart />
         <RiskEvolutionChart />
       </div>
+
+      {/* Market Regime & Exit Diagnostics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <VixRegimeChart className="lg:col-span-2" />
+        <ExitReasonChart />
+        <PremiumEfficiencyChart />
+      </div>
+
+      {/* Trade Duration */}
+      <HoldingDurationChart />
     </div>
   )
 }
