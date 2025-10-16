@@ -9,6 +9,7 @@ import {
   IconReportAnalytics,
   IconRouteSquare,
   IconStack2,
+  IconTarget,
   IconUser,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
@@ -36,7 +37,12 @@ const navData = {
       title: "Block Management",
       href: "/blocks",
       icon: IconStack2,
-  IconUser,
+    },
+    {
+      title: "Auto Take-Profit Optimizer",
+      href: "/tp-optimizer",
+      icon: IconTarget,
+      badge: "New",
     },
     {
       title: "Block Stats",

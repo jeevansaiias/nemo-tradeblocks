@@ -121,7 +121,7 @@ export function parsePersonalTradeCSV(csvContent: string): PersonalTrade[] {
       const amountStr = cleanValue(columns[amountCol]) || '0'
       
       // Parse amount (remove commas, quotes, and handle negative values in quotes)
-      let cleanAmountStr = amountStr.replace(/[",]/g, '').trim()
+      const cleanAmountStr = amountStr.replace(/[",]/g, '').trim()
       
       // Handle negative amounts that might be in quotes like "-3,455.00"
       const amount = parseFloat(cleanAmountStr)
