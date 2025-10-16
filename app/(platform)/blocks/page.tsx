@@ -137,6 +137,117 @@ function BlockCard({
   );
 }
 
+function BlockRow({
+  block,
+  onEdit,
+}: {
+  block: Block;
+  onEdit: (block: Block) => void;
+}) {
+  const setActiveBlock = useBlockStore(state => state.setActiveBlock);
+  const recalculateBlock = useBlockStore(state => state.recalculateBlock);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  const formatDate = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(date);
+
+  const handleRecalculate = async () => {
+    setIsRecalculating(true);
+    try {
+      await recalculateBlock(block.id);
+
+      if (block.isActive) {
+        const { usePerformanceStore } = await import('@/lib/stores/performance-store');
+        await usePerformanceStore.getState().fetchPerformanceData(block.id);
+      }
+    } catch (error) {
+      console.error('Failed to recalculate block:', error);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-4 p-4 rounded-lg border transition-all hover:shadow-md ${
+        block.isActive ? "ring-2 ring-primary bg-primary/5" : "bg-card"
+      }`}
+    >
+      {/* Name and Description */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold truncate">{block.name}</h3>
+          {block.isActive && (
+            <Badge variant="default" className="text-xs">ACTIVE</Badge>
+          )}
+        </div>
+        {block.description && (
+          <p className="text-sm text-muted-foreground truncate mt-0.5">
+            {block.description}
+          </p>
+        )}
+      </div>
+
+      {/* File Indicators */}
+      <div className="hidden md:flex items-center gap-2">
+        <Badge variant="secondary" className="text-xs whitespace-nowrap">
+          <Activity className="w-3 h-3 mr-1" />
+          {block.tradeLog.rowCount}
+        </Badge>
+        {block.dailyLog && (
+          <Badge variant="outline" className="text-xs whitespace-nowrap">
+            <Calendar className="w-3 h-3 mr-1" />
+            {block.dailyLog.rowCount}
+          </Badge>
+        )}
+        {block.reportingLog && (
+          <Badge variant="outline" className="text-xs whitespace-nowrap">
+            <List className="w-3 h-3 mr-1" />
+            {block.reportingLog.rowCount}
+          </Badge>
+        )}
+      </div>
+
+      {/* Last Modified */}
+      <div className="hidden lg:block text-sm text-muted-foreground whitespace-nowrap">
+        {formatDate(block.lastModified)}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 ml-auto">
+        {!block.isActive && (
+          <Button
+            size="sm"
+            onClick={() => setActiveBlock(block.id)}
+          >
+            Activate
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onEdit(block)}
+        >
+          Edit
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRecalculate}
+          disabled={isRecalculating}
+          title="Recalculate statistics and charts"
+        >
+          <RotateCcw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const COMPLETE_TEMPLATE_CSV = `Date Opened,Time Opened,Opening Price,Legs,Premium,Closing Price,Date Closed,Time Closed,Avg. Closing Cost,Reason For Close,P/L,No. of Contracts,Funds at Close,Margin Req.,Strategy
 2024-01-15,09:30:00,4535.25,SPX 15JAN24 4500P/4450P,2.50,1.25,2024-01-15,15:45:00,1.25,Profit Target,125.00,1,10125.00,1000.00,Bull Put Spread
 2024-01-16,10:15:00,4542.75,SPX 19JAN24 4600C/4650C,3.25,0.50,2024-01-18,14:30:00,0.50,Profit Target,275.00,1,10400.00,1200.00,Bear Call Spread`;
@@ -154,6 +265,7 @@ export default function BlockManagementPage() {
   const [dialogMode, setDialogMode] = useState<"new" | "edit">("new");
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // No need for useEffect here since AppSidebar handles loading
 
@@ -237,10 +349,18 @@ export default function BlockManagementPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm">
+          <Button
+            variant={viewMode === "grid" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+          >
             <Grid3X3 className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="sm">
+          <Button
+            variant={viewMode === "list" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+          >
             <List className="w-4 h-4" />
           </Button>
           <Button onClick={handleNewBlock}>
@@ -362,10 +482,16 @@ export default function BlockManagementPage() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredBlocks.map((block) => (
               <BlockCard key={block.id} block={block} onEdit={handleEditBlock} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredBlocks.map((block) => (
+              <BlockRow key={block.id} block={block} onEdit={handleEditBlock} />
             ))}
           </div>
         )}
