@@ -250,50 +250,123 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart className="h-5 w-5" />
-              Optimization Results Preview
+              Complete Performance Analysis
             </CardTitle>
             <CardDescription>
-              {getObjectiveLabel()} comparison across {candidates.length} TP candidates (1% to 15,000% range)
+              {getObjectiveLabel()} across ALL {candidates.length} TP candidates (1% to 15,000% range)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Quick Comparison */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Comprehensive Summary */}
+            <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-3 bg-muted rounded-lg">
                 <div className="text-lg font-bold">{formatValue(baseline.totalPnL)}</div>
                 <div className="text-xs text-muted-foreground">Baseline (Hold)</div>
+                <div className="text-xs text-muted-foreground">No TP Used</div>
               </div>
               <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
                 <div className="text-lg font-bold text-green-600">
-                  {formatValue(best.totalPnL)} @ {formatTPPercentage(best.tpPct)}
+                  {formatValue(best.totalPnL)}
                 </div>
-                <div className="text-xs text-green-600">Best TP</div>
+                <div className="text-xs text-green-600">Peak Performance</div>
+                <div className="text-xs text-green-600">@ {formatTPPercentage(best.tpPct)} TP</div>
+              </div>
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                <div className="text-lg font-bold text-blue-600">
+                  {formatValue(best.totalPnL - baseline.totalPnL)}
+                </div>
+                <div className="text-xs text-blue-600">Improvement</div>
+                <div className="text-xs text-blue-600">vs Baseline</div>
               </div>
             </div>
 
-            {/* Chart */}
+            {/* Performance Curve Chart */}
             {chartData.length > 0 && (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="tp" 
-                      fontSize={10}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis fontSize={10} />
-                    <Tooltip 
-                      formatter={(value) => [formatValue(value as number), getObjectiveLabel()]}
-                    />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#3b82f6"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="space-y-4">
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="tpRaw" 
+                        type="number"
+                        domain={['dataMin', 'dataMax']}
+                        fontSize={10}
+                        tickFormatter={(value) => formatTPPercentage(value)}
+                        label={{ value: 'Take-Profit %', position: 'insideBottom', offset: -10 }}
+                      />
+                      <YAxis 
+                        fontSize={10}
+                        label={{ value: getObjectiveLabel(), angle: -90, position: 'insideLeft' }}
+                      />
+                      <Tooltip 
+                        formatter={(value) => [formatValue(value as number), getObjectiveLabel()]}
+                        labelFormatter={(label) => `TP: ${formatTPPercentage(label as number)}`}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#3b82f6"
+                        stroke="#2563eb"
+                        strokeWidth={1}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Chart Statistics */}
+                <div className="grid grid-cols-4 gap-2 text-xs bg-muted/50 p-3 rounded">
+                  <div className="text-center">
+                    <div className="font-semibold">{candidates.length}</div>
+                    <div className="text-muted-foreground">TP Levels Tested</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold">{formatTPPercentage(Math.min(...candidates))}</div>
+                    <div className="text-muted-foreground">Min TP</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold">{formatTPPercentage(Math.max(...candidates))}</div>
+                    <div className="text-muted-foreground">Max TP</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-red-600">{formatTPPercentage(best.tpPct)}</div>
+                    <div className="text-muted-foreground">Peak TP</div>
+                  </div>
+                </div>
+                
+                {/* Debug Information */}
+                <details className="text-xs">
+                  <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
+                    🔍 Debug: Optimization Details
+                  </summary>
+                  <div className="mt-2 p-3 bg-muted/30 rounded space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <strong>Testing Verification:</strong>
+                        <div>• Total candidates generated: {candidates.length}</div>
+                        <div>• Total results computed: {results.length}</div>
+                        <div>• Range: {formatTPPercentage(Math.min(...candidates))} - {formatTPPercentage(Math.max(...candidates))}</div>
+                      </div>
+                      <div>
+                        <strong>Performance Distribution:</strong>
+                        <div>• Results above baseline: {results.filter(r => r.totalPnL > baseline.totalPnL).length}</div>
+                        <div>• Results at baseline: {results.filter(r => Math.abs(r.totalPnL - baseline.totalPnL) < 0.01).length}</div>
+                        <div>• Results below baseline: {results.filter(r => r.totalPnL < baseline.totalPnL).length}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <strong>Top 5 TP Levels:</strong>
+                      {results
+                        .slice()
+                        .sort((a, b) => b.totalPnL - a.totalPnL)
+                        .slice(0, 5)
+                        .map((result, i) => (
+                          <div key={i} className="ml-2">
+                            #{i + 1}: {formatTPPercentage(result.tpPct)} → {formatValue(result.totalPnL)}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </details>
               </div>
             )}
 
