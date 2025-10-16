@@ -112,7 +112,7 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
                   🎯 Auto Take-Profit Optimization
                 </h3>
                 <p className="text-xs text-blue-800 dark:text-blue-200">
-                  Auto-TP uses your Max Profit % to simulate exits at candidate thresholds and compares them to your actual results. Stop-loss behavior remains unchanged.
+                  Auto-TP tests every possible TP% from 1% to 15,000% using your Max Profit % data to find if any outperforms your baseline results. Stop-loss behavior remains unchanged. This comprehensive analysis may take a moment to complete.
                 </p>
               </div>
 
@@ -228,7 +228,7 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
               </div>
               <Progress value={undefined} className="h-2" />
               <p className="text-xs text-muted-foreground">
-                Testing TP candidates on {scopedData.length} trades to maximize {getObjectiveLabel().toLowerCase()} {scope === "byStrategy" && selectedStrategy ? `for ${selectedStrategy}` : "(overall)"}
+                Testing all TP levels from 1% to 15,000% on {scopedData.length} trades to find the absolute best {getObjectiveLabel().toLowerCase()} {scope === "byStrategy" && selectedStrategy ? `for ${selectedStrategy}` : "(overall)"}
               </p>
             </div>
           </CardContent>
@@ -251,7 +251,7 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
               Optimization Results Preview
             </CardTitle>
             <CardDescription>
-              {getObjectiveLabel()} comparison across {candidates.length} TP candidates
+              {getObjectiveLabel()} comparison across {candidates.length} TP candidates (1% to 15,000% range)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

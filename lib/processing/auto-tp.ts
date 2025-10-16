@@ -11,45 +11,50 @@ export function pct(x: string | number): number {
 
 /**
  * Generate auto TP candidates from trade data
- * Combines percentiles from maxProfitPct with log-scale anchors (NO 100% cap)
+ * Tests every possible TP% from 1% to 15,000% for comprehensive analysis
  */
 export function autoTPCandidates(trades: TradeRecord[]): number[] {
   if (trades.length === 0) return [];
   
-  // Get all maxProfitPct values, sorted
-  const maxProfits = trades
-    .map(t => t.maxProfitPct)
-    .filter(p => p > 0)
-    .sort((a, b) => a - b);
-  
-  if (maxProfits.length === 0) return [5, 10, 15, 20, 25, 30, 40, 50];
-  
   const candidates = new Set<number>();
-  const maxValue = Math.max(...maxProfits);
-  const upperBound = maxValue * 1.05; // Small cushion above max
   
-  // Add percentiles (10th, 20th, ..., 90th) of maxProfitPct
-  for (let i = 1; i <= 9; i++) {
-    const percentileIndex = Math.floor((i / 10) * (maxProfits.length - 1));
-    const percentileValue = Math.round(maxProfits[percentileIndex] * 10) / 10; // Round to 0.1
-    if (percentileValue >= 1) {
-      candidates.add(percentileValue);
-    }
+  // Test every 1% increment from 1% to 100%
+  for (let tp = 1; tp <= 100; tp++) {
+    candidates.add(tp);
   }
   
-  // Add log-scale anchor points (NO 100% cap)
-  const anchors = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000];
-  anchors.forEach(anchor => {
-    if (anchor >= 1 && anchor <= upperBound) {
-      candidates.add(anchor);
-    }
-  });
+  // Test every 5% increment from 105% to 500% 
+  for (let tp = 105; tp <= 500; tp += 5) {
+    candidates.add(tp);
+  }
   
-  // Convert to sorted array, clamped to [1, upperBound]
-  return Array.from(candidates)
-    .filter(tp => tp >= 1 && tp <= upperBound)
-    .map(tp => Math.round(tp * 10) / 10) // Round to 0.1 precision
-    .sort((a, b) => a - b);
+  // Test every 10% increment from 510% to 1000%
+  for (let tp = 510; tp <= 1000; tp += 10) {
+    candidates.add(tp);
+  }
+  
+  // Test every 25% increment from 1025% to 2500%
+  for (let tp = 1025; tp <= 2500; tp += 25) {
+    candidates.add(tp);
+  }
+  
+  // Test every 50% increment from 2550% to 5000%
+  for (let tp = 2550; tp <= 5000; tp += 50) {
+    candidates.add(tp);
+  }
+  
+  // Test every 100% increment from 5100% to 10000%
+  for (let tp = 5100; tp <= 10000; tp += 100) {
+    candidates.add(tp);
+  }
+  
+  // Test every 250% increment from 10250% to 15000%
+  for (let tp = 10250; tp <= 15000; tp += 250) {
+    candidates.add(tp);
+  }
+  
+  // Convert to sorted array
+  return Array.from(candidates).sort((a, b) => a - b);
 }
 
 /**

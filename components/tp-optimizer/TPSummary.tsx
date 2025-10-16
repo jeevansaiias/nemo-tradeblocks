@@ -196,7 +196,7 @@ export function TPSummary() {
         <CardHeader>
           <CardTitle>TP % vs {objective === "totalPnL" ? "Total P&L" : objective === "expectancy" ? "Expectancy" : "Profit Factor"}</CardTitle>
           <CardDescription>
-            Performance across all {candidates.length} tested take-profit levels
+            Performance across all {candidates.length} tested take-profit levels (1% to 15,000% comprehensive range)
           </CardDescription>
         </CardHeader>
         <CardContent>
