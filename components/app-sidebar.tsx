@@ -10,7 +10,6 @@ import {
   IconRouteSquare,
   IconStack2,
   IconTarget,
-  IconUser,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -64,11 +63,6 @@ const navData = {
       title: "P/L Calendar",
       href: "/calendar",
       icon: IconCalendarStats,
-    },
-    {
-      title: "Personal Dashboard",
-      href: "/personal-dashboard",
-      icon: IconUser,
     },
     {
       title: "Position Sizing",
