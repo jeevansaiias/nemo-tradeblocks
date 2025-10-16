@@ -153,8 +153,19 @@ export default function BlockManagementPage() {
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"new" | "edit">("new");
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // No need for useEffect here since AppSidebar handles loading
+
+  // Filter blocks based on search query
+  const filteredBlocks = React.useMemo(() => {
+    if (!searchQuery.trim()) return blocks;
+
+    const query = searchQuery.toLowerCase();
+    return blocks.filter(block =>
+      block.name.toLowerCase().includes(query)
+    );
+  }, [blocks, searchQuery]);
 
   const handleNewBlock = () => {
     setDialogMode("new");
@@ -191,7 +202,12 @@ export default function BlockManagementPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input placeholder="Search blocks..." className="pl-10" />
+          <Input
+            placeholder="Search blocks..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
@@ -239,7 +255,11 @@ export default function BlockManagementPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Trading Blocks</h2>
           <span className="text-sm text-muted-foreground">
-            {!isInitialized ? "Loading..." : `${blocks.length} blocks`}
+            {!isInitialized
+              ? "Loading..."
+              : searchQuery.trim()
+              ? `${filteredBlocks.length} of ${blocks.length} blocks`
+              : `${blocks.length} blocks`}
           </span>
         </div>
 
@@ -275,6 +295,17 @@ export default function BlockManagementPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        ) : filteredBlocks.length === 0 && searchQuery.trim() ? (
+          <div className="text-center py-12">
+            <Search className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No blocks found</h3>
+            <p className="text-muted-foreground mb-4">
+              No blocks match &quot;{searchQuery}&quot;
+            </p>
+            <Button variant="outline" onClick={() => setSearchQuery("")}>
+              Clear Search
+            </Button>
           </div>
         ) : blocks.length === 0 ? (
           <div className="text-center py-12 max-w-2xl mx-auto">
@@ -333,7 +364,7 @@ export default function BlockManagementPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {blocks.map((block) => (
+            {filteredBlocks.map((block) => (
               <BlockCard key={block.id} block={block} onEdit={handleEditBlock} />
             ))}
           </div>
