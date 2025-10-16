@@ -12,86 +12,92 @@ interface PremiumEfficiencyChartProps {
 export function PremiumEfficiencyChart({ className }: PremiumEfficiencyChartProps) {
   const { data } = usePerformanceStore()
 
-  const { plotData, layout } = useMemo(() => {
+  const { plotData, layout, stats } = useMemo(() => {
     if (!data?.premiumEfficiency || data.premiumEfficiency.length === 0) {
-      return { plotData: [], layout: {} }
+      return { plotData: [], layout: {}, stats: null }
     }
 
-    const entries = data.premiumEfficiency.filter(entry => typeof entry.efficiencyPct === 'number' && isFinite(entry.efficiencyPct))
+    const validEntries = data.premiumEfficiency.filter(entry =>
+      typeof entry.pl === 'number' &&
+      typeof entry.totalCommissions === 'number'
+    )
 
-    if (entries.length === 0) {
-      return { plotData: [], layout: {} }
+    if (validEntries.length === 0) {
+      return { plotData: [], layout: {}, stats: null }
     }
 
-    const tradeNumbers = entries.map(entry => entry.tradeNumber)
-    const efficiencyValues = entries.map(entry => entry.efficiencyPct as number)
-    const commissionValues = entries.map(entry => entry.totalCommissions ?? 0)
-    const denominatorValues = entries.map(entry => entry.efficiencyDenominator ?? null)
-    const basisLookup: Record<string, string> = {
-      premium: 'Premium',
-      maxProfit: 'Max Profit',
-      margin: 'Margin',
-      unknown: 'Unknown'
-    }
-    const basisLabels = entries.map(entry => basisLookup[entry.efficiencyBasis ?? 'unknown'] ?? 'Unknown')
-    const premiumTotals = entries.map(entry => entry.totalPremium ?? null)
+    // Calculate gross P/L (before commissions) and net P/L (after commissions)
+    const grossPL = validEntries.map(entry => (entry.pl ?? 0) + (entry.totalCommissions ?? 0))
+    const commissions = validEntries.map(entry => entry.totalCommissions ?? 0)
+    const netPL = validEntries.map(entry => entry.pl ?? 0)
+    const tradeNumbers = validEntries.map(entry => entry.tradeNumber)
 
-    const markerSizes = premiumTotals.map(total => {
-      if (!total || total <= 0) return 6
-      return Math.min(26, Math.max(8, Math.sqrt(total) / 10))
+    // Calculate summary stats
+    const totalGrossPL = grossPL.reduce((sum, val) => sum + val, 0)
+    const totalCommissions = commissions.reduce((sum, val) => sum + val, 0)
+    const totalNetPL = netPL.reduce((sum, val) => sum + val, 0)
+    const commissionDragPct = totalGrossPL !== 0 ? (totalCommissions / Math.abs(totalGrossPL)) * 100 : 0
+
+    const currencyFormatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0
     })
 
-    const efficiencyTrace: Partial<PlotData> = {
+    // Gross P/L bars (before commissions)
+    const grossTrace: Partial<PlotData> = {
       x: tradeNumbers,
-      y: efficiencyValues,
-      customdata: entries.map((entry, idx) => [
-        commissionValues[idx],
-        entry.pl,
-        denominatorValues[idx],
-        basisLabels[idx],
-        premiumTotals[idx]
-      ]),
-      mode: 'markers+lines',
-      type: 'scatter',
-      name: 'Efficiency %',
+      y: grossPL,
+      type: 'bar',
+      name: 'Gross P/L',
       marker: {
-        size: markerSizes,
-        color: entries.map(entry => entry.pl),
-        colorscale: 'Viridis',
-        showscale: true,
-        colorbar: {
-          title: 'P/L ($)',
-          titleside: 'right'
-        }
+        color: grossPL.map(val => val >= 0 ? '#22c55e' : '#ef4444'),
+        opacity: 0.6
       },
-      hovertemplate:
-        'Trade #%{x}<br>Efficiency: %{y:.2f}%<br>P/L: $%{customdata[1]:.2f}<br>Basis (%{customdata[3]}): $%{customdata[2]:.2f}<br>Commissions: $%{customdata[0]:.2f}<br>Total Premium: $%{customdata[4]:.2f}<extra></extra>'
+      customdata: grossPL.map((val, i) => [
+        currencyFormatter.format(val),
+        currencyFormatter.format(commissions[i]),
+        currencyFormatter.format(netPL[i])
+      ]),
+      hovertemplate: 'Trade #%{x}<br>Gross P/L: %{customdata[0]}<br>Commissions: %{customdata[1]}<br>Net P/L: %{customdata[2]}<extra></extra>'
     }
 
-    const commissionTrace: Partial<PlotData> = {
+    // Net P/L line (after commissions)
+    const netTrace: Partial<PlotData> = {
       x: tradeNumbers,
-      y: commissionValues,
-      type: 'bar',
-      name: 'Total Commissions',
-      yaxis: 'y2',
-      opacity: 0.4,
-      marker: {
-        color: '#f97316'
+      y: netPL,
+      type: 'scatter',
+      mode: 'lines+markers',
+      name: 'Net P/L',
+      line: {
+        color: '#2563eb',
+        width: 2
       },
-      hovertemplate: 'Trade #%{x}<br>Commissions: $%{y:.2f}<extra></extra>'
+      marker: {
+        size: 6,
+        color: '#2563eb'
+      },
+      customdata: netPL.map((val, i) => [
+        currencyFormatter.format(grossPL[i]),
+        currencyFormatter.format(commissions[i]),
+        currencyFormatter.format(val)
+      ]),
+      hovertemplate: 'Trade #%{x}<br>Gross P/L: %{customdata[0]}<br>Commissions: %{customdata[1]}<br>Net P/L: %{customdata[2]}<extra></extra>'
     }
+
+    const minTrade = Math.min(...tradeNumbers)
+    const maxTrade = Math.max(...tradeNumbers)
 
     const chartLayout: Partial<Layout> = {
       xaxis: {
         title: { text: 'Trade Number' }
       },
       yaxis: {
-        title: { text: 'Efficiency (%)' }
-      },
-      yaxis2: {
-        title: { text: 'Commissions ($)' },
-        overlaying: 'y',
-        side: 'right'
+        title: { text: 'P/L ($)' },
+        zeroline: true,
+        zerolinecolor: '#94a3b8',
+        zerolinewidth: 2
       },
       hovermode: 'x unified',
       legend: {
@@ -100,27 +106,85 @@ export function PremiumEfficiencyChart({ className }: PremiumEfficiencyChartProp
         y: 1.02,
         xanchor: 'right',
         x: 1
-      }
+      },
+      shapes: [
+        {
+          type: 'line',
+          xref: 'x',
+          yref: 'y',
+          x0: minTrade,
+          x1: maxTrade,
+          y0: 0,
+          y1: 0,
+          line: {
+            color: '#94a3b8',
+            width: 1,
+            dash: 'dot'
+          }
+        }
+      ]
     }
 
-    return { plotData: [commissionTrace, efficiencyTrace], layout: chartLayout }
+    return {
+      plotData: [grossTrace, netTrace],
+      layout: chartLayout,
+      stats: {
+        totalGrossPL,
+        totalCommissions,
+        totalNetPL,
+        commissionDragPct
+      }
+    }
   }, [data?.premiumEfficiency])
 
   const tooltip = {
-    flavor: 'Are you capturing enough of the premium to justify the risk?',
+    flavor: 'How much are commissions eating into your profits?',
     detailed:
-      'Efficiency compares realized P/L to collected premium or theoretical max profit, while bubble size highlights commission drag. Spot trades where execution or fees leak edge.'
+      'Bars show gross P/L before commissions, blue line shows net P/L after commissions. The gap between them reveals commission drag - smaller gaps mean better efficiency.'
   }
+
+  const statsFooter = stats ? (() => {
+    const currencyFormatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0
+    })
+
+    const formatCurrency = (value: number) => currencyFormatter.format(value)
+
+    return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+      <div>
+        <div className="text-muted-foreground text-xs">Gross P/L</div>
+        <div className="font-semibold">{formatCurrency(stats.totalGrossPL)}</div>
+      </div>
+      <div>
+        <div className="text-muted-foreground text-xs">Total Commissions</div>
+        <div className="font-semibold text-amber-600">{formatCurrency(-stats.totalCommissions)}</div>
+      </div>
+      <div>
+        <div className="text-muted-foreground text-xs">Net P/L</div>
+        <div className="font-semibold">{formatCurrency(stats.totalNetPL)}</div>
+      </div>
+      <div>
+        <div className="text-muted-foreground text-xs">Commission Drag</div>
+        <div className="font-semibold">{stats.commissionDragPct.toFixed(1)}%</div>
+      </div>
+    </div>
+    )
+  })() : null
 
   return (
     <ChartWrapper
-      title="💰 Premium Efficiency"
-      description="Realized versus potential capture with commission drag"
+      title="💸 Commission Drag"
+      description="Gross vs net P/L showing commission impact per trade"
       className={className}
       data={plotData as PlotData[]}
       layout={layout}
       style={{ height: '350px' }}
       tooltip={tooltip}
+      footer={statsFooter}
     />
   )
 }

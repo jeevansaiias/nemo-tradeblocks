@@ -270,7 +270,7 @@ export function ChartWrapper({
       <CardContent className="pt-0">
         <div ref={plotRef} className="relative min-h-[300px]">
           {contentOverlay && (
-            <div className="pointer-events-none absolute inset-x-0 top-8 z-10 flex justify-center">
+            <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center">
               <div className="pointer-events-auto">{contentOverlay}</div>
             </div>
           )}

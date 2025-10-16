@@ -66,12 +66,27 @@ export default function PerformanceBlocksPage() {
 
   // Fetch performance data when active block changes
   useEffect(() => {
-    if (activeBlock && !isInitialized) {
-      fetchPerformanceData(activeBlock.id)
-        .then(() => setIsInitialized(true))
-        .catch(console.error)
+    if (!activeBlock) {
+      setIsInitialized(false)
+      return
     }
-  }, [activeBlock?.id, activeBlock, fetchPerformanceData, isInitialized])
+
+    setIsInitialized(false)
+
+    let isCancelled = false
+
+    fetchPerformanceData(activeBlock.id)
+      .then(() => {
+        if (!isCancelled) {
+          setIsInitialized(true)
+        }
+      })
+      .catch(console.error)
+
+    return () => {
+      isCancelled = true
+    }
+  }, [activeBlock?.id, fetchPerformanceData])
 
   // Helper functions
   const getDateRange = () => {
