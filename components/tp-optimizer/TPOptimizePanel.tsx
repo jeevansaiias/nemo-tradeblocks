@@ -39,6 +39,13 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
   const strategies = getStrategies();
   const scopedData = getScopedData();
 
+  const formatTPPercentage = (tp: number) => {
+    if (tp >= 1000) {
+      return `${(tp / 1000).toFixed(1)}k%`;
+    }
+    return `${tp}%`;
+  };
+
   const handleOptimize = async () => {
     await runOptimization();
     if (!error) {
@@ -76,13 +83,6 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
       return value.toFixed(2);
     }
     return value.toFixed(2);
-  };
-
-  const formatTPPercentage = (tp: number) => {
-    if (tp >= 1000) {
-      return `${(tp / 1000).toFixed(1)}k%`;
-    }
-    return `${tp}%`;
   };
 
   if (data.length === 0) {
