@@ -37,8 +37,12 @@ interface ChartWrapperProps {
   title: string;
   description?: string;
   tooltip?: TooltipContent;
-  children?: React.ReactNode;
   className?: string;
+  actions?: React.ReactNode;
+  headerAddon?: React.ReactNode;
+  contentOverlay?: React.ReactNode;
+  footer?: React.ReactNode;
+  children?: React.ReactNode; // deprecated; retained for backward compatibility
   data: Data[];
   layout: Partial<Layout>;
   config?: Partial<Config>;
@@ -61,6 +65,10 @@ export function ChartWrapper({
   title,
   description,
   tooltip,
+  actions,
+  headerAddon,
+  contentOverlay,
+  footer,
   children,
   className,
   data,
@@ -211,6 +219,8 @@ export function ChartWrapper({
     [config, title]
   );
 
+  const headerActions = actions ?? children
+
   return (
     <Card className={cn("h-full", className)}>
       <CardHeader className="pb-0">
@@ -252,12 +262,18 @@ export function ChartWrapper({
                 {description}
               </CardDescription>
             )}
+            {headerAddon}
           </div>
-          {children}
+          {headerActions}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
         <div ref={plotRef} className="relative min-h-[300px]">
+          {contentOverlay && (
+            <div className="pointer-events-none absolute inset-x-0 top-8 z-10 flex justify-center">
+              <div className="pointer-events-auto">{contentOverlay}</div>
+            </div>
+          )}
           <Suspense fallback={<ChartSkeleton />}>
             <Plot
               divId={chartId}
@@ -272,6 +288,11 @@ export function ChartWrapper({
             />
           </Suspense>
         </div>
+        {footer && (
+          <div className="mt-4">
+            {footer}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

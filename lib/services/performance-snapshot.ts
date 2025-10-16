@@ -2,6 +2,11 @@ import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
 import { PortfolioStatsCalculator } from '@/lib/calculations/portfolio-stats'
+import {
+  calculatePremiumEfficiencyPercent,
+  computeTotalPremium,
+  EfficiencyBasis
+} from '@/lib/metrics/trade-efficiency'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -39,6 +44,24 @@ export interface SnapshotChartData {
   tradeSequence: Array<{ tradeNumber: number; pl: number; date: string }>
   romTimeline: Array<{ date: string; rom: number }>
   rollingMetrics: Array<{ date: string; winRate: number; sharpeRatio: number; profitFactor: number; volatility: number }>
+  volatilityRegimes: Array<{ date: string; openingVix?: number; closingVix?: number; pl: number; rom?: number }>
+  premiumEfficiency: Array<{
+    tradeNumber: number
+    date: string
+    pl: number
+    premium?: number
+    avgClosingCost?: number
+    maxProfit?: number
+    maxLoss?: number
+    totalCommissions?: number
+    efficiencyPct?: number
+    efficiencyDenominator?: number
+    efficiencyBasis?: EfficiencyBasis
+    totalPremium?: number
+  }>
+  marginUtilization: Array<{ date: string; marginReq: number; fundsAtClose: number; numContracts: number; pl: number }>
+  exitReasonBreakdown: Array<{ reason: string; count: number; avgPl: number; totalPl: number }>
+  holdingPeriods: Array<{ tradeNumber: number; dateOpened: string; dateClosed?: string; durationHours: number; pl: number; strategy: string }>
 }
 
 export interface PerformanceSnapshot {
@@ -130,6 +153,12 @@ export async function processChartData(
 
   const rollingMetrics = calculateRollingMetrics(trades)
 
+  const volatilityRegimes = calculateVolatilityRegimes(trades)
+  const premiumEfficiency = calculatePremiumEfficiency(trades)
+  const marginUtilization = calculateMarginUtilization(trades)
+  const exitReasonBreakdown = calculateExitReasonBreakdown(trades)
+  const holdingPeriods = calculateHoldingPeriods(trades)
+
   return {
     equityCurve,
     drawdownData,
@@ -139,7 +168,12 @@ export async function processChartData(
     monthlyReturns,
     tradeSequence,
     romTimeline,
-    rollingMetrics
+    rollingMetrics,
+    volatilityRegimes,
+    premiumEfficiency,
+    marginUtilization,
+    exitReasonBreakdown,
+    holdingPeriods
   }
 }
 
@@ -491,4 +525,160 @@ function calculateRollingMetrics(trades: Trade[]) {
   }
 
   return metrics
+}
+
+function calculateVolatilityRegimes(trades: Trade[]) {
+  const regimes: SnapshotChartData['volatilityRegimes'] = []
+
+  trades.forEach(trade => {
+    const openingVix = typeof trade.openingVix === 'number' && isFinite(trade.openingVix)
+      ? trade.openingVix
+      : undefined
+    const closingVix = typeof trade.closingVix === 'number' && isFinite(trade.closingVix)
+      ? trade.closingVix
+      : undefined
+
+    if (openingVix === undefined && closingVix === undefined) {
+      return
+    }
+
+    const rom = trade.marginReq && trade.marginReq !== 0 ? (trade.pl / trade.marginReq) * 100 : undefined
+
+    regimes.push({
+      date: new Date(trade.dateOpened).toISOString(),
+      openingVix,
+      closingVix,
+      pl: trade.pl,
+      rom
+    })
+  })
+
+  return regimes
+}
+
+function calculatePremiumEfficiency(trades: Trade[]) {
+  const efficiency: SnapshotChartData['premiumEfficiency'] = []
+
+  trades.forEach((trade, index) => {
+    const premium = typeof trade.premium === 'number' && isFinite(trade.premium)
+      ? trade.premium
+      : undefined
+    const avgClosingCost = typeof trade.avgClosingCost === 'number' && isFinite(trade.avgClosingCost)
+      ? trade.avgClosingCost
+      : undefined
+    const maxProfit = typeof trade.maxProfit === 'number' && isFinite(trade.maxProfit)
+      ? trade.maxProfit
+      : undefined
+    const maxLoss = typeof trade.maxLoss === 'number' && isFinite(trade.maxLoss)
+      ? trade.maxLoss
+      : undefined
+
+    const totalCommissions =
+      typeof trade.openingCommissionsFees === 'number' && isFinite(trade.openingCommissionsFees) &&
+      typeof trade.closingCommissionsFees === 'number' && isFinite(trade.closingCommissionsFees)
+        ? trade.openingCommissionsFees + trade.closingCommissionsFees
+        : undefined
+
+    const efficiencyResult = calculatePremiumEfficiencyPercent(trade)
+    const totalPremium = computeTotalPremium(trade)
+
+    efficiency.push({
+      tradeNumber: index + 1,
+      date: new Date(trade.dateOpened).toISOString(),
+      pl: trade.pl,
+      premium,
+      avgClosingCost,
+      maxProfit,
+      maxLoss,
+      totalCommissions,
+      efficiencyPct: efficiencyResult.percentage,
+      efficiencyDenominator: efficiencyResult.denominator,
+      efficiencyBasis: efficiencyResult.basis,
+      totalPremium
+    })
+  })
+
+  return efficiency
+}
+
+function calculateMarginUtilization(trades: Trade[]) {
+  const utilization: SnapshotChartData['marginUtilization'] = []
+
+  trades.forEach(trade => {
+    const marginReq = typeof trade.marginReq === 'number' && isFinite(trade.marginReq)
+      ? trade.marginReq
+      : 0
+    const fundsAtClose = typeof trade.fundsAtClose === 'number' && isFinite(trade.fundsAtClose)
+      ? trade.fundsAtClose
+      : 0
+    const numContracts = typeof trade.numContracts === 'number' && isFinite(trade.numContracts)
+      ? trade.numContracts
+      : 0
+
+    if (marginReq === 0 && fundsAtClose === 0 && numContracts === 0) {
+      return
+    }
+
+    utilization.push({
+      date: new Date(trade.dateOpened).toISOString(),
+      marginReq,
+      fundsAtClose,
+      numContracts,
+      pl: trade.pl
+    })
+  })
+
+  return utilization
+}
+
+function calculateExitReasonBreakdown(trades: Trade[]) {
+  const summaryMap = new Map<string, { count: number; totalPl: number }>()
+
+  trades.forEach(trade => {
+    const reason = (trade.reasonForClose && trade.reasonForClose.trim()) || 'Unknown'
+    const current = summaryMap.get(reason) || { count: 0, totalPl: 0 }
+    current.count += 1
+    current.totalPl += trade.pl
+    summaryMap.set(reason, current)
+  })
+
+  return Array.from(summaryMap.entries()).map(([reason, { count, totalPl }]) => ({
+    reason,
+    count,
+    totalPl,
+    avgPl: count > 0 ? totalPl / count : 0
+  }))
+}
+
+function calculateHoldingPeriods(trades: Trade[]) {
+  const periods: SnapshotChartData['holdingPeriods'] = []
+
+  trades.forEach((trade, index) => {
+    if (!trade.dateOpened) {
+      return
+    }
+
+    const openDate = new Date(trade.dateOpened)
+    const closeDate = trade.dateClosed ? new Date(trade.dateClosed) : undefined
+
+    if (isNaN(openDate.getTime())) {
+      return
+    }
+
+    let durationHours = 0
+    if (closeDate && !isNaN(closeDate.getTime())) {
+      durationHours = (closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60)
+    }
+
+    periods.push({
+      tradeNumber: index + 1,
+      dateOpened: openDate.toISOString(),
+      dateClosed: closeDate ? closeDate.toISOString() : undefined,
+      durationHours,
+      pl: trade.pl,
+      strategy: trade.strategy || 'Unknown'
+    })
+  })
+
+  return periods
 }
