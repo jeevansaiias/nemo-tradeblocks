@@ -9,6 +9,7 @@ import {
     IconReportAnalytics,
     IconRouteSquare,
     IconStack2,
+    IconTargetArrow,
 } from "@tabler/icons-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -45,6 +46,11 @@ const navData = {
       title: "Performance Blocks",
       href: "/performance-blocks",
       icon: IconReportAnalytics,
+    },
+    {
+      title: "Take-Profit Optimizer",
+      href: "/take-profit-optimizer",
+      icon: IconTargetArrow,
     },
     {
       title: "Comparison Blocks",
