@@ -36,34 +36,13 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
     getScopedData
   } = useTPOptimizerStore();
 
-  const strategies = getStrategies();
-  const scopedData = getScopedData();
-
+  // Define all helper functions first
   const formatTPPercentage = (tp: number) => {
     if (tp >= 1000) {
       return `${(tp / 1000).toFixed(1)}k%`;
     }
     return `${tp}%`;
   };
-
-  const handleOptimize = async () => {
-    await runOptimization();
-    if (!error) {
-      setTimeout(() => {
-        setActiveTab("summary");
-        onOptimizationComplete?.();
-      }, 1000);
-    }
-  };
-
-  const chartData = results.map(result => ({
-    tp: formatTPPercentage(result.tpPct),
-    tpRaw: result.tpPct,
-    value: objective === "totalPnL" ? result.totalPnL :
-           objective === "expectancy" ? result.expectancy :
-           result.profitFactor,
-    isBest: best && result.tpPct === best.tpPct
-  }));
 
   const getObjectiveLabel = () => {
     switch (objective) {
@@ -84,6 +63,29 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
     }
     return value.toFixed(2);
   };
+
+  // Then compute derived values
+  const strategies = getStrategies();
+  const scopedData = getScopedData();
+
+  const handleOptimize = async () => {
+    await runOptimization();
+    if (!error) {
+      setTimeout(() => {
+        setActiveTab("summary");
+        onOptimizationComplete?.();
+      }, 1000);
+    }
+  };
+
+  const chartData = results.map(result => ({
+    tp: formatTPPercentage(result.tpPct),
+    tpRaw: result.tpPct,
+    value: objective === "totalPnL" ? result.totalPnL :
+           objective === "expectancy" ? result.expectancy :
+           result.profitFactor,
+    isBest: best && result.tpPct === best.tpPct
+  }));
 
   if (data.length === 0) {
     return (
