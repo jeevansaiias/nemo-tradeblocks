@@ -18,23 +18,74 @@ function parseCSV(csvContent: string): Trade[] {
   const lines = csvContent.trim().split('\n');
   if (lines.length < 2) throw new Error('Invalid CSV format');
 
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const headerLine = lines[0];
+  const headers = headerLine.split(',').map(h => h.trim().toLowerCase());
+  
+  // Find indices for required columns with flexible matching
+  let strategyIdx = -1;
+  let maxProfitIdx = -1;
+  let resultIdx = -1;
+
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    
+    if (strategyIdx === -1 && (h === 'strategy' || h.includes('strategy'))) {
+      strategyIdx = i;
+    }
+    
+    if (maxProfitIdx === -1 && 
+        (h.includes('maxprofit') || h.includes('max_profit') || h.includes('max profit') ||
+         h.includes('maxpct') || h.includes('max_pct') || h.includes('pct') && h.includes('max'))) {
+      maxProfitIdx = i;
+    }
+    
+    if (resultIdx === -1 && 
+        (h.includes('result') || h.includes('realizedpct') || h.includes('realized') ||
+         h.includes('pl%') || h.includes('p/l') || h.includes('pct') && !h.includes('max'))) {
+      resultIdx = i;
+    }
+  }
+
+  // If we couldn't find result column, try alternative patterns
+  if (resultIdx === -1) {
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      if (i !== strategyIdx && i !== maxProfitIdx && 
+          (h.includes('result') || h.includes('return') || h.includes('pnl') || h.includes('pl'))) {
+        resultIdx = i;
+        break;
+      }
+    }
+  }
+
+  if (strategyIdx === -1 || maxProfitIdx === -1 || resultIdx === -1) {
+    throw new Error(
+      `Invalid CSV headers. Found: ${headers.join(', ')}. ` +
+      `Need: strategy, maxProfit, result columns`
+    );
+  }
+
   const trades: Trade[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
-    const record: Record<string, string | number> = {};
-
-    headers.forEach((col, idx) => {
-      record[col] = values[idx];
-    });
-
-    const strategy = String(record.strategy || '').trim();
-    const maxProfit = parseFloat(String(record.maxprofitpct || record['max profit pct'] || record['max profit %'] || 0));
-    const result = parseFloat(String(record.resultpct || record['result pct'] || record['result %'] || 0));
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    const values = line.split(',').map(v => v.trim());
+    
+    const strategy = String(values[strategyIdx] || '').trim();
+    const maxProfitStr = String(values[maxProfitIdx] || '0').replace(/[%$,]/g, '').trim();
+    const resultStr = String(values[resultIdx] || '0').replace(/[%$,]/g, '').trim();
+    
+    const maxProfit = parseFloat(maxProfitStr);
+    const result = parseFloat(resultStr);
 
     if (strategy && !isNaN(maxProfit) && !isNaN(result)) {
-      trades.push({ strategy, maxProfitPct: maxProfit, resultPct: result });
+      trades.push({ 
+        strategy, 
+        maxProfitPct: maxProfit, 
+        resultPct: result 
+      });
     }
   }
 
