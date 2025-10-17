@@ -50,6 +50,12 @@ const navData = {
       badge: "Advanced",
     },
     {
+      title: "TP Optimizer (MAE/MFE)",
+      href: "/tp-optimizer-mae-mfe",
+      icon: IconTarget,
+      badge: "Latest",
+    },
+    {
       title: "Block Stats",
       href: "/block-stats",
       icon: IconLayoutDashboard,
