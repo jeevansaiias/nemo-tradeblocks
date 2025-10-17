@@ -5,6 +5,17 @@ import { MFEDistribution } from './auto-tp-optimizer/mfe-distribution';
 import { MissedProfitChart } from './auto-tp-optimizer/missed-profit-chart';
 import { ExitReasonBreakdown } from './auto-tp-optimizer/exit-reason-breakdown';
 import { EfficiencyMatrix } from './auto-tp-optimizer/efficiency-matrix';
+import { ExitReasonAttributionMatrix } from './charts/ExitReasonAttributionMatrix';
+import { ExitReasonContributionChart } from './charts/ExitReasonContributionChart';
+import { ExitReasonTPHeatmap } from './charts/ExitReasonTPHeatmap';
+import { StrategyExitReasonMatrix } from './charts/StrategyExitReasonMatrix';
+import { AutoInsightsSummary } from './charts/AutoInsightsSummary';
+import {
+  analyzeByExitReason,
+  strategyExitReasonCrosstab,
+  analyzeTPBinsByExitReason,
+  generateAutoInsights,
+} from '@/lib/processing/exit_reason_analyzer';
 
 interface ExitReasonData {
   reason: string;
@@ -263,6 +274,54 @@ export function AutoTPOptimizerMAEMFE() {
           <div className="rounded-lg border p-6">
             <h3 className="font-semibold mb-4">Efficiency Matrix</h3>
             <EfficiencyMatrix strategies={filteredStrategies} />
+          </div>
+
+          {/* Exit Reason Attribution Section */}
+          <div className="space-y-6 border-t pt-6">
+            <div>
+              <h2 className="text-2xl font-bold">Exit Reason Attribution Analysis</h2>
+              <p className="text-muted-foreground mt-2">
+                Deep dive into how each exit condition impacts your P&L and efficiency
+              </p>
+            </div>
+
+            {/* Auto Insights */}
+            {filteredTrades.length > 0 && (
+              <AutoInsightsSummary
+                insight={generateAutoInsights(
+                  filteredTrades,
+                  analyzeByExitReason(filteredTrades)
+                )}
+              />
+            )}
+
+            {/* Exit Reason Attribution Matrix */}
+            {filteredTrades.length > 0 && (
+              <ExitReasonAttributionMatrix
+                data={analyzeByExitReason(filteredTrades)}
+              />
+            )}
+
+            {/* Exit Reason Contribution Chart */}
+            {filteredTrades.length > 0 && (
+              <ExitReasonContributionChart
+                data={analyzeByExitReason(filteredTrades)}
+              />
+            )}
+
+            {/* Exit Reason vs TP Heatmap */}
+            {filteredTrades.length > 0 && (
+              <ExitReasonTPHeatmap
+                data={analyzeTPBinsByExitReason(filteredTrades)}
+              />
+            )}
+
+            {/* Strategy vs Exit Reason Matrix */}
+            {filteredTrades.length > 0 && (
+              <StrategyExitReasonMatrix
+                data={strategyExitReasonCrosstab(filteredTrades)}
+              />
+            )}
           </div>
         </div>
       )}
