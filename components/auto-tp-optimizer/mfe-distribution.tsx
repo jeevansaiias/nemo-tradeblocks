@@ -10,7 +10,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatInt } from '@/lib/utils/format';
-import { fmt } from '@/lib/analytics/format';
 
 interface Trade {
   trade_id: string;
