@@ -202,9 +202,12 @@ export default function ComparisonBlocksPage() {
         }
         setAlignments(
           existingAlignments.map((mapping) => ({
-            ...mapping,
-            createdAt: new Date(mapping.createdAt),
-            updatedAt: new Date(mapping.updatedAt),
+            id: crypto.randomUUID(),
+            reportingStrategies: mapping.reportingStrategies,
+            liveStrategies: mapping.liveStrategies,
+            note: mapping.note,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           }))
         );
       } catch (err) {
