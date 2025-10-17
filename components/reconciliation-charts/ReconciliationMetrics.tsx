@@ -4,7 +4,6 @@ import { MetricCard } from "@/components/metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { calculateDualEquityCurves, calculateSeparateEquityCurves, MatchedPair } from "@/lib/calculations/reconciliation-stats"
 import { AlignedTradeSet, AlignmentMetrics } from "@/lib/services/trade-reconciliation"
-import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DualEquityCurveChart } from "./DualEquityCurveChart"
 import { SlippageDistributionChart, computeSlippageDistribution } from "./SlippageDistributionChart"
@@ -19,7 +18,6 @@ interface ReconciliationMetricsProps {
 export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = false, className }: ReconciliationMetricsProps) {
   const {
     backtested,
-    reported,
     delta,
     slippagePerContract,
     tTest,
@@ -102,8 +100,6 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
 
   const slippageMeanDisplay = slippageDistribution ? formatCurrency(slippageDistribution.mean) : "N/A"
   const slippageMedianDisplay = slippageDistribution ? formatCurrency(slippageDistribution.median) : "N/A"
-  const slippageP25Display = slippageDistribution ? formatCurrency(slippageDistribution.p25) : "N/A"
-  const slippageP75Display = slippageDistribution ? formatCurrency(slippageDistribution.p75) : "N/A"
   const slippageP10Display = slippageDistribution ? formatCurrency(slippageDistribution.p10) : "N/A"
   const slippageP90Display = slippageDistribution ? formatCurrency(slippageDistribution.p90) : "N/A"
   const slippageCountDisplay = slippageDistribution
