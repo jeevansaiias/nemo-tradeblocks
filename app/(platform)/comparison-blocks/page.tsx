@@ -117,6 +117,16 @@ export default function ComparisonBlocksPage() {
   const [dialogNote, setDialogNote] = useState("");
   const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
 
+  // Auto-select first block if no active block exists
+  useEffect(() => {
+    const blocks = useBlockStore.getState().blocks;
+    const activeBlockId = useBlockStore.getState().activeBlockId;
+    
+    if (!activeBlockId && blocks.length > 0) {
+      useBlockStore.getState().setActiveBlock(blocks[0].id);
+    }
+  }, []);
+
   useEffect(() => {
     if (!activeBlockId || typeof window === "undefined") {
       return;
