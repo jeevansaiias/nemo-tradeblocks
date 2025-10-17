@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { useBlockStore } from '@/lib/stores/block-store';
+import { getTradesByBlock } from '@/lib/db';
+import { Trade } from '@/lib/models/trade';
 import { MFEDistribution } from './auto-tp-optimizer/mfe-distribution';
 import { MissedProfitChart } from './auto-tp-optimizer/missed-profit-chart';
 import { ExitReasonBreakdown } from './auto-tp-optimizer/exit-reason-breakdown';
@@ -86,74 +90,168 @@ export interface APIResponse {
 
 export function AutoTPOptimizerMAEMFE() {
   const [data, setData] = useState<APIResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
   const [selectedExitReasons, setSelectedExitReasons] = useState<string[]>([]);
-  const [uploadStatus, setUploadStatus] = useState('');
 
-  // Load seed data on mount
+  // Get active block from store
+  const activeBlock = useBlockStore(state => {
+    const activeBlockId = state.activeBlockId;
+    return activeBlockId ? state.blocks.find(block => block.id === activeBlockId) : null;
+  });
+  const isInitialized = useBlockStore(state => state.isInitialized);
+  const loadBlocks = useBlockStore(state => state.loadBlocks);
+
+  // Load blocks if not initialized
   useEffect(() => {
-    const loadSeedData = async () => {
+    if (!isInitialized) {
+      loadBlocks().catch(console.error);
+    }
+  }, [isInitialized, loadBlocks]);
+
+  // Fetch and process trades when active block changes
+  useEffect(() => {
+    if (!activeBlock) {
+      setData(null);
+      setError(null);
+      return;
+    }
+
+    const fetchBlockData = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch('/api/tp-optimizer-mae-mfe');
-        if (!res.ok) throw new Error('Failed to load seed data');
-        const jsonData: APIResponse = await res.json();
-        setData(jsonData);
-        setSelectedStrategies(jsonData.strategies.map((s) => s.strategy));
-        // Initialize all exit reasons
-        const allExitReasons = [...new Set(jsonData.trades.map((t) => t.exit_reason))];
+        const trades = await getTradesByBlock(activeBlock.id);
+        if (trades.length === 0) {
+          setError('No trades found in this block');
+          setData(null);
+          return;
+        }
+
+        // Enrich trades and build API response
+        const enrichedTrades = enrichTrades(trades);
+        const apiResponse = buildAPIResponse(enrichedTrades);
+        
+        setData(apiResponse);
+        setSelectedStrategies(apiResponse.strategies.map((s) => s.strategy));
+        const allExitReasons = [...new Set(apiResponse.trades.map((t) => t.exit_reason))];
         setSelectedExitReasons(allExitReasons);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        const message = err instanceof Error ? err.message : 'Failed to load trades';
+        setError(message);
+        setData(null);
       } finally {
         setLoading(false);
       }
     };
 
-    loadSeedData();
-  }, []);
+    fetchBlockData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBlock?.id]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+  // Helper function to convert Trade to EnrichedTrade
+  const enrichTrades = (trades: Trade[]): EnrichedTrade[] => {
+    return trades.map((trade) => {
+      const mfePct = trade.maxProfit ? (trade.maxProfit / (trade.openingPrice * trade.numContracts)) * 100 : 0;
+      const maePct = trade.maxLoss ? (Math.abs(trade.maxLoss) / (trade.openingPrice * trade.numContracts)) * 100 : 0;
+      const actualPct = trade.pl ? (trade.pl / (trade.openingPrice * trade.numContracts)) * 100 : 0;
+      const efficiency = mfePct !== 0 ? (actualPct / mfePct) * 100 : 0;
 
-    setUploadStatus('Uploading...');
+      return {
+        trade_id: `${trade.strategy}-${trade.dateOpened}`,
+        strategy: trade.strategy,
+        entry_date: new Date(trade.dateOpened).toISOString().split('T')[0],
+        exit_date: trade.closingPrice ? new Date(trade.dateOpened).toISOString().split('T')[0] : '',
+        entry_price: trade.openingPrice,
+        exit_price: trade.closingPrice || 0,
+        max_price: trade.maxProfit ? trade.openingPrice + (trade.maxProfit / trade.numContracts) : trade.openingPrice,
+        min_price: trade.maxLoss ? trade.openingPrice - (Math.abs(trade.maxLoss) / trade.numContracts) : trade.openingPrice,
+        contracts: trade.numContracts,
+        exit_reason: trade.reasonForClose || 'Unknown',
+        actual_pct: actualPct,
+        max_profit_pct: mfePct,
+        max_loss_pct: maePct,
+        mfe_pct: mfePct,
+        mae_pct: maePct,
+        optimal_tp: actualPct > 0 ? actualPct * 0.95 : 0,
+        missed_profit_pct: Math.max(0, mfePct - actualPct),
+        efficiency: efficiency,
+      };
+    });
+  };
 
-    try {
-      const text = await selectedFile.text();
-      const res = await fetch('/api/tp-optimizer-mae-mfe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvContent: text }),
-      });
+  // Helper function to build API response structure
+  const buildAPIResponse = (trades: EnrichedTrade[]): APIResponse => {
+    const strategies = new Map<string, EnrichedTrade[]>();
+    const exitReasons = new Map<string, EnrichedTrade[]>();
 
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(
-          errData.message || 'Failed to process CSV'
-        );
+    trades.forEach((trade) => {
+      if (!strategies.has(trade.strategy)) {
+        strategies.set(trade.strategy, []);
       }
+      strategies.get(trade.strategy)!.push(trade);
 
-      const jsonData: APIResponse = await res.json();
-      setData(jsonData);
-      setSelectedStrategies(jsonData.strategies.map((s) => s.strategy));
-      // Initialize all exit reasons after upload
-      const allExitReasons = [...new Set(jsonData.trades.map((t) => t.exit_reason))];
-      setSelectedExitReasons(allExitReasons);
-      setUploadStatus(
-        `✓ Loaded ${jsonData.trades.length} trades from ${selectedFile.name}`
-      );
+      if (!exitReasons.has(trade.exit_reason)) {
+        exitReasons.set(trade.exit_reason, []);
+      }
+      exitReasons.get(trade.exit_reason)!.push(trade);
+    });
 
-      // Reset file input
-      if (e.target) e.target.value = '';
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setUploadStatus(`✗ Error: ${message}`);
-      setError(message);
-    }
+    const strategyMetrics: StrategyMetrics[] = Array.from(strategies).map(([strategy, stratTrades]) => {
+      const winners = stratTrades.filter((t) => t.actual_pct > 0).length;
+      const avgMFE = stratTrades.reduce((sum, t) => sum + t.mfe_pct, 0) / stratTrades.length;
+      const avgMAE = stratTrades.reduce((sum, t) => sum + t.mae_pct, 0) / stratTrades.length;
+      const avgMissed = stratTrades.reduce((sum, t) => sum + t.missed_profit_pct, 0) / stratTrades.length;
+      const avgEfficiency = stratTrades.reduce((sum, t) => sum + t.efficiency, 0) / stratTrades.length;
+
+      return {
+        strategy,
+        trade_count: stratTrades.length,
+        avg_mfe: avgMFE,
+        avg_mae: avgMAE,
+        avg_missed_profit: avgMissed,
+        recommended_tp: avgMFE * 0.9,
+        win_rate: (winners / stratTrades.length) * 100,
+        efficiency_score: avgEfficiency,
+      };
+    });
+
+    const winners = trades.filter((t) => t.actual_pct > 0).length;
+    const avgEfficiency = trades.reduce((sum, t) => sum + t.efficiency, 0) / trades.length;
+    const avgMFE = trades.reduce((sum, t) => sum + t.mfe_pct, 0) / trades.length;
+    const avgMissed = trades.reduce((sum, t) => sum + t.missed_profit_pct, 0) / trades.length;
+
+    const exitReasonBreakdowns: Record<string, ExitReasonData[]> = {};
+    strategies.forEach((_stratTrades, strategy) => {
+      const stratExitReasons = Array.from(exitReasons).map(([reason, reasonTrades]) => {
+        const stratReasonTrades = reasonTrades.filter((t) => t.strategy === strategy);
+        return {
+          reason,
+          count: stratReasonTrades.length,
+          avg_missed_profit: stratReasonTrades.length > 0 ? stratReasonTrades.reduce((sum, t) => sum + t.missed_profit_pct, 0) / stratReasonTrades.length : 0,
+          recommended_tp: 0,
+        };
+      });
+      exitReasonBreakdowns[strategy] = stratExitReasons.filter((x) => x.count > 0);
+    });
+
+    return {
+      status: 'success',
+      source: 'active_block',
+      globalMetrics: {
+        total_trades: trades.length,
+        total_strategies: strategies.size,
+        overall_win_rate: (winners / trades.length) * 100,
+        overall_avg_efficiency: avgEfficiency,
+        overall_avg_mfe: avgMFE,
+        overall_avg_missed_profit: avgMissed,
+      },
+      trades,
+      strategies: strategyMetrics,
+      exitReasonBreakdowns,
+    };
   };
 
   const filteredTrades = data?.trades.filter((t) =>
@@ -167,12 +265,14 @@ export function AutoTPOptimizerMAEMFE() {
   // Get unique exit reasons for filter
   const allExitReasons = [...new Set(data?.trades.map((t) => t.exit_reason) || [])];
 
-  if (loading) {
+  if (loading || !isInitialized) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading MAE/MFE data...</p>
+          <p className="text-muted-foreground">
+            {isInitialized ? `Loading ${activeBlock?.name || 'block'} MAE/MFE data...` : 'Initializing...'}
+          </p>
         </div>
       </div>
     );
@@ -180,35 +280,44 @@ export function AutoTPOptimizerMAEMFE() {
 
   if (error && !data) {
     return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-        <h3 className="font-semibold text-destructive mb-2">Error</h3>
-        <p className="text-sm text-destructive/90">{error}</p>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">
+            {activeBlock ? 'Error Loading Block Data' : 'No Active Block Selected'}
+          </h3>
+          <p className="text-muted-foreground">
+            {activeBlock ? error : 'Please select a block from the sidebar to view TP Optimizer data.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeBlock) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Active Block</h3>
+          <p className="text-muted-foreground">
+            Select a block from the sidebar to view TP Optimizer (MAE/MFE) analysis.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Upload Section */}
-      <div className="rounded-lg border border-dashed border-muted-foreground/25 p-6 text-center">
-        <label className="cursor-pointer">
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Upload Trade Log CSV</div>
-            <p className="text-xs text-muted-foreground">
-              Or use sample data below
-            </p>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </div>
-        </label>
-        {uploadStatus && (
-          <p className="mt-3 text-sm font-medium">{uploadStatus}</p>
-        )}
-      </div>
+      {/* Active Block Info */}
+      {activeBlock && (
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+          <p className="text-sm font-medium text-blue-200">
+            📊 Analyzing block: <span className="font-semibold">{activeBlock.name}</span>
+          </p>
+        </div>
+      )}
 
       {/* Strategy & Exit Reason Filters */}
       {data && (
