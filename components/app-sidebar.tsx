@@ -38,12 +38,6 @@ const navData = {
       icon: IconStack2,
     },
     {
-      title: "Auto Take-Profit Optimizer",
-      href: "/tp-optimizer",
-      icon: IconTarget,
-      badge: "New",
-    },
-    {
       title: "TP Optimizer (MAE/MFE)",
       href: "/tp-optimizer-mae-mfe",
       icon: IconTarget,
