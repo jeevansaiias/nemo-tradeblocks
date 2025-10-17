@@ -1,0 +1,48 @@
+{
+  "DC SPX Mon 2/4": [
+    {"tp": 25, "pl": 12540, "plPct": 8.2, "winRate": 62.5, "expectancy": 145.2, "profitFactor": 2.34},
+    {"tp": 50, "pl": 14250, "plPct": 9.1, "winRate": 65.0, "expectancy": 158.7, "profitFactor": 2.51},
+    {"tp": 100, "pl": 16800, "plPct": 10.8, "winRate": 67.5, "expectancy": 172.4, "profitFactor": 2.68},
+    {"tp": 150, "pl": 18920, "plPct": 12.1, "winRate": 68.8, "expectancy": 181.2, "profitFactor": 2.79},
+    {"tp": 200, "pl": 20450, "plPct": 13.0, "winRate": 69.4, "expectancy": 186.5, "profitFactor": 2.85},
+    {"tp": 250, "pl": 21340, "plPct": 13.5, "winRate": 69.7, "expectancy": 189.3, "profitFactor": 2.88},
+    {"tp": 300, "pl": 21890, "plPct": 13.8, "winRate": 69.9, "expectancy": 190.8, "profitFactor": 2.89},
+    {"tp": 400, "pl": 22150, "plPct": 13.9, "winRate": 70.1, "expectancy": 191.5, "profitFactor": 2.89},
+    {"tp": 500, "pl": 21850, "plPct": 13.7, "winRate": 70.0, "expectancy": 190.2, "profitFactor": 2.87}
+  ],
+  "Jeevan Wed": [
+    {"tp": 25, "pl": 9800, "plPct": 7.5, "winRate": 58.3, "expectancy": 132.1, "profitFactor": 2.12},
+    {"tp": 50, "pl": 11200, "plPct": 8.4, "winRate": 60.0, "expectancy": 144.5, "profitFactor": 2.28},
+    {"tp": 100, "pl": 13500, "plPct": 10.1, "winRate": 62.5, "expectancy": 158.2, "profitFactor": 2.45},
+    {"tp": 150, "pl": 15200, "plPct": 11.3, "winRate": 64.2, "expectancy": 167.8, "profitFactor": 2.57},
+    {"tp": 200, "pl": 16450, "plPct": 12.2, "winRate": 65.1, "expectancy": 173.4, "profitFactor": 2.63},
+    {"tp": 250, "pl": 17200, "plPct": 12.8, "winRate": 65.6, "expectancy": 176.9, "profitFactor": 2.67},
+    {"tp": 300, "pl": 17600, "plPct": 13.1, "winRate": 65.9, "expectancy": 178.5, "profitFactor": 2.69},
+    {"tp": 400, "pl": 17850, "plPct": 13.3, "winRate": 66.1, "expectancy": 179.6, "profitFactor": 2.70}
+  ],
+  "Kool SPX Spreads": [
+    {"tp": 25, "pl": 8900, "plPct": 6.8, "winRate": 55.0, "expectancy": 118.5, "profitFactor": 1.95},
+    {"tp": 50, "pl": 10300, "plPct": 7.9, "winRate": 57.1, "expectancy": 132.2, "profitFactor": 2.11},
+    {"tp": 100, "pl": 12800, "plPct": 9.6, "winRate": 59.7, "expectancy": 148.9, "profitFactor": 2.28},
+    {"tp": 150, "pl": 14500, "plPct": 10.8, "winRate": 61.5, "expectancy": 159.3, "profitFactor": 2.39},
+    {"tp": 200, "pl": 15900, "plPct": 11.8, "winRate": 62.8, "expectancy": 166.4, "profitFactor": 2.46},
+    {"tp": 250, "pl": 16700, "plPct": 12.4, "winRate": 63.5, "expectancy": 170.7, "profitFactor": 2.50},
+    {"tp": 300, "pl": 17200, "plPct": 12.8, "winRate": 64.0, "expectancy": 173.2, "profitFactor": 2.52}
+  ],
+  "0DTE PCS - EMA Entry": [
+    {"tp": 25, "pl": 15200, "plPct": 9.1, "winRate": 68.0, "expectancy": 165.3, "profitFactor": 2.54},
+    {"tp": 50, "pl": 17450, "plPct": 10.5, "winRate": 70.0, "expectancy": 180.2, "profitFactor": 2.73},
+    {"tp": 100, "pl": 20100, "plPct": 12.1, "winRate": 72.0, "expectancy": 198.5, "profitFactor": 2.92},
+    {"tp": 150, "pl": 22300, "plPct": 13.4, "winRate": 73.2, "expectancy": 210.6, "profitFactor": 3.05},
+    {"tp": 200, "pl": 23850, "plPct": 14.2, "winRate": 74.0, "expectancy": 219.4, "profitFactor": 3.13},
+    {"tp": 250, "pl": 24600, "plPct": 14.7, "winRate": 74.5, "expectancy": 223.8, "profitFactor": 3.17},
+    {"tp": 300, "pl": 25100, "plPct": 15.0, "winRate": 74.8, "expectancy": 226.5, "profitFactor": 3.19}
+  ],
+  "Long Calls Wed": [
+    {"tp": 25, "pl": 7200, "plPct": 5.9, "winRate": 52.0, "expectancy": 105.3, "profitFactor": 1.78},
+    {"tp": 50, "pl": 8700, "plPct": 7.1, "winRate": 54.5, "expectancy": 121.4, "profitFactor": 1.95},
+    {"tp": 100, "pl": 11200, "plPct": 9.0, "winRate": 57.5, "expectancy": 141.2, "profitFactor": 2.17},
+    {"tp": 150, "pl": 13200, "plPct": 10.6, "winRate": 59.5, "expectancy": 156.8, "profitFactor": 2.33},
+    {"tp": 200, "pl": 14600, "plPct": 11.7, "winRate": 61.0, "expectancy": 166.5, "profitFactor": 2.42}
+  ]
+}
