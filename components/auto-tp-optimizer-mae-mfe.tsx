@@ -14,7 +14,6 @@ import {
   winRatePct,
   validateEfficiencies,
 } from '@/lib/analytics/returns';
-import { fmt } from '@/lib/analytics/format';
 import { MFEDistribution } from './auto-tp-optimizer/mfe-distribution';
 import { MissedProfitChart } from './auto-tp-optimizer/missed-profit-chart';
 import { ExitReasonBreakdown } from './auto-tp-optimizer/exit-reason-breakdown';
@@ -221,7 +220,6 @@ export function AutoTPOptimizerMAEMFE() {
 
     const strategyMetrics: StrategyMetrics[] = Array.from(strategies).map(([strategy, stratTrades]) => {
       const actualPcts = stratTrades.map((t) => t.actual_pct);
-      const mfePcts = stratTrades.map((t) => t.mfe_pct);
       
       // Calculate efficiency for each trade and validate
       const efficiencies = stratTrades.map((t) => t.efficiency);

@@ -8,7 +8,6 @@ import {
   mfePercent,
   maePercent,
   efficiencyPct,
-  clampPct,
   missedProfitPct,
   winRatePct,
 } from '@/lib/analytics/returns';
@@ -75,7 +74,6 @@ describe('Returns Analytics', () => {
   test('Trade 3: Win with excellent execution (multi-leg)', () => {
     const entry = 50;
     const contracts = 2;
-    const premium = entry * contracts; // 100
     const maxPrice = 57;
     const exitPrice = 55;
     const actualPL = (exitPrice - entry) * contracts; // 10
