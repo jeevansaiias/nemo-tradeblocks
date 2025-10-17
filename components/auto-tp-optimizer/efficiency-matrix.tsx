@@ -1,6 +1,7 @@
 'use client';
 
 import { fmt } from '@/lib/analytics/format';
+import { formatInt, formatPercentRaw } from '@/lib/utils/format';
 
 interface StrategyMetrics {
   strategy: string;
@@ -33,10 +34,10 @@ export function EfficiencyMatrix({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm table-fixed">
         <thead>
           <tr className="border-b">
-            <th className="text-left py-3 px-4 font-semibold">Strategy</th>
+            <th className="text-left py-3 px-4 font-semibold break-words">Strategy</th>
             <th className="text-right py-3 px-4 font-semibold">Trades</th>
             <th className="text-right py-3 px-4 font-semibold">Win Rate</th>
             <th className="text-right py-3 px-4 font-semibold">
@@ -56,13 +57,13 @@ export function EfficiencyMatrix({
               key={idx}
               className="border-b hover:bg-muted/50 transition-colors"
             >
-              <td className="py-3 px-4 font-medium">{strategy.strategy}</td>
+              <td className="py-3 px-4 font-medium break-words">{strategy.strategy}</td>
               <td className="text-right py-3 px-4">
-                {strategy.trade_count}
+                {formatInt(strategy.trade_count, false)}
               </td>
               <td className="text-right py-3 px-4">
-                <span className="inline-flex items-center justify-center w-8 h-6 rounded bg-green-100 text-green-800 text-xs font-semibold">
-                  {fmt.pct2(strategy.win_rate)}
+                <span className="inline-flex items-center justify-center w-12 h-6 rounded bg-green-100 text-green-800 text-xs font-semibold">
+                  {formatPercentRaw(strategy.win_rate)}
                 </span>
               </td>
               <td className="text-right py-3 px-4">
@@ -79,26 +80,26 @@ export function EfficiencyMatrix({
                         : ''}
                     </div>
                   </div>
-                  <span className="w-10 text-right">{fmt.pct1(strategy.efficiency_score)}</span>
+                  <span className="w-12 text-right">{fmt.pct1(strategy.efficiency_score)}</span>
                 </div>
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-blue-600 font-semibold">
-                  {fmt.pct2(strategy.avg_mfe)}
+                  {formatPercentRaw(strategy.avg_mfe)}
                 </span>
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-red-600">
-                  {fmt.pct2(strategy.avg_mae)}
+                  {formatPercentRaw(strategy.avg_mae)}
                 </span>
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-amber-600 font-semibold">
-                  {fmt.pct2(strategy.avg_missed_profit)}
+                  {formatPercentRaw(strategy.avg_missed_profit)}
                 </span>
               </td>
               <td className="text-right py-3 px-4 font-semibold">
-                {fmt.pct2(strategy.recommended_tp)}
+                {formatPercentRaw(strategy.recommended_tp)}
               </td>
             </tr>
           ))}

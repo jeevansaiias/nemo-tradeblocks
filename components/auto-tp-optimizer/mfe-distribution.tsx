@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { formatInt } from '@/lib/utils/format';
 import { fmt } from '@/lib/analytics/format';
 
 interface Trade {
@@ -82,10 +83,11 @@ export function MFEDistribution({ trades }: { trades: Trade[] }) {
         <XAxis dataKey="range" />
         <YAxis />
         <Tooltip 
-          formatter={(value: number) => fmt.int(value)}
+          formatter={(value: number) => formatInt(value, false)}
+          labelFormatter={(label) => `MFE Range: ${label}`}
           contentStyle={{ backgroundColor: 'rgba(0,0,0,0.75)', border: 'none', borderRadius: '4px' }}
         />
-        <Bar dataKey="count" fill="#8884d8" />
+        <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

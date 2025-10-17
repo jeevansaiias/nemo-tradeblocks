@@ -14,6 +14,7 @@ import {
   winRatePct,
   validateEfficiencies,
 } from '@/lib/analytics/returns';
+import { formatPercent, formatInt } from '@/lib/utils/format';
 import { MFEDistribution } from './auto-tp-optimizer/mfe-distribution';
 import { MissedProfitChart } from './auto-tp-optimizer/missed-profit-chart';
 import { ExitReasonBreakdown } from './auto-tp-optimizer/exit-reason-breakdown';
@@ -431,12 +432,12 @@ export function AutoTPOptimizerMAEMFE() {
       {/* Global Metrics Cards */}
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div className="rounded-lg border p-4">
+                    <div className="rounded-lg border p-4">
             <div className="text-xs font-medium text-muted-foreground">
-              Total Trades
+              Trades
             </div>
             <div className="text-2xl font-bold">
-              {data.globalMetrics.total_trades}
+              {formatInt(data.globalMetrics.total_trades)}
             </div>
           </div>
           <div className="rounded-lg border p-4">
@@ -444,7 +445,7 @@ export function AutoTPOptimizerMAEMFE() {
               Strategies
             </div>
             <div className="text-2xl font-bold">
-              {data.globalMetrics.total_strategies}
+              {formatInt(data.globalMetrics.total_strategies)}
             </div>
           </div>
           <div className="rounded-lg border p-4">
@@ -452,7 +453,7 @@ export function AutoTPOptimizerMAEMFE() {
               Win Rate
             </div>
             <div className="text-2xl font-bold">
-              {data.globalMetrics.overall_win_rate}%
+              {formatPercent(data.globalMetrics.overall_win_rate)}
             </div>
           </div>
           <div className="rounded-lg border p-4">
@@ -460,7 +461,7 @@ export function AutoTPOptimizerMAEMFE() {
               Avg Efficiency
             </div>
             <div className="text-2xl font-bold">
-              {data.globalMetrics.overall_avg_efficiency}%
+              {formatPercent(data.globalMetrics.overall_avg_efficiency)}
             </div>
           </div>
           <div className="rounded-lg border p-4">
@@ -468,7 +469,7 @@ export function AutoTPOptimizerMAEMFE() {
               Avg MFE
             </div>
             <div className="text-2xl font-bold">
-              {data.globalMetrics.overall_avg_mfe.toFixed(2)}%
+              {formatPercent(data.globalMetrics.overall_avg_mfe)}
             </div>
           </div>
           <div className="rounded-lg border p-4">
@@ -476,7 +477,7 @@ export function AutoTPOptimizerMAEMFE() {
               Avg Missed Profit
             </div>
             <div className="text-2xl font-bold">
-              {data.globalMetrics.overall_avg_missed_profit.toFixed(2)}%
+              {formatPercent(data.globalMetrics.overall_avg_missed_profit)}
             </div>
           </div>
         </div>

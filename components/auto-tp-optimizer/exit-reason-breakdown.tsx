@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { formatInt, formatPercentRaw } from '@/lib/utils/format';
 
 interface ExitReasonData {
   reason: string;
@@ -65,9 +66,9 @@ export function ExitReasonBreakdown({
                 return (
                   <div className="rounded border border-border bg-background p-2 text-xs shadow-lg">
                     <p className="font-semibold">{data.name}</p>
-                    <p>Count: {data.value}</p>
+                    <p>Count: {formatInt(data.value, false)}</p>
                     <p>
-                      Avg Missed: {data.avg_missed_profit.toFixed(2)}%
+                      Avg Missed: {formatPercentRaw(data.avg_missed_profit)}
                     </p>
                   </div>
                 );
@@ -96,9 +97,9 @@ export function ExitReasonBreakdown({
               <span className="font-medium">{item.reason}</span>
             </div>
             <div className="text-right">
-              <div>{item.count} trades</div>
+              <div>{formatInt(item.count, false)} trades</div>
               <div className="text-muted-foreground">
-                Missed: {item.avg_missed_profit.toFixed(2)}%
+                Missed: {formatPercentRaw(item.avg_missed_profit)}
               </div>
             </div>
           </div>

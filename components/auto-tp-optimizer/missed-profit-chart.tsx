@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { formatPercentRaw } from '@/lib/utils/format';
 
 interface Trade {
   trade_id: string;
@@ -78,8 +79,8 @@ export function MissedProfitChart({ trades }: { trades: Trade[] }) {
               return (
                 <div className="rounded border border-border bg-background p-2 text-xs shadow-lg">
                   <p className="font-semibold">{data.strategy}</p>
-                  <p>Actual: {data.actual.toFixed(2)}%</p>
-                  <p>Missed: {data.missed.toFixed(2)}%</p>
+                  <p>Actual: {formatPercentRaw(data.actual)}</p>
+                  <p>Missed: {formatPercentRaw(data.missed)}</p>
                   <p>Exit: {data.exitReason}</p>
                 </div>
               );
