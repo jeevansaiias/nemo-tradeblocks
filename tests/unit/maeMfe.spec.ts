@@ -20,7 +20,6 @@ import {
   sanityCheckTopline,
   formatDecimalPercent,
   Trade,
-  TradeMetrics,
 } from '@/lib/analytics/maeMfe';
 
 describe('maeMfe Analytics', () => {
