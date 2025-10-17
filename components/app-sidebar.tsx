@@ -44,12 +44,6 @@ const navData = {
       badge: "New",
     },
     {
-      title: "TP Optimizer (v2)",
-      href: "/auto-tp-optimizer",
-      icon: IconTarget,
-      badge: "Advanced",
-    },
-    {
       title: "TP Optimizer (MAE/MFE)",
       href: "/tp-optimizer-mae-mfe",
       icon: IconTarget,
