@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  type TooltipProps,
 } from 'recharts';
 import { ExitReasonMetrics } from '@/lib/processing/exit_reason_analyzer';
 
@@ -31,7 +32,8 @@ export function ExitReasonContributionChart({
     return '#ef4444'; // Red
   };
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: ExitReasonMetrics }> }) => {
+  const CustomTooltip = (props: TooltipProps<number, string>) => {
+    const { active, payload } = props;
     if (active && payload && payload[0]) {
       const data = payload[0].payload as ExitReasonMetrics;
       return (
