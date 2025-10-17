@@ -5,6 +5,16 @@ import { AlertTriangle } from 'lucide-react';
 import { useBlockStore } from '@/lib/stores/block-store';
 import { getTradesByBlock } from '@/lib/db';
 import { Trade } from '@/lib/models/trade';
+import {
+  pctOfPremium,
+  mfePercent,
+  maePercent,
+  efficiencyPct,
+  missedProfitPct,
+  winRatePct,
+  validateEfficiencies,
+} from '@/lib/analytics/returns';
+import { fmt } from '@/lib/analytics/format';
 import { MFEDistribution } from './auto-tp-optimizer/mfe-distribution';
 import { MissedProfitChart } from './auto-tp-optimizer/missed-profit-chart';
 import { ExitReasonBreakdown } from './auto-tp-optimizer/exit-reason-breakdown';
@@ -151,42 +161,23 @@ export function AutoTPOptimizerMAEMFE() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBlock?.id]);
 
-  // Helper function to convert Trade to EnrichedTrade
+  // Helper function to convert Trade to EnrichedTrade using consistent analytics
   const enrichTrades = (trades: Trade[]): EnrichedTrade[] => {
     return trades.map((trade) => {
-      // Calculate percentages from raw trade data
-      const mfePct = trade.maxProfit ? (trade.maxProfit / (trade.openingPrice * trade.numContracts)) * 100 : 0;
-      const maePct = trade.maxLoss ? (Math.abs(trade.maxLoss) / (trade.openingPrice * trade.numContracts)) * 100 : 0;
-      const actualPct = trade.pl ? (trade.pl / (trade.openingPrice * trade.numContracts)) * 100 : 0;
-
-      // Normalize MFE/MAE in case they're stored as raw ratios (0.02-0.06 instead of 2-6)
-      const normalize = (v: number): number => {
-        if (Math.abs(v) < 1 && Math.abs(v) > 0) {
-          const normalized = v * 100;
-          if (Math.abs(v) < 0.1) {
-            console.warn(`[TP Optimizer] Detected raw ratio MFE/MAE: ${v} → normalized to ${normalized}%`);
-          }
-          return normalized;
-        }
-        return v;
-      };
-
-      const normalizedMFE = normalize(mfePct);
-      const normalizedMAE = normalize(maePct);
-      const normalizedActual = normalize(actualPct);
-
-      // Calculate efficiency with bounds checking
-      let efficiency = 0;
-      if (normalizedMFE > 0) {
-        efficiency = (normalizedActual / normalizedMFE) * 100;
-        // Clamp efficiency to reasonable range (-200% to 200%)
-        efficiency = Math.max(Math.min(efficiency, 200), -200);
-      }
-
-      // If efficiency is invalid or MFE is non-positive, set to 0
-      if (!Number.isFinite(efficiency) || normalizedMFE <= 0) {
-        efficiency = 0;
-      }
+      // Use standardized analytics: all as % of premium
+      const actualPct = pctOfPremium(trade.pl || 0, trade.openingPrice, trade.numContracts);
+      const mfePct = mfePercent(
+        trade.maxProfit ? trade.openingPrice + (trade.maxProfit / trade.numContracts) : trade.openingPrice,
+        trade.openingPrice,
+        trade.numContracts
+      );
+      const maePct = maePercent(
+        trade.maxLoss ? trade.openingPrice - (Math.abs(trade.maxLoss) / trade.numContracts) : trade.openingPrice,
+        trade.openingPrice,
+        trade.numContracts
+      );
+      const efficiency = efficiencyPct(actualPct, mfePct);
+      const missedProfit = missedProfitPct(mfePct, actualPct);
 
       return {
         trade_id: `${trade.strategy}-${trade.dateOpened}`,
@@ -199,13 +190,13 @@ export function AutoTPOptimizerMAEMFE() {
         min_price: trade.maxLoss ? trade.openingPrice - (Math.abs(trade.maxLoss) / trade.numContracts) : trade.openingPrice,
         contracts: trade.numContracts,
         exit_reason: trade.reasonForClose || 'Unknown',
-        actual_pct: normalizedActual,
-        max_profit_pct: normalizedMFE,
-        max_loss_pct: normalizedMAE,
-        mfe_pct: normalizedMFE,
-        mae_pct: normalizedMAE,
-        optimal_tp: normalizedActual > 0 ? normalizedActual * 0.95 : 0,
-        missed_profit_pct: Math.max(0, normalizedMFE - normalizedActual),
+        actual_pct: actualPct,
+        max_profit_pct: mfePct,
+        max_loss_pct: maePct,
+        mfe_pct: mfePct,
+        mae_pct: maePct,
+        optimal_tp: actualPct > 0 ? actualPct * 0.95 : 0,
+        missed_profit_pct: missedProfit,
         efficiency: efficiency,
       };
     });
@@ -229,7 +220,12 @@ export function AutoTPOptimizerMAEMFE() {
     });
 
     const strategyMetrics: StrategyMetrics[] = Array.from(strategies).map(([strategy, stratTrades]) => {
-      const winners = stratTrades.filter((t) => t.actual_pct > 0).length;
+      const actualPcts = stratTrades.map((t) => t.actual_pct);
+      const mfePcts = stratTrades.map((t) => t.mfe_pct);
+      
+      // Calculate efficiency for each trade and validate
+      const efficiencies = stratTrades.map((t) => t.efficiency);
+      validateEfficiencies(efficiencies, `Strategy: ${strategy}`);
       
       // Filter valid values only for calculations
       const validTrades = stratTrades.filter((t) => 
@@ -257,12 +253,15 @@ export function AutoTPOptimizerMAEMFE() {
         avg_mae: Number.isFinite(avgMAE) ? avgMAE : 0,
         avg_missed_profit: Number.isFinite(avgMissed) ? avgMissed : 0,
         recommended_tp: Number.isFinite(avgMFE) ? avgMFE * 0.9 : 0,
-        win_rate: (winners / stratTrades.length) * 100,
+        win_rate: winRatePct(actualPcts),
         efficiency_score: Number.isFinite(avgEfficiency) ? avgEfficiency : 0,
       };
     });
 
-    const winners = trades.filter((t) => t.actual_pct > 0).length;
+    // Calculate global metrics using analytics functions
+    const actualPcts = trades.map((t) => t.actual_pct);
+    const efficiencies = trades.map((t) => t.efficiency);
+    validateEfficiencies(efficiencies, 'Global');
     
     // Filter valid trades for global metrics
     const validTrades = trades.filter((t) => 
@@ -300,7 +299,7 @@ export function AutoTPOptimizerMAEMFE() {
       globalMetrics: {
         total_trades: trades.length,
         total_strategies: strategies.size,
-        overall_win_rate: (winners / trades.length) * 100,
+        overall_win_rate: winRatePct(actualPcts),
         overall_avg_efficiency: Number.isFinite(avgEfficiency) ? avgEfficiency : 0,
         overall_avg_mfe: Number.isFinite(avgMFE) ? avgMFE : 0,
         overall_avg_missed_profit: Number.isFinite(avgMissed) ? avgMissed : 0,

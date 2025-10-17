@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { fmt } from '@/lib/analytics/format';
 
 interface Trade {
   trade_id: string;
@@ -80,7 +81,10 @@ export function MFEDistribution({ trades }: { trades: Trade[] }) {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="range" />
         <YAxis />
-        <Tooltip />
+        <Tooltip 
+          formatter={(value: number) => fmt.int(value)}
+          contentStyle={{ backgroundColor: 'rgba(0,0,0,0.75)', border: 'none', borderRadius: '4px' }}
+        />
         <Bar dataKey="count" fill="#8884d8" />
       </BarChart>
     </ResponsiveContainer>

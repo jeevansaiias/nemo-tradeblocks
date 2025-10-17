@@ -1,5 +1,7 @@
 'use client';
 
+import { fmt } from '@/lib/analytics/format';
+
 interface StrategyMetrics {
   strategy: string;
   trade_count: number;
@@ -60,7 +62,7 @@ export function EfficiencyMatrix({
               </td>
               <td className="text-right py-3 px-4">
                 <span className="inline-flex items-center justify-center w-8 h-6 rounded bg-green-100 text-green-800 text-xs font-semibold">
-                  {strategy.win_rate}%
+                  {fmt.pct2(strategy.win_rate)}
                 </span>
               </td>
               <td className="text-right py-3 px-4">
@@ -73,30 +75,30 @@ export function EfficiencyMatrix({
                       }}
                     >
                       {strategy.efficiency_score > 20
-                        ? `${strategy.efficiency_score}%`
+                        ? fmt.pct1(strategy.efficiency_score)
                         : ''}
                     </div>
                   </div>
-                  <span className="w-10 text-right">{strategy.efficiency_score}%</span>
+                  <span className="w-10 text-right">{fmt.pct1(strategy.efficiency_score)}</span>
                 </div>
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-blue-600 font-semibold">
-                  {strategy.avg_mfe.toFixed(2)}%
+                  {fmt.pct2(strategy.avg_mfe)}
                 </span>
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-red-600">
-                  {strategy.avg_mae.toFixed(2)}%
+                  {fmt.pct2(strategy.avg_mae)}
                 </span>
               </td>
               <td className="text-right py-3 px-4">
                 <span className="text-amber-600 font-semibold">
-                  {strategy.avg_missed_profit.toFixed(2)}%
+                  {fmt.pct2(strategy.avg_missed_profit)}
                 </span>
               </td>
               <td className="text-right py-3 px-4 font-semibold">
-                {strategy.recommended_tp.toFixed(2)}%
+                {fmt.pct2(strategy.recommended_tp)}
               </td>
             </tr>
           ))}
