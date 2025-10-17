@@ -10,12 +10,22 @@ import { ExitReasonContributionChart } from './charts/ExitReasonContributionChar
 import { ExitReasonTPHeatmap } from './charts/ExitReasonTPHeatmap';
 import { StrategyExitReasonMatrix } from './charts/StrategyExitReasonMatrix';
 import { AutoInsightsSummary } from './charts/AutoInsightsSummary';
+import { StrategyExitHeatmap } from './charts/StrategyExitHeatmap';
+import { StrategyExitTPMatrix } from './charts/StrategyExitTPMatrix';
+import { WeightedExitImpactTable } from './charts/WeightedExitImpactTable';
+import { AutoInsights3 } from './charts/AutoInsights3';
 import {
   analyzeByExitReason,
   strategyExitReasonCrosstab,
   analyzeTPBinsByExitReason,
   generateAutoInsights,
 } from '@/lib/processing/exit_reason_analyzer';
+import {
+  strategyExitHeatmapData,
+  perStrategyTPCurves,
+  weightedExitImpactTable,
+  generateAutoInsights3,
+} from '@/lib/processing/strategy_exit_matrix';
 
 interface ExitReasonData {
   reason: string;
@@ -79,6 +89,7 @@ export function AutoTPOptimizerMAEMFE() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
+  const [selectedExitReasons, setSelectedExitReasons] = useState<string[]>([]);
   const [uploadStatus, setUploadStatus] = useState('');
 
   // Load seed data on mount
@@ -92,6 +103,9 @@ export function AutoTPOptimizerMAEMFE() {
         const jsonData: APIResponse = await res.json();
         setData(jsonData);
         setSelectedStrategies(jsonData.strategies.map((s) => s.strategy));
+        // Initialize all exit reasons
+        const allExitReasons = [...new Set(jsonData.trades.map((t) => t.exit_reason))];
+        setSelectedExitReasons(allExitReasons);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -126,6 +140,9 @@ export function AutoTPOptimizerMAEMFE() {
       const jsonData: APIResponse = await res.json();
       setData(jsonData);
       setSelectedStrategies(jsonData.strategies.map((s) => s.strategy));
+      // Initialize all exit reasons after upload
+      const allExitReasons = [...new Set(jsonData.trades.map((t) => t.exit_reason))];
+      setSelectedExitReasons(allExitReasons);
       setUploadStatus(
         `✓ Loaded ${jsonData.trades.length} trades from ${selectedFile.name}`
       );
@@ -140,11 +157,15 @@ export function AutoTPOptimizerMAEMFE() {
   };
 
   const filteredTrades = data?.trades.filter((t) =>
-    selectedStrategies.includes(t.strategy)
+    selectedStrategies.includes(t.strategy) &&
+    selectedExitReasons.includes(t.exit_reason)
   ) || [];
   const filteredStrategies = data?.strategies.filter((s) =>
     selectedStrategies.includes(s.strategy)
   ) || [];
+  
+  // Get unique exit reasons for filter
+  const allExitReasons = [...new Set(data?.trades.map((t) => t.exit_reason) || [])];
 
   if (loading) {
     return (
@@ -188,6 +209,61 @@ export function AutoTPOptimizerMAEMFE() {
           <p className="mt-3 text-sm font-medium">{uploadStatus}</p>
         )}
       </div>
+
+      {/* Strategy & Exit Reason Filters */}
+      {data && (
+        <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+          <div>
+            <p className="text-xs font-semibold text-zinc-400 uppercase mb-2">Strategy Filter</p>
+            <div className="flex flex-wrap gap-2">
+              {data.strategies.map((strategy) => (
+                <button
+                  key={strategy.strategy}
+                  onClick={() => {
+                    setSelectedStrategies((prev) =>
+                      prev.includes(strategy.strategy)
+                        ? prev.filter((s) => s !== strategy.strategy)
+                        : [...prev, strategy.strategy]
+                    );
+                  }}
+                  className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+                    selectedStrategies.includes(strategy.strategy)
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  }`}
+                >
+                  {strategy.strategy} ({strategy.trade_count})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-zinc-400 uppercase mb-2">Exit Reason Filter</p>
+            <div className="flex flex-wrap gap-2">
+              {allExitReasons.map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => {
+                    setSelectedExitReasons((prev) =>
+                      prev.includes(reason)
+                        ? prev.filter((r) => r !== reason)
+                        : [...prev, reason]
+                    );
+                  }}
+                  className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+                    selectedExitReasons.includes(reason)
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  }`}
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Metrics Cards */}
       {data && (
@@ -320,6 +396,47 @@ export function AutoTPOptimizerMAEMFE() {
             {filteredTrades.length > 0 && (
               <StrategyExitReasonMatrix
                 data={strategyExitReasonCrosstab(filteredTrades)}
+              />
+            )}
+          </div>
+
+          {/* Strategy × Exit Reason Advanced Analysis Section */}
+          <div className="space-y-6 border-t pt-6">
+            <div>
+              <h2 className="text-2xl font-bold">Strategy × Exit Reason Advanced Analysis</h2>
+              <p className="text-muted-foreground mt-2">
+                Multi-dimensional performance heatmaps, TP curves, and AI-driven insights across all combinations
+              </p>
+            </div>
+
+            {/* Auto Insights 3.0 */}
+            {filteredTrades.length > 0 && (
+              <AutoInsights3
+                insights={generateAutoInsights3(
+                  filteredTrades,
+                  strategyExitHeatmapData(filteredTrades)
+                )}
+              />
+            )}
+
+            {/* Strategy × Exit Reason Heatmap */}
+            {filteredTrades.length > 0 && (
+              <StrategyExitHeatmap
+                data={strategyExitHeatmapData(filteredTrades)}
+              />
+            )}
+
+            {/* Weighted Exit Impact Table */}
+            {filteredTrades.length > 0 && (
+              <WeightedExitImpactTable
+                data={weightedExitImpactTable(filteredTrades)}
+              />
+            )}
+
+            {/* Strategy × Exit Reason TP Performance Matrix */}
+            {filteredTrades.length > 0 && (
+              <StrategyExitTPMatrix
+                curves={perStrategyTPCurves(filteredTrades)}
               />
             )}
           </div>
