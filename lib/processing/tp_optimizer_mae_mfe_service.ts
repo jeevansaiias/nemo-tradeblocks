@@ -222,23 +222,31 @@ export function parseTradesFromCSV(csvContent: string): Trade[] {
   const lines = csvContent.trim().split('\n');
   if (lines.length < 2) throw new Error('Invalid CSV format');
 
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  // Parse header - handle quoted fields
+  const headerLine = lines[0];
+  const headers = headerLine
+    .split(',')
+    .map(h => h.trim().replace(/^"|"$/g, '').toLowerCase()); // Remove quotes
   
-  // Find column indices
+  // Find column indices with flexible matching
   let strategyIdx = -1, entryDateIdx = -1, exitDateIdx = -1;
   let entryPriceIdx = -1, exitPriceIdx = -1, maxPriceIdx = -1, minPriceIdx = -1;
   let contractsIdx = -1, exitReasonIdx = -1;
+  let maxProfitIdx = -1, maxLossIdx = -1;
 
   headers.forEach((h, i) => {
     if (h.includes('strategy')) strategyIdx = i;
-    if (h.includes('entry') && h.includes('date')) entryDateIdx = i;
-    if (h.includes('exit') && h.includes('date')) exitDateIdx = i;
-    if (h.includes('entry') && (h.includes('price') || h.includes('open'))) entryPriceIdx = i;
-    if (h.includes('exit') && (h.includes('price') || h.includes('close'))) exitPriceIdx = i;
-    if (h.includes('high') || h.includes('max')) maxPriceIdx = i;
-    if (h.includes('low') || h.includes('min')) minPriceIdx = i;
-    if (h.includes('contract')) contractsIdx = i;
-    if (h.includes('reason') || h.includes('exit')) exitReasonIdx = i;
+    if (h.includes('date') && h.includes('open')) entryDateIdx = i;
+    if (h.includes('date') && h.includes('clos')) exitDateIdx = i;
+    if ((h.includes('opening') || h.includes('entry')) && h.includes('price')) entryPriceIdx = i;
+    // For exit price, prefer "Closing Price" column (not "Avg. Closing Cost" which is for multi-leg costs)
+    if (h.includes('closing') && h.includes('price') && !h.includes('avg')) exitPriceIdx = i;
+    if (h.includes('high') || (h.includes('max') && h.includes('price'))) maxPriceIdx = i;
+    if (h.includes('low') || (h.includes('min') && h.includes('price'))) minPriceIdx = i;
+    if (h.includes('contract') || h.includes('qty') || h.includes('quantity')) contractsIdx = i;
+    if (h.includes('reason') && h.includes('close')) exitReasonIdx = i;
+    if (h.includes('max') && h.includes('profit')) maxProfitIdx = i;
+    if (h.includes('max') && h.includes('loss')) maxLossIdx = i;
   });
 
   const trades: Trade[] = [];
@@ -248,18 +256,55 @@ export function parseTradesFromCSV(csvContent: string): Trade[] {
     const line = lines[i].trim();
     if (!line) continue;
 
-    const values = line.split(',').map(v => v.trim());
-    
+    // Parse CSV line handling quoted fields
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^"|"$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim().replace(/^"|"$/g, ''));
+
     const strategy = values[strategyIdx] || 'Unknown';
     const entryDate = values[entryDateIdx] || new Date().toISOString();
     const exitDate = values[exitDateIdx] || new Date().toISOString();
     const entryPrice = parseFloat(values[entryPriceIdx] || '0');
     const exitPrice = parseFloat(values[exitPriceIdx] || '0');
-    const maxPrice = parseFloat(String(values[maxPriceIdx] || exitPrice));
-    const minPrice = parseFloat(String(values[minPriceIdx] || exitPrice));
+    
+    // Handle max/min prices - use actual max/min or derive from profit/loss percentages
+    let maxPrice = exitPrice;
+    let minPrice = exitPrice;
+    
+    if (maxPriceIdx >= 0 && values[maxPriceIdx]) {
+      // If we have an actual high price column, use it
+      maxPrice = parseFloat(values[maxPriceIdx]);
+    } else if (maxProfitIdx >= 0 && values[maxProfitIdx]) {
+      // Otherwise, use Max Profit % to calculate: maxPrice = entryPrice * (1 + maxProfit%)
+      const maxProfitPct = parseFloat(values[maxProfitIdx]);
+      maxPrice = entryPrice * (1 + maxProfitPct / 100);
+    }
+    
+    if (minPriceIdx >= 0 && values[minPriceIdx]) {
+      // If we have an actual low price column, use it
+      minPrice = parseFloat(values[minPriceIdx]);
+    } else if (maxLossIdx >= 0 && values[maxLossIdx]) {
+      // Otherwise, use Max Loss % to calculate: minPrice = entryPrice * (1 - |maxLoss%|)
+      const maxLossPct = Math.abs(parseFloat(values[maxLossIdx]));
+      minPrice = Math.max(0, entryPrice * (1 - maxLossPct / 100));
+    }
+    
     const contracts = parseInt(values[contractsIdx] || '1');
     const exitReason = values[exitReasonIdx] || 'Manual';
 
+    // Validate we have required prices
     if (entryPrice > 0 && exitPrice > 0) {
       trades.push({
         trade_id: `${strategy}-${tradeCounter++}`,
@@ -268,8 +313,8 @@ export function parseTradesFromCSV(csvContent: string): Trade[] {
         exit_date: exitDate,
         entry_price: entryPrice,
         exit_price: exitPrice,
-        max_price: maxPrice,
-        min_price: minPrice,
+        max_price: maxPrice > 0 ? maxPrice : exitPrice,
+        min_price: minPrice > 0 ? minPrice : exitPrice,
         contracts,
         exit_reason: exitReason
       });
