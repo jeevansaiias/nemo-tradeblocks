@@ -21,6 +21,10 @@ import { PremiumEfficiencyChart } from '@/components/performance-charts/premium-
 import { MarginUtilizationChart } from '@/components/performance-charts/margin-utilization-chart'
 import { ExitReasonChart } from '@/components/performance-charts/exit-reason-chart'
 import { HoldingDurationChart } from '@/components/performance-charts/holding-duration-chart'
+import { MFEMAEScatterChart } from '@/components/performance-charts/mfe-mae-scatter-chart'
+import { ProfitCaptureChart } from '@/components/performance-charts/profit-capture-chart'
+import { ExcursionDistributionChart } from '@/components/performance-charts/excursion-distribution-chart'
+import { ExcursionRatioChart } from '@/components/performance-charts/excursion-ratio-chart'
 
 // UI Components
 import { MultiSelect } from '@/components/multi-select'
@@ -33,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function PerformanceBlocksPage() {
   // Block store
@@ -201,48 +206,60 @@ export default function PerformanceBlocksPage() {
         </Badge>
       </div>
 
-      {/* Main Equity Analysis - Full Width */}
-      <EquityCurveChart />
+      {/* Tabbed Interface */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="returns">Returns Analysis</TabsTrigger>
+          <TabsTrigger value="risk">Risk & Margin</TabsTrigger>
+          <TabsTrigger value="efficiency">Trade Efficiency</TabsTrigger>
+          <TabsTrigger value="excursion">Excursion Analysis</TabsTrigger>
+        </TabsList>
 
-      {/* Drawdown Analysis - Full Width */}
-      <DrawdownChart />
+        {/* Tab 1: Overview */}
+        <TabsContent value="overview" className="space-y-6">
+          <EquityCurveChart />
+          <DrawdownChart />
+          <WinLossStreaksChart />
+          <MonthlyReturnsChart />
+        </TabsContent>
 
-      {/* Win/Loss Streaks - Full Width */}
-      <WinLossStreaksChart />
+        {/* Tab 2: Returns Analysis */}
+        <TabsContent value="returns" className="space-y-6">
+          <ReturnDistributionChart />
+          <DayOfWeekChart />
+          <TradeSequenceChart />
+          <RollingMetricsChart />
+          <VixRegimeChart />
+        </TabsContent>
 
-      {/* Return on Margin Timeline - Full Width */}
-      <ROMTimelineChart />
+        {/* Tab 3: Risk & Margin */}
+        <TabsContent value="risk" className="space-y-6">
+          <ROMTimelineChart />
+          <MarginUtilizationChart />
+          <RiskEvolutionChart />
+          <HoldingDurationChart />
+        </TabsContent>
 
-      {/* Margin Utilization - Full Width */}
-      <MarginUtilizationChart />
+        {/* Tab 4: Trade Efficiency */}
+        <TabsContent value="efficiency" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ExitReasonChart />
+            <PremiumEfficiencyChart />
+          </div>
+          {/* Additional efficiency metrics can go here */}
+        </TabsContent>
 
-      {/* Distribution and Pattern Analysis - Two Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ReturnDistributionChart />
-        <DayOfWeekChart />
-      </div>
-
-      {/* Monthly and Trade Analysis - Two Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MonthlyReturnsChart />
-        <TradeSequenceChart />
-      </div>
-
-      {/* Rolling Analysis - Two Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RollingMetricsChart />
-        <RiskEvolutionChart />
-      </div>
-
-      {/* Market Regime & Exit Diagnostics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <VixRegimeChart className="lg:col-span-2" />
-        <ExitReasonChart />
-        <PremiumEfficiencyChart />
-      </div>
-
-      {/* Trade Duration */}
-      <HoldingDurationChart />
+        {/* Tab 5: Excursion Analysis */}
+        <TabsContent value="excursion" className="space-y-6">
+          <MFEMAEScatterChart />
+          <ProfitCaptureChart />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ExcursionDistributionChart />
+            <ExcursionRatioChart />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
