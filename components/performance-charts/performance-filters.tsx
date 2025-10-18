@@ -96,18 +96,14 @@ export function PerformanceFilters({ className }: PerformanceFiltersProps) {
     setDateRange({
       from,
       to,
-      preset: preset as "all" | "ytd" | "1y" | "6m" | "3m" | "1m",
     });
   };
 
   const getFilterSummary = () => {
     const parts: string[] = [];
 
-    if (dateRange.preset !== "all") {
-      parts.push(
-        DATE_RANGE_OPTIONS.find((opt) => opt.value === dateRange.preset)
-          ?.label || "Custom"
-      );
+    if (dateRange.from || dateRange.to) {
+      parts.push("Custom range");
     }
 
     if (selectedStrategies.length > 0) {
@@ -135,7 +131,7 @@ export function PerformanceFilters({ className }: PerformanceFiltersProps) {
               Date Range
             </Label>
             <Select
-              value={dateRange.preset}
+              value="all"
               onValueChange={handleDateRangeChange}
             >
               <SelectTrigger className="w-[150px]" id="date-range">

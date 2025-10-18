@@ -279,7 +279,7 @@ export function ChartWrapper({
               divId={chartId}
               data={data}
               layout={themedLayout}
-              config={enhancedConfig}
+              config={enhancedConfig as unknown as Parameters<typeof Plot>[0]['config']}
               onInitialized={onInitialized}
               onUpdate={onUpdate}
               style={style}
