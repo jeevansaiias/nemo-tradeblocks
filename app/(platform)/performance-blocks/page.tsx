@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useBlockStore } from '@/lib/stores/block-store'
-import { usePerformanceStore, type DateRange } from '@/lib/stores/performance-store'
-import { AlertTriangle, Loader2, Calendar } from 'lucide-react'
+import { usePerformanceStore } from '@/lib/stores/performance-store'
+import { AlertTriangle, Loader2, CalendarIcon } from 'lucide-react'
+import { DateRange } from 'react-day-picker'
+import { format } from 'date-fns'
 
 // Chart Components
 import { EquityCurveChart } from '@/components/performance-charts/equity-curve-chart'
@@ -25,14 +27,14 @@ import { HoldingDurationChart } from '@/components/performance-charts/holding-du
 // UI Components
 import { MultiSelect } from '@/components/multi-select'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { cn } from '@/lib/utils'
 
 export default function PerformanceBlocksPage() {
   // Block store
@@ -50,10 +52,21 @@ export default function PerformanceBlocksPage() {
     error,
     fetchPerformanceData,
     data,
-    dateRange,
     setDateRange,
     setSelectedStrategies
   } = usePerformanceStore()
+
+  // Local state for date range picker
+  const [dateRange, setLocalDateRange] = useState<DateRange | undefined>(undefined)
+
+  // Handle date range changes
+  const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
+    setLocalDateRange(newDateRange)
+    setDateRange({
+      from: newDateRange?.from,
+      to: newDateRange?.to
+    })
+  }
 
   // Initialize blocks if needed
   useEffect(() => {
@@ -72,19 +85,6 @@ export default function PerformanceBlocksPage() {
   }, [activeBlockId, fetchPerformanceData])
 
   // Helper functions
-  const getDateRange = () => {
-    if (!data || data.trades.length === 0) return "No trades"
-
-    const sortedTrades = [...data.trades].sort((a, b) =>
-      new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
-    )
-
-    const startDate = new Date(sortedTrades[0].dateOpened).toLocaleDateString()
-    const endDate = new Date(sortedTrades[sortedTrades.length - 1].dateOpened).toLocaleDateString()
-
-    return `${startDate} to ${endDate}`
-  }
-
   const getStrategyOptions = () => {
     if (!data || data.allTrades.length === 0) return []
 
@@ -168,22 +168,37 @@ export default function PerformanceBlocksPage() {
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
           <Label>Date Range</Label>
-          <Select
-            value={dateRange.preset}
-            onValueChange={(value) => setDateRange({ ...dateRange, preset: value as DateRange['preset'] })}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="ytd">Year to Date</SelectItem>
-              <SelectItem value="1y">Last 12 Months</SelectItem>
-              <SelectItem value="6m">Last 6 Months</SelectItem>
-              <SelectItem value="3m">Last 3 Months</SelectItem>
-              <SelectItem value="1m">Last Month</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>All time</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <DateRangePicker
+                date={dateRange}
+                onDateChange={handleDateRangeChange}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2 flex-1 min-w-[250px]">
           <Label>Strategies</Label>
@@ -195,10 +210,6 @@ export default function PerformanceBlocksPage() {
             className="w-full"
           />
         </div>
-        <Badge variant="outline" className="text-xs">
-          <Calendar className="w-3 h-3 mr-1" />
-          {getDateRange()}
-        </Badge>
       </div>
 
       {/* Main Equity Analysis - Full Width */}
