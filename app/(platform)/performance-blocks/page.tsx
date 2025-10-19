@@ -1,53 +1,57 @@
 "use client";
 
-import { useEffect } from 'react'
-import { useBlockStore } from '@/lib/stores/block-store'
-import { usePerformanceStore, type DateRange } from '@/lib/stores/performance-store'
-import { AlertTriangle, Loader2, Calendar } from 'lucide-react'
+import { useBlockStore } from "@/lib/stores/block-store";
+import { usePerformanceStore } from "@/lib/stores/performance-store";
+import { format } from "date-fns";
+import { AlertTriangle, CalendarIcon, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { DateRange } from "react-day-picker";
 
 // Chart Components
-import { EquityCurveChart } from '@/components/performance-charts/equity-curve-chart'
-import { DrawdownChart } from '@/components/performance-charts/drawdown-chart'
-import { DayOfWeekChart } from '@/components/performance-charts/day-of-week-chart'
-import { ReturnDistributionChart } from '@/components/performance-charts/return-distribution-chart'
-import { WinLossStreaksChart } from '@/components/performance-charts/win-loss-streaks-chart'
-import { MonthlyReturnsChart } from '@/components/performance-charts/monthly-returns-chart'
-import { TradeSequenceChart } from '@/components/performance-charts/trade-sequence-chart'
-import { RollingMetricsChart } from '@/components/performance-charts/rolling-metrics-chart'
-import { RiskEvolutionChart } from '@/components/performance-charts/risk-evolution-chart'
-import { ROMTimelineChart } from '@/components/performance-charts/rom-timeline-chart'
-import { VixRegimeChart } from '@/components/performance-charts/vix-regime-chart'
-import { PremiumEfficiencyChart } from '@/components/performance-charts/premium-efficiency-chart'
-import { MarginUtilizationChart } from '@/components/performance-charts/margin-utilization-chart'
-import { ExitReasonChart } from '@/components/performance-charts/exit-reason-chart'
-import { HoldingDurationChart } from '@/components/performance-charts/holding-duration-chart'
-import { MFEMAEScatterChart } from '@/components/performance-charts/mfe-mae-scatter-chart'
-import { ProfitCaptureChart } from '@/components/performance-charts/profit-capture-chart'
-import { ExcursionDistributionChart } from '@/components/performance-charts/excursion-distribution-chart'
-import { ExcursionRatioChart } from '@/components/performance-charts/excursion-ratio-chart'
+import { DayOfWeekChart } from "@/components/performance-charts/day-of-week-chart";
+import { DrawdownChart } from "@/components/performance-charts/drawdown-chart";
+import { EquityCurveChart } from "@/components/performance-charts/equity-curve-chart";
+import { ExcursionDistributionChart } from "@/components/performance-charts/excursion-distribution-chart";
+import { ExcursionRatioChart } from "@/components/performance-charts/excursion-ratio-chart";
+import { ExitReasonChart } from "@/components/performance-charts/exit-reason-chart";
+import { HoldingDurationChart } from "@/components/performance-charts/holding-duration-chart";
+import { MarginUtilizationChart } from "@/components/performance-charts/margin-utilization-chart";
+import { MFEMAEScatterChart } from "@/components/performance-charts/mfe-mae-scatter-chart";
+import { MonthlyReturnsChart } from "@/components/performance-charts/monthly-returns-chart";
+import { PremiumEfficiencyChart } from "@/components/performance-charts/premium-efficiency-chart";
+import { ProfitCaptureChart } from "@/components/performance-charts/profit-capture-chart";
+import { ReturnDistributionChart } from "@/components/performance-charts/return-distribution-chart";
+import { RiskEvolutionChart } from "@/components/performance-charts/risk-evolution-chart";
+import { RollingMetricsChart } from "@/components/performance-charts/rolling-metrics-chart";
+import { ROMTimelineChart } from "@/components/performance-charts/rom-timeline-chart";
+import { TradeSequenceChart } from "@/components/performance-charts/trade-sequence-chart";
+import { VixRegimeChart } from "@/components/performance-charts/vix-regime-chart";
+import { WinLossStreaksChart } from "@/components/performance-charts/win-loss-streaks-chart";
 
 // UI Components
-import { MultiSelect } from '@/components/multi-select'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { MultiSelect } from "@/components/multi-select";
+import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 export default function PerformanceBlocksPage() {
   // Block store
-  const activeBlock = useBlockStore(state => {
-    const activeBlockId = state.activeBlockId
-    return activeBlockId ? state.blocks.find(block => block.id === activeBlockId) : null
-  })
-  const isBlockLoading = useBlockStore(state => state.isLoading)
-  const blockIsInitialized = useBlockStore(state => state.isInitialized)
-  const loadBlocks = useBlockStore(state => state.loadBlocks)
+  const activeBlock = useBlockStore((state) => {
+    const activeBlockId = state.activeBlockId;
+    return activeBlockId
+      ? state.blocks.find((block) => block.id === activeBlockId)
+      : null;
+  });
+  const isBlockLoading = useBlockStore((state) => state.isLoading);
+  const blockIsInitialized = useBlockStore((state) => state.isInitialized);
+  const loadBlocks = useBlockStore((state) => state.loadBlocks);
 
   // Performance store
   const {
@@ -55,50 +59,52 @@ export default function PerformanceBlocksPage() {
     error,
     fetchPerformanceData,
     data,
-    dateRange,
     setDateRange,
-    setSelectedStrategies
-  } = usePerformanceStore()
+    setSelectedStrategies,
+  } = usePerformanceStore();
+
+  // Local state for date range picker
+  const [dateRange, setLocalDateRange] = useState<DateRange | undefined>(
+    undefined
+  );
+
+  // Handle date range changes
+  const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
+    setLocalDateRange(newDateRange);
+    setDateRange({
+      from: newDateRange?.from,
+      to: newDateRange?.to,
+    });
+  };
 
   // Initialize blocks if needed
   useEffect(() => {
     if (!blockIsInitialized) {
-      loadBlocks().catch(console.error)
+      loadBlocks().catch(console.error);
     }
-  }, [blockIsInitialized, loadBlocks])
+  }, [blockIsInitialized, loadBlocks]);
 
   // Fetch performance data when active block changes
-  const activeBlockId = activeBlock?.id
+  const activeBlockId = activeBlock?.id;
 
   useEffect(() => {
-    if (!activeBlockId) return
+    if (!activeBlockId) return;
 
-    fetchPerformanceData(activeBlockId).catch(console.error)
-  }, [activeBlockId, fetchPerformanceData])
+    fetchPerformanceData(activeBlockId).catch(console.error);
+  }, [activeBlockId, fetchPerformanceData]);
 
   // Helper functions
-  const getDateRange = () => {
-    if (!data || data.trades.length === 0) return "No trades"
-
-    const sortedTrades = [...data.trades].sort((a, b) =>
-      new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
-    )
-
-    const startDate = new Date(sortedTrades[0].dateOpened).toLocaleDateString()
-    const endDate = new Date(sortedTrades[sortedTrades.length - 1].dateOpened).toLocaleDateString()
-
-    return `${startDate} to ${endDate}`
-  }
-
   const getStrategyOptions = () => {
-    if (!data || data.allTrades.length === 0) return []
+    if (!data || data.allTrades.length === 0) return [];
 
-    const uniqueStrategies = [...new Set(data.allTrades.map(trade => trade.strategy || 'Unknown'))]
-    return uniqueStrategies.map(strategy => ({
+    const uniqueStrategies = [
+      ...new Set(data.allTrades.map((trade) => trade.strategy || "Unknown")),
+    ];
+    return uniqueStrategies.map((strategy) => ({
       label: strategy,
       value: strategy,
-    }))
-  }
+    }));
+  };
 
   // Show loading state
   if (!blockIsInitialized || isBlockLoading) {
@@ -109,7 +115,7 @@ export default function PerformanceBlocksPage() {
           <p className="text-muted-foreground">Loading blocks...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Show message if no active block
@@ -118,13 +124,16 @@ export default function PerformanceBlocksPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center max-w-md">
           <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Active Block Selected</h3>
+          <h3 className="text-lg font-semibold mb-2">
+            No Active Block Selected
+          </h3>
           <p className="text-muted-foreground mb-4">
-            Please select a block from the sidebar to view its performance analysis.
+            Please select a block from the sidebar to view its performance
+            analysis.
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   // Show loading state for performance data
@@ -133,10 +142,12 @@ export default function PerformanceBlocksPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading {activeBlock.name} performance data...</p>
+          <p className="text-muted-foreground">
+            Loading {activeBlock.name} performance data...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   // Show error state
@@ -145,11 +156,13 @@ export default function PerformanceBlocksPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center max-w-md">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Error Loading Performance Data</h3>
+          <h3 className="text-lg font-semibold mb-2">
+            Error Loading Performance Data
+          </h3>
           <p className="text-muted-foreground mb-4">{error}</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Show empty state if no data
@@ -160,11 +173,12 @@ export default function PerformanceBlocksPage() {
           <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Trade Data</h3>
           <p className="text-muted-foreground mb-4">
-            This block doesn&apos;t contain any trades yet. Upload trading data to see performance analytics.
+            This block doesn&apos;t contain any trades yet. Upload trading data
+            to see performance analytics.
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -173,22 +187,37 @@ export default function PerformanceBlocksPage() {
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
           <Label>Date Range</Label>
-          <Select
-            value={dateRange.preset}
-            onValueChange={(value) => setDateRange({ ...dateRange, preset: value as DateRange['preset'] })}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="ytd">Year to Date</SelectItem>
-              <SelectItem value="1y">Last 12 Months</SelectItem>
-              <SelectItem value="6m">Last 6 Months</SelectItem>
-              <SelectItem value="3m">Last 3 Months</SelectItem>
-              <SelectItem value="1m">Last Month</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>All time</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <DateRangePicker
+                date={dateRange}
+                onDateChange={handleDateRangeChange}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="space-y-2 flex-1 min-w-[250px]">
           <Label>Strategies</Label>
@@ -200,10 +229,6 @@ export default function PerformanceBlocksPage() {
             className="w-full"
           />
         </div>
-        <Badge variant="outline" className="text-xs">
-          <Calendar className="w-3 h-3 mr-1" />
-          {getDateRange()}
-        </Badge>
       </div>
 
       {/* Tabbed Interface */}
@@ -261,5 +286,5 @@ export default function PerformanceBlocksPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
