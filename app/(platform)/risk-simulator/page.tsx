@@ -48,6 +48,7 @@ import {
   timeToTrades,
   type TimeUnit,
 } from "@/lib/utils/time-conversions";
+import { estimateTradesPerYear } from "@/lib/utils/trade-frequency";
 import { HelpCircle, Play, RotateCcw } from "lucide-react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
@@ -188,6 +189,8 @@ export default function RiskSimulatorPage() {
           ? trades.filter((t) => selectedStrategies.includes(t.strategy || ""))
           : trades;
 
+      const isStrategyFiltered = filteredTrades.length !== trades.length;
+
       if (filteredTrades.length === 0) {
         setError("No trades match the selected strategies");
         setIsRunning(false);
@@ -200,14 +203,44 @@ export default function RiskSimulatorPage() {
           ? undefined
           : percentageToTrades(resamplePercentage, filteredTrades.length);
 
+      // IMPORTANT: For percentage mode with filtered strategies from multi-strategy portfolios,
+      // we need to provide the historical initial capital to avoid contamination from
+      // other strategies' P&L in fundsAtClose values.
+      //
+      // The user's initialCapital in the UI represents what they want to START with for
+      // the simulation. We use this same value to reconstruct the capital trajectory
+      // when calculating percentage returns for filtered strategies.
+      let historicalInitialCapital: number | undefined;
+      if (isStrategyFiltered && resampleMethod === "percentage") {
+        // We're excluding at least one strategy. Use the UI's initial capital
+        // so percentage returns are reconstructed from only the filtered P&L.
+        historicalInitialCapital = initialCapital;
+      }
+
+      const effectiveTradesPerYear = isStrategyFiltered
+        ? estimateTradesPerYear(filteredTrades, tradesPerYear)
+        : tradesPerYear;
+
+      const effectiveSimulationLength = isStrategyFiltered
+        ? Math.max(
+            1,
+            timeToTrades(
+              simulationPeriodValue,
+              simulationPeriodUnit,
+              effectiveTradesPerYear
+            )
+          )
+        : simulationLength;
+
       const params: MonteCarloParams = {
         numSimulations,
-        simulationLength,
+        simulationLength: effectiveSimulationLength,
         resampleWindow,
         resampleMethod,
         initialCapital,
+        historicalInitialCapital, // Only set when simulating a subset of strategies
         strategy: undefined, // We pre-filter trades instead
-        tradesPerYear,
+        tradesPerYear: effectiveTradesPerYear,
         randomSeed: useFixedSeed ? seedValue : undefined,
         normalizeTo1Lot,
       };

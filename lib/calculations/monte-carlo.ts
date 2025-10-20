@@ -30,6 +30,13 @@ export interface MonteCarloParams {
   /** Starting capital for simulations */
   initialCapital: number;
 
+  /**
+   * Historical initial capital for calculating percentage returns
+   * Only needed for filtered strategies from multi-strategy portfolios
+   * If not provided, will infer from first trade's fundsAtClose
+   */
+  historicalInitialCapital?: number;
+
   /** Filter to specific strategy (optional) */
   strategy?: string;
 
@@ -322,20 +329,21 @@ export function getDailyResamplePool(
 }
 
 /**
- * Calculate percentage returns from trades based on HISTORICAL capital at trade time
+ * Calculate percentage returns from trades based on capital at trade time
  * This properly accounts for compounding strategies where position sizes grow with equity
  *
- * IMPORTANT: Uses the actual historical account values to compute percentages, NOT the
- * user's chosen initial capital. This ensures that when users scale up/down their starting
- * capital in simulations, the percentage returns scale proportionally.
+ * IMPORTANT: For filtered strategies from multi-strategy portfolios, the initialCapital
+ * parameter must be provided to avoid contamination from other strategies' P&L in fundsAtClose.
  *
  * @param trades - Trades to calculate percentage returns from
  * @param normalizeTo1Lot - Whether to scale P&L to 1-lot before calculating percentage
+ * @param initialCapital - Starting capital for this strategy (required for accurate filtered results)
  * @returns Array of percentage returns (as decimals, e.g., 0.05 = 5%)
  */
 export function calculatePercentageReturns(
   trades: Trade[],
-  normalizeTo1Lot?: boolean
+  normalizeTo1Lot?: boolean,
+  initialCapital?: number
 ): number[] {
   if (trades.length === 0) {
     return [];
@@ -348,9 +356,16 @@ export function calculatePercentageReturns(
 
   const percentageReturns: number[] = [];
 
-  // Calculate HISTORICAL initial capital from the first trade
-  const firstTrade = sortedTrades[0];
-  let capital = firstTrade.fundsAtClose - firstTrade.pl;
+  // Determine starting capital
+  let capital: number;
+  if (initialCapital !== undefined && initialCapital > 0) {
+    // Use provided initial capital (for filtered strategies)
+    capital = initialCapital;
+  } else {
+    // Infer from first trade's fundsAtClose (for single-strategy portfolios)
+    const firstTrade = sortedTrades[0];
+    capital = firstTrade.fundsAtClose - firstTrade.pl;
+  }
 
   for (const trade of sortedTrades) {
     if (capital <= 0) {
@@ -362,12 +377,12 @@ export function calculatePercentageReturns(
     // Get trade P&L (optionally normalized)
     const pl = normalizeTo1Lot ? scaleTradeToOneLot(trade) : trade.pl;
 
-    // Calculate percentage return based on HISTORICAL capital at trade time
-    // This ensures percentages are independent of user's chosen simulation capital
+    // Calculate percentage return based on current capital
     const percentageReturn = pl / capital;
     percentageReturns.push(percentageReturn);
 
-    // Update capital for next trade using historical account values
+    // Update capital for next trade using ONLY this strategy's P&L
+    // This ensures filtered strategies track their own capital independently
     capital += pl;
   }
 
@@ -619,7 +634,8 @@ export function runMonteCarloSimulation(
 
     const percentageReturns = calculatePercentageReturns(
       filteredTrades,
-      params.normalizeTo1Lot
+      params.normalizeTo1Lot,
+      params.historicalInitialCapital // Use historical capital (if provided) to reconstruct trajectory
     );
     const percentagePool = getPercentageResamplePool(
       percentageReturns,

@@ -9,6 +9,8 @@ import {
   runMonteCarloSimulation,
 } from "@/lib/calculations/monte-carlo";
 import { Trade } from "@/lib/models/trade";
+import { estimateTradesPerYear } from "@/lib/utils/trade-frequency";
+import { timeToTrades } from "@/lib/utils/time-conversions";
 
 // Helper to create mock trades with proper fundsAtClose values
 function createMockTrade(
@@ -415,5 +417,73 @@ describe("Percentage mode vs Dollar mode comparison", () => {
 
     // Percentage mode max drawdown should be < 100% for this scenario
     expect(percentageResult.statistics.meanMaxDrawdown).toBeLessThan(1.0);
+  });
+});
+
+describe("Filtered strategy simulations", () => {
+  const baseCapital = 500000;
+
+  const createFilteredStrategyTrades = (): Trade[] => {
+    const trades: Trade[] = [];
+    const start = new Date("2024-01-01");
+    let contaminatedFunds = 25000000; // Includes other strategies
+
+    for (let i = 0; i < 23; i++) {
+      const date = new Date(start.getTime() + i * 10 * 24 * 60 * 60 * 1000);
+      const isWin = i % 3 !== 0;
+      const percent = isWin ? 0.12 : -0.07;
+      const pl = Math.round(baseCapital * percent);
+      contaminatedFunds += pl + 100000; // Other strategies move account equity
+      trades.push({
+        ...createMockTrade(pl, 1, date, contaminatedFunds),
+        strategy: "8/10 DC",
+      });
+    }
+
+    return trades;
+  };
+
+  it("keeps annualized returns bounded once filtered frequency is respected", () => {
+    const trades = createFilteredStrategyTrades();
+    const fallbackTradesPerYear = 1190;
+    const simulationPeriodValue = 6;
+    const simulationPeriodUnit = "months" as const;
+
+    const runawayParams = {
+      numSimulations: 200,
+      simulationLength: timeToTrades(
+        simulationPeriodValue,
+        simulationPeriodUnit,
+        fallbackTradesPerYear
+      ),
+      resampleMethod: "percentage" as const,
+      initialCapital: baseCapital,
+      historicalInitialCapital: baseCapital,
+      tradesPerYear: fallbackTradesPerYear,
+      randomSeed: 42,
+    };
+
+    const runaway = runMonteCarloSimulation(trades, runawayParams);
+    expect(runaway.statistics.meanTotalReturn).toBeGreaterThan(1e6);
+
+    const adjustedTradesPerYear = estimateTradesPerYear(
+      trades,
+      fallbackTradesPerYear
+    );
+    expect(adjustedTradesPerYear).toBeLessThan(fallbackTradesPerYear);
+    expect(adjustedTradesPerYear).toBeGreaterThan(10);
+
+    const adjustedParams = {
+      ...runawayParams,
+      tradesPerYear: adjustedTradesPerYear,
+      simulationLength: timeToTrades(
+        simulationPeriodValue,
+        simulationPeriodUnit,
+        adjustedTradesPerYear
+      ),
+    };
+
+    const adjusted = runMonteCarloSimulation(trades, adjustedParams);
+    expect(adjusted.statistics.meanTotalReturn).toBeLessThan(100);
   });
 });
