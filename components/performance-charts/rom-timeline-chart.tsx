@@ -51,27 +51,33 @@ export function ROMTimelineChart({ className }: ROMTimelineChartProps) {
     // Moving average overlay
     if (maPeriod !== 'none' && romValues.length >= 2) {
       const period = parseInt(maPeriod)
-      const ma: number[] = []
 
-      for (let i = 0; i < romValues.length; i++) {
-        const start = Math.max(0, i - period + 1)
-        const window = romValues.slice(start, i + 1)
-        const avg = window.reduce((sum, val) => sum + val, 0) / window.length
-        ma.push(avg)
+      // Only display MA if we have enough data points for a full window
+      if (romValues.length >= period) {
+        const ma: number[] = []
+        const maDates: string[] = []
+
+        // Start from the first point where we have a full window
+        for (let i = period - 1; i < romValues.length; i++) {
+          const window = romValues.slice(i - period + 1, i + 1)
+          const avg = window.reduce((sum, val) => sum + val, 0) / window.length
+          ma.push(avg)
+          maDates.push(dates[i])
+        }
+
+        traces.push({
+          x: maDates,
+          y: ma,
+          type: 'scatter',
+          mode: 'lines',
+          name: `${period}-point MA`,
+          line: {
+            color: '#dc2626',
+            width: 2
+          },
+          hovertemplate: `<b>%{x}</b><br>MA: %{y:.1f}%<extra></extra>`
+        })
       }
-
-      traces.push({
-        x: dates,
-        y: ma,
-        type: 'scatter',
-        mode: 'lines',
-        name: `${period}-point MA`,
-        line: {
-          color: '#dc2626',
-          width: 2
-        },
-        hovertemplate: `<b>%{x}</b><br>MA: %{y:.1f}%<extra></extra>`
-      })
     }
 
     // Calculate mean ROM
