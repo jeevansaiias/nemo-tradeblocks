@@ -1,6 +1,7 @@
 import { Trade } from "@/lib/models/trade";
 
 export const MIN_TRADES_PER_YEAR = 10;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 /**
  * Estimate annual trade frequency from a sample of trades.
@@ -22,8 +23,7 @@ export function estimateTradesPerYear(
 
   const firstDate = sortedTrades[0].dateOpened;
   const lastDate = sortedTrades[sortedTrades.length - 1].dateOpened;
-  const daysElapsed =
-    (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
+  const daysElapsed = (lastDate.getTime() - firstDate.getTime()) / MS_PER_DAY;
 
   if (daysElapsed <= 0) {
     return Math.max(MIN_TRADES_PER_YEAR, fallback);
