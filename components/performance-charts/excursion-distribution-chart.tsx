@@ -61,7 +61,8 @@ export function ExcursionDistributionChart({ className }: ExcursionDistributionC
       barmode: 'group',
       xaxis: {
         title: { text: 'Excursion Range (%)' },
-        showgrid: true
+        showgrid: true,
+        tickangle: -45
       },
       yaxis: {
         title: { text: 'Number of Trades' },
@@ -75,7 +76,10 @@ export function ExcursionDistributionChart({ className }: ExcursionDistributionC
         xanchor: 'right',
         x: 1
       },
-      hovermode: 'closest'
+      hovermode: 'closest',
+      margin: {
+        b: 80
+      }
     }
 
     return { plotData: traces, layout: chartLayout }

@@ -28,44 +28,78 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
       return { plotData: [], layout: {}, stats: null }
     }
 
-    const tradeNumbers = validData.map(d => d.tradeNumber)
-    const profitCaptures = validData.map(d => d.profitCapturePercent!)
-    const colors = validData.map(d => d.isWinner ? '#22c55e' : '#ef4444')
+    // Split into winners and losers
+    const winners = validData.filter(d => d.isWinner)
+    const losers = validData.filter(d => !d.isWinner)
 
     const traces: Partial<PlotData>[] = []
 
-    // Scatter plot for profit capture
-    traces.push({
-      x: tradeNumbers,
-      y: profitCaptures,
-      type: 'scatter',
-      mode: 'markers',
-      name: 'Profit Capture',
-      marker: {
-        color: colors,
-        size: 8,
-        opacity: 0.7
-      },
-      customdata: validData.map(d => ({
-        date: d.date.toLocaleDateString(),
-        strategy: d.strategy,
-        pl: d.pl,
-        mfe: d.mfe,
-        mae: d.mae
-      })),
-      hovertemplate:
-        '<b>Trade #%{x}</b><br>' +
-        'Profit Capture: %{y:.1f}%<br>' +
-        'Strategy: %{customdata.strategy}<br>' +
-        'Date: %{customdata.date}<br>' +
-        'P&L: $%{customdata.pl:.0f}<br>' +
-        'MFE: $%{customdata.mfe:.0f}<br>' +
-        '<extra></extra>'
-    })
+    // Winners scatter plot
+    if (winners.length > 0) {
+      traces.push({
+        x: winners.map(d => d.tradeNumber),
+        y: winners.map(d => d.profitCapturePercent!),
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Winners',
+        marker: {
+          color: '#22c55e',
+          size: 8,
+          opacity: 0.7
+        },
+        customdata: winners.map(d => ({
+          date: d.date.toLocaleDateString(),
+          strategy: d.strategy,
+          pl: d.pl,
+          mfe: d.mfe,
+          mae: d.mae
+        })),
+        hovertemplate:
+          '<b>Trade #%{x}</b><br>' +
+          'Profit Capture: %{y:.1f}%<br>' +
+          'Strategy: %{customdata.strategy}<br>' +
+          'Date: %{customdata.date}<br>' +
+          'P&L: $%{customdata.pl:.0f}<br>' +
+          'MFE: $%{customdata.mfe:.0f}<br>' +
+          '<extra></extra>'
+      })
+    }
+
+    // Losers scatter plot
+    if (losers.length > 0) {
+      traces.push({
+        x: losers.map(d => d.tradeNumber),
+        y: losers.map(d => d.profitCapturePercent!),
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Losers',
+        marker: {
+          color: '#ef4444',
+          size: 8,
+          opacity: 0.7
+        },
+        customdata: losers.map(d => ({
+          date: d.date.toLocaleDateString(),
+          strategy: d.strategy,
+          pl: d.pl,
+          mfe: d.mfe,
+          mae: d.mae
+        })),
+        hovertemplate:
+          '<b>Trade #%{x}</b><br>' +
+          'Profit Capture: %{y:.1f}%<br>' +
+          'Strategy: %{customdata.strategy}<br>' +
+          'Date: %{customdata.date}<br>' +
+          'P&L: $%{customdata.pl:.0f}<br>' +
+          'MFE: $%{customdata.mfe:.0f}<br>' +
+          '<extra></extra>'
+      })
+    }
 
     // Add 100% reference line
+    const allTradeNumbers = validData.map(d => d.tradeNumber)
     traces.push({
-      x: [Math.min(...tradeNumbers), Math.max(...tradeNumbers)],
+      x: [Math.min(...allTradeNumbers), Math.max(...allTradeNumbers)],
       y: [100, 100],
       type: 'scatter',
       mode: 'lines',
@@ -82,7 +116,7 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
     // Add average line if we have stats
     if (mfeMaeStats) {
       traces.push({
-        x: [Math.min(...tradeNumbers), Math.max(...tradeNumbers)],
+        x: [Math.min(...allTradeNumbers), Math.max(...allTradeNumbers)],
         y: [mfeMaeStats.avgProfitCapturePercent, mfeMaeStats.avgProfitCapturePercent],
         type: 'scatter',
         mode: 'lines',
