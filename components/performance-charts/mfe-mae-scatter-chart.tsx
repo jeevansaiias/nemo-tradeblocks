@@ -1,9 +1,16 @@
 "use client"
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ChartWrapper } from './chart-wrapper'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
 import type { Layout, PlotData } from 'plotly.js'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { NORMALIZATION_BASES, type NormalizationBasis } from '@/lib/calculations/mfe-mae'
+
+const basisLabels: Record<NormalizationBasis, string> = {
+  premium: 'Collected Premium',
+  margin: 'Margin Requirement'
+}
 
 interface MFEMAEScatterChartProps {
   className?: string
@@ -11,34 +18,52 @@ interface MFEMAEScatterChartProps {
 
 export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
   const { data } = usePerformanceStore()
+  const [selectedBasis, setSelectedBasis] = useState<NormalizationBasis | null>(null)
+
+  const basisOptions = useMemo(() => {
+    if (!data?.mfeMaeData) {
+      return NORMALIZATION_BASES.map(basis => ({ value: basis, label: `${basisLabels[basis]} (0)`, disabled: true }))
+    }
+
+    return NORMALIZATION_BASES.map(basis => {
+      const count = data.mfeMaeData.filter(point => point.normalizedBy?.[basis]).length
+      return {
+        value: basis,
+        label: `${basisLabels[basis]} (${count})`,
+        disabled: count === 0
+      }
+    })
+  }, [data])
+
+  useEffect(() => {
+    const firstAvailable = basisOptions.find(option => !option.disabled)?.value ?? null
+    setSelectedBasis(prev => (prev && !basisOptions.find(option => option.value === prev && option.disabled) ? prev : firstAvailable))
+  }, [basisOptions])
 
   const { plotData, layout } = useMemo(() => {
-    if (!data?.mfeMaeData || data.mfeMaeData.length === 0) {
+    if (!data?.mfeMaeData || data.mfeMaeData.length === 0 || !selectedBasis) {
       return { plotData: [], layout: {} }
     }
 
     const { mfeMaeData } = data
 
-    // Filter to only trades with both MFE and MAE percentages
-    const validData = mfeMaeData.filter(d =>
-      d.maePercent !== undefined && d.mfePercent !== undefined
-    )
+    const basisData = mfeMaeData.filter(d => d.normalizedBy?.[selectedBasis])
 
-    if (validData.length === 0) {
+    if (basisData.length === 0) {
       return { plotData: [], layout: {} }
     }
 
     // Split into winners and losers
-    const winners = validData.filter(d => d.isWinner)
-    const losers = validData.filter(d => !d.isWinner)
+    const winners = basisData.filter(d => d.isWinner)
+    const losers = basisData.filter(d => !d.isWinner)
 
     const traces: Partial<PlotData>[] = []
 
     // Winners scatter plot
     if (winners.length > 0) {
       traces.push({
-        x: winners.map(d => d.maePercent),
-        y: winners.map(d => d.mfePercent),
+        x: winners.map(d => d.normalizedBy[selectedBasis]!.maePercent),
+        y: winners.map(d => d.normalizedBy[selectedBasis]!.mfePercent),
         type: 'scatter',
         mode: 'markers',
         name: 'Winners',
@@ -56,7 +81,12 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
           strategy: d.strategy,
           pl: d.pl,
           date: d.date.toLocaleDateString(),
-          profitCapture: d.profitCapturePercent?.toFixed(1) || 'N/A'
+          profitCapture: d.profitCapturePercent?.toFixed(1) || 'N/A',
+          basisLabel: basisLabels[selectedBasis],
+          denominatorLabel: d.normalizedBy[selectedBasis]?.denominator ? `$${d.normalizedBy[selectedBasis]!.denominator.toLocaleString()}` : '—',
+          maeRaw: d.mae,
+          mfeRaw: d.mfe,
+          plPercent: `${d.normalizedBy[selectedBasis]!.plPercent.toFixed(1)}%`
         })),
         hovertemplate:
           '<b>Winner - Trade #%{customdata.trade}</b><br>' +
@@ -65,7 +95,12 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
           'MAE: %{x:.1f}%<br>' +
           'MFE: %{y:.1f}%<br>' +
           'P&L: $%{customdata.pl:.0f}<br>' +
-          'Profit Capture: %{customdata.profitCapture}%' +
+          'Profit Capture: %{customdata.profitCapture}%<br>' +
+          'Normalization: %{customdata.basisLabel}<br>' +
+          'Denominator: %{customdata.denominatorLabel}<br>' +
+          'Raw MAE: $%{customdata.maeRaw:.0f}<br>' +
+          'Raw MFE: $%{customdata.mfeRaw:.0f}<br>' +
+          'P&L Normalized: %{customdata.plPercent}' +
           '<extra></extra>'
       })
     }
@@ -73,8 +108,8 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
     // Losers scatter plot
     if (losers.length > 0) {
       traces.push({
-        x: losers.map(d => d.maePercent),
-        y: losers.map(d => d.mfePercent),
+        x: losers.map(d => d.normalizedBy[selectedBasis]!.maePercent),
+        y: losers.map(d => d.normalizedBy[selectedBasis]!.mfePercent),
         type: 'scatter',
         mode: 'markers',
         name: 'Losers',
@@ -92,7 +127,12 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
           strategy: d.strategy,
           pl: d.pl,
           date: d.date.toLocaleDateString(),
-          profitCapture: d.profitCapturePercent?.toFixed(1) || 'N/A'
+          profitCapture: d.profitCapturePercent?.toFixed(1) || 'N/A',
+          basisLabel: basisLabels[selectedBasis],
+          denominatorLabel: d.normalizedBy[selectedBasis]?.denominator ? `$${d.normalizedBy[selectedBasis]!.denominator.toLocaleString()}` : '—',
+          maeRaw: d.mae,
+          mfeRaw: d.mfe,
+          plPercent: `${d.normalizedBy[selectedBasis]!.plPercent.toFixed(1)}%`
         })),
         hovertemplate:
           '<b>Loser - Trade #%{customdata.trade}</b><br>' +
@@ -101,14 +141,22 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
           'MAE: %{x:.1f}%<br>' +
           'MFE: %{y:.1f}%<br>' +
           'P&L: $%{customdata.pl:.0f}<br>' +
-          'Profit Capture: %{customdata.profitCapture}%' +
+          'Profit Capture: %{customdata.profitCapture}%<br>' +
+          'Normalization: %{customdata.basisLabel}<br>' +
+          'Denominator: %{customdata.denominatorLabel}<br>' +
+          'Raw MAE: $%{customdata.maeRaw:.0f}<br>' +
+          'Raw MFE: $%{customdata.mfeRaw:.0f}<br>' +
+          'P&L Normalized: %{customdata.plPercent}' +
           '<extra></extra>'
       })
     }
 
     // Add diagonal reference line (MFE = MAE)
     const maxVal = Math.max(
-      ...validData.map(d => Math.max(d.maePercent || 0, d.mfePercent || 0))
+      ...basisData.map(d => {
+        const metrics = d.normalizedBy[selectedBasis]!
+        return Math.max(metrics.maePercent || 0, metrics.mfePercent || 0)
+      })
     )
 
     traces.push({
@@ -167,18 +215,40 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
     }
 
     return { plotData: traces, layout: chartLayout }
-  }, [data])
+  }, [data, selectedBasis])
+
+  const description = selectedBasis
+    ? `Backtest theoretical risk vs reward normalized by ${basisLabels[selectedBasis]}`
+    : 'Backtest theoretical risk vs reward'
+
+  const basisSelect = (
+    <Select
+      value={selectedBasis ?? undefined}
+      onValueChange={(value) => setSelectedBasis(value as NormalizationBasis)}
+    >
+      <SelectTrigger size="sm">
+        <SelectValue placeholder="Select normalization basis" />
+      </SelectTrigger>
+      <SelectContent>
+        {basisOptions.map(option => (
+          <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 
   const tooltip = {
-    flavor: "The opportunity map - see how much profit potential you had versus how much risk you took on each trade.",
-    detailed: "Each point represents a trade plotted by its Maximum Adverse Excursion (worst drawdown) on the x-axis and Maximum Favorable Excursion (peak profit) on the y-axis. Trades in the upper-left quadrant had the best risk/reward profiles - high profit potential with low drawdowns. The diagonal line shows where MFE equals MAE. Points above the line had more upside than downside, while points below had more risk than reward. Green dots are winners, red dots are losers. This helps identify whether your exits are optimal and if certain trades offered better opportunities than others."
+    flavor: "The opportunity map - see how much theoretical profit potential you had versus modeled risk on each trade.",
+    detailed: "Each point represents a backtest trade plotted by its Maximum Adverse Excursion (worst modeled drawdown) on the x-axis and Maximum Favorable Excursion (peak modeled profit) on the y-axis. Trades in the upper-left quadrant had the best risk/reward profiles - high profit potential with low drawdowns. The diagonal line shows where MFE equals MAE. Points above the line had more upside than downside, while points below had more risk than reward. Use the basis selector to normalize by collected premium or margin requirement so you compare trades on the same scale."
   }
 
   if (!data || !data.mfeMaeData || data.mfeMaeData.length === 0) {
     return (
       <ChartWrapper
         title="🎯 MFE vs MAE Analysis"
-        description="Maximum Favorable vs Adverse Excursion scatter plot"
+        description="Maximum Favorable vs Adverse Excursion scatter plot (backtest theoretical)"
         className={className}
         data={[]}
         layout={{}}
@@ -191,12 +261,13 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
   return (
     <ChartWrapper
       title="🎯 MFE vs MAE Analysis"
-      description="Risk-reward profile: Maximum Favorable Excursion vs Maximum Adverse Excursion"
+      description={description}
       className={className}
       data={plotData}
       layout={layout}
       style={{ height: '500px' }}
       tooltip={tooltip}
+      actions={basisSelect}
     />
   )
 }

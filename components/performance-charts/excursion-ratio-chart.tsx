@@ -5,6 +5,13 @@ import { ChartWrapper } from './chart-wrapper'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
 import type { Layout, PlotData } from 'plotly.js'
 
+const basisLabels = {
+  premium: 'Collected Premium',
+  maxProfit: 'Maximum Profit',
+  margin: 'Margin Requirement',
+  unknown: 'Unknown Basis'
+} as const
+
 interface ExcursionRatioChartProps {
   className?: string
   groupBy?: 'time' | 'strategy'
@@ -53,7 +60,9 @@ export function ExcursionRatioChart({ className, groupBy = 'time' }: ExcursionRa
           strategy: d.strategy,
           mfe: d.mfe,
           mae: d.mae,
-          pl: d.pl
+          pl: d.pl,
+          basisLabel: basisLabels[d.basis],
+          denominatorLabel: d.denominator ? `$${d.denominator.toLocaleString()}` : '—'
         })),
         hovertemplate:
           '<b>Trade #%{x}</b><br>' +
@@ -63,6 +72,8 @@ export function ExcursionRatioChart({ className, groupBy = 'time' }: ExcursionRa
           'MFE: $%{customdata.mfe:.0f}<br>' +
           'MAE: $%{customdata.mae:.0f}<br>' +
           'P&L: $%{customdata.pl:.0f}<br>' +
+          'Normalization: %{customdata.basisLabel}<br>' +
+          'Denominator: %{customdata.denominatorLabel}<br>' +
           '<extra></extra>'
       })
 
@@ -187,8 +198,8 @@ export function ExcursionRatioChart({ className, groupBy = 'time' }: ExcursionRa
   }, [data, groupBy])
 
   const tooltip = {
-    flavor: "The reward-to-risk balance - do your trades offer more upside than downside?",
-    detailed: "Excursion Ratio = MFE / MAE. A ratio above 1.0 means the trade had more profit potential (MFE) than risk (MAE), which is ideal. A ratio below 1.0 indicates more downside than upside. Consistently high ratios suggest you're entering trades with favorable risk/reward setups. Low ratios might indicate poor entry timing or trading against the trend. Green dots represent winning trades, red dots are losers. The average line helps identify if your typical trade setup is favorable. Use this to evaluate entry quality and whether you're selecting trades with adequate profit potential relative to their risk."
+    flavor: "The reward-to-risk balance - do your modeled trades offer more upside than downside?",
+    detailed: "Excursion Ratio = MFE / MAE using backtest excursions. A ratio above 1.0 means the modeled trade had more profit potential (MFE) than risk (MAE). A ratio below 1.0 indicates more downside than upside. Consistently high ratios suggest the strategy is finding favorable setups in simulation. Hover to see which normalization basis was used for each trade so you compare like-for-like denominators when interpreting the ratio." 
   }
 
   if (!data || !data.mfeMaeData || data.mfeMaeData.length === 0) {

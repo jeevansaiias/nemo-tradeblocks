@@ -17,6 +17,7 @@ import { ExitReasonChart } from "@/components/performance-charts/exit-reason-cha
 import { HoldingDurationChart } from "@/components/performance-charts/holding-duration-chart";
 import { MarginUtilizationChart } from "@/components/performance-charts/margin-utilization-chart";
 import { MFEMAEScatterChart } from "@/components/performance-charts/mfe-mae-scatter-chart";
+import { MaePnlScatterChart } from "@/components/performance-charts/mae-pnl-scatter-chart";
 import { MonthlyReturnsChart } from "@/components/performance-charts/monthly-returns-chart";
 import { PremiumEfficiencyChart } from "@/components/performance-charts/premium-efficiency-chart";
 import { ProfitCaptureChart } from "@/components/performance-charts/profit-capture-chart";
@@ -278,6 +279,7 @@ export default function PerformanceBlocksPage() {
         {/* Tab 5: Excursion Analysis */}
         <TabsContent value="excursion" className="space-y-6">
           <MFEMAEScatterChart />
+          <MaePnlScatterChart />
           <ProfitCaptureChart />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ExcursionDistributionChart />

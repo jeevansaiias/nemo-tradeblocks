@@ -4,6 +4,14 @@ import React, { useMemo } from 'react'
 import { ChartWrapper } from './chart-wrapper'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
 import type { Layout, PlotData } from 'plotly.js'
+import { NORMALIZATION_BASES } from '@/lib/calculations/mfe-mae'
+
+const basisLabels = {
+  premium: 'Collected Premium',
+  maxProfit: 'Maximum Profit',
+  margin: 'Margin Requirement',
+  unknown: 'Unknown Basis'
+} as const
 
 interface ProfitCaptureChartProps {
   className?: string
@@ -18,6 +26,7 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
     }
 
     const { mfeMaeData, mfeMaeStats } = data
+    const statsEntry = NORMALIZATION_BASES.map(basis => mfeMaeStats?.[basis]).find(Boolean) || null
 
     // Filter to trades with profit capture data
     const validData = mfeMaeData.filter(d =>
@@ -52,7 +61,9 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
           strategy: d.strategy,
           pl: d.pl,
           mfe: d.mfe,
-          mae: d.mae
+          mae: d.mae,
+          basisLabel: basisLabels[d.basis],
+          denominatorLabel: d.denominator ? `$${d.denominator.toLocaleString()}` : '—'
         })),
         hovertemplate:
           '<b>Trade #%{x}</b><br>' +
@@ -61,6 +72,8 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
           'Date: %{customdata.date}<br>' +
           'P&L: $%{customdata.pl:.0f}<br>' +
           'MFE: $%{customdata.mfe:.0f}<br>' +
+          'Normalization: %{customdata.basisLabel}<br>' +
+          'Denominator: %{customdata.denominatorLabel}<br>' +
           '<extra></extra>'
       })
     }
@@ -83,7 +96,9 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
           strategy: d.strategy,
           pl: d.pl,
           mfe: d.mfe,
-          mae: d.mae
+          mae: d.mae,
+          basisLabel: basisLabels[d.basis],
+          denominatorLabel: d.denominator ? `$${d.denominator.toLocaleString()}` : '—'
         })),
         hovertemplate:
           '<b>Trade #%{x}</b><br>' +
@@ -92,6 +107,8 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
           'Date: %{customdata.date}<br>' +
           'P&L: $%{customdata.pl:.0f}<br>' +
           'MFE: $%{customdata.mfe:.0f}<br>' +
+          'Normalization: %{customdata.basisLabel}<br>' +
+          'Denominator: %{customdata.denominatorLabel}<br>' +
           '<extra></extra>'
       })
     }
@@ -114,13 +131,13 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
     })
 
     // Add average line if we have stats
-    if (mfeMaeStats) {
+    if (statsEntry) {
       traces.push({
         x: [Math.min(...allTradeNumbers), Math.max(...allTradeNumbers)],
-        y: [mfeMaeStats.avgProfitCapturePercent, mfeMaeStats.avgProfitCapturePercent],
+        y: [statsEntry.avgProfitCapturePercent, statsEntry.avgProfitCapturePercent],
         type: 'scatter',
         mode: 'lines',
-        name: `Average (${mfeMaeStats.avgProfitCapturePercent.toFixed(1)}%)`,
+        name: `Average (${statsEntry.avgProfitCapturePercent.toFixed(1)}%)`,
         line: {
           color: '#3b82f6',
           width: 2,
@@ -181,12 +198,12 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
       ]
     }
 
-    return { plotData: traces, layout: chartLayout, stats: mfeMaeStats }
+    return { plotData: traces, layout: chartLayout, stats: statsEntry }
   }, [data])
 
   const tooltip = {
-    flavor: "How well did you lock in your wins? This shows what percentage of peak profit you actually captured at exit.",
-    detailed: "Profit Capture % = (Realized P&L / Maximum Favorable Excursion) × 100. A value of 100% means you exited at the exact peak. Values above 100% indicate you captured more than the initial peak (trade went even higher before exit). Values below 100% mean you gave back some profit from the peak. The optimal zone (80-120%) is highlighted in green. Consistently low values might indicate exiting too early, while extremely high values on losers might indicate holding too long hoping for recovery. This metric helps refine your exit timing strategy."
+    flavor: "How well did you lock in your modeled wins? This shows what percentage of peak theoretical profit you captured at exit.",
+    detailed: "Profit Capture % = (Realized P&L / Maximum Favorable Excursion) × 100 using backtest excursions. A value of 100% means the strategy exited at the modeled peak. Values above 100% indicate the backtest captured more than the initial peak, while values below 100% mean profit was given back from the modeled high. Hover to see which normalization basis (premium, margin, or max profit) underpins each trade. Use this to refine exit timing in the presence of model assumptions and recognize that live execution may deviate." 
   }
 
   const description = stats

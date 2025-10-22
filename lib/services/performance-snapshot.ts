@@ -13,7 +13,8 @@ import {
   createExcursionDistribution,
   type MFEMAEDataPoint,
   type MFEMAEStats,
-  type DistributionBucket
+  type DistributionBucket,
+  type NormalizationBasis
 } from '@/lib/calculations/mfe-mae'
 
 export interface SnapshotDateRange {
@@ -71,7 +72,7 @@ export interface SnapshotChartData {
   exitReasonBreakdown: Array<{ reason: string; count: number; avgPl: number; totalPl: number }>
   holdingPeriods: Array<{ tradeNumber: number; dateOpened: string; dateClosed?: string; durationHours: number; pl: number; strategy: string }>
   mfeMaeData: MFEMAEDataPoint[]
-  mfeMaeStats: MFEMAEStats | null
+  mfeMaeStats: Partial<Record<NormalizationBasis, MFEMAEStats>>
   mfeMaeDistribution: DistributionBucket[]
 }
 
