@@ -10,7 +10,23 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { formatInt, formatPercentRaw } from '@/lib/utils/format';
+
+// Local format utilities (inline to avoid import issues)
+const formatInt = (value: number, withSign: boolean = false): string => {
+  const formatted = Math.abs(value).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  
+  if (withSign && value !== 0) {
+    return value > 0 ? `+${formatted}` : `-${formatted}`;
+  }
+  return formatted;
+};
+
+const formatPercentRaw = (value: number): string => {
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+};
 
 interface ExitReasonData {
   reason: string;
