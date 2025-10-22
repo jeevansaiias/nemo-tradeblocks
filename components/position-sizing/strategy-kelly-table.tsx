@@ -119,7 +119,7 @@ export function StrategyKellyTable({
                           }
                           min={0}
                           max={200}
-                          step={5}
+                          step={2.5}
                           className="flex-1"
                         />
                         <span className="text-sm font-medium w-12 text-right">

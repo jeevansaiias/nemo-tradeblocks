@@ -402,7 +402,7 @@ export default function PositionSizingPage() {
                 }
                 min={0}
                 max={200}
-                step={5}
+                step={2.5}
               />
             </div>
 
@@ -466,7 +466,7 @@ export default function PositionSizingPage() {
                     }
                     min={0}
                     max={200}
-                    step={5}
+                    step={2.5}
                     className="flex-1"
                   />
                   <Button

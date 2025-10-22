@@ -465,7 +465,7 @@ export default function RiskSimulatorPage() {
                 }}
                 min={10}
                 max={5000}
-                step={5}
+                step={2.5}
               />
               <p className="text-xs text-muted-foreground">
                 Auto-detected pace ≈ {calculatedTradesPerYear.toLocaleString()}{" "}
@@ -785,7 +785,7 @@ export default function RiskSimulatorPage() {
                         }
                         min={10}
                         max={100}
-                        step={5}
+                        step={2.5}
                         className="flex-1"
                       />
                       <div className="w-16 text-right font-medium">
