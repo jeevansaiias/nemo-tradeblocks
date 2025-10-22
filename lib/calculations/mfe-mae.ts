@@ -45,6 +45,18 @@ export interface MFEMAEDataPoint {
   openingPrice: number
   closingPrice?: number
   numContracts: number
+  avgClosingCost?: number
+  fundsAtClose: number
+  openingCommissionsFees: number
+  closingCommissionsFees?: number
+  openingShortLongRatio: number
+  closingShortLongRatio?: number
+  openingVix?: number
+  closingVix?: number
+  gap?: number
+  movement?: number
+  maxProfit?: number
+  maxLoss?: number
 }
 
 /**
@@ -154,6 +166,18 @@ export function calculateTradeExcursionMetrics(trade: Trade, tradeNumber: number
     openingPrice: trade.openingPrice,
     closingPrice: trade.closingPrice,
     numContracts: trade.numContracts,
+    avgClosingCost: trade.avgClosingCost,
+    fundsAtClose: trade.fundsAtClose,
+    openingCommissionsFees: trade.openingCommissionsFees,
+    closingCommissionsFees: trade.closingCommissionsFees,
+    openingShortLongRatio: trade.openingShortLongRatio,
+    closingShortLongRatio: trade.closingShortLongRatio,
+    openingVix: trade.openingVix,
+    closingVix: trade.closingVix,
+    gap: trade.gap,
+    movement: trade.movement,
+    maxProfit: trade.maxProfit,
+    maxLoss: trade.maxLoss,
   }
 
   // Calculate percentages if we have a denominator
