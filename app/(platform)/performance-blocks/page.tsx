@@ -11,16 +11,12 @@ import { DateRange } from "react-day-picker";
 import { DayOfWeekChart } from "@/components/performance-charts/day-of-week-chart";
 import { DrawdownChart } from "@/components/performance-charts/drawdown-chart";
 import { EquityCurveChart } from "@/components/performance-charts/equity-curve-chart";
-import { ExcursionDistributionChart } from "@/components/performance-charts/excursion-distribution-chart";
-import { ExcursionRatioChart } from "@/components/performance-charts/excursion-ratio-chart";
 import { ExitReasonChart } from "@/components/performance-charts/exit-reason-chart";
 import { HoldingDurationChart } from "@/components/performance-charts/holding-duration-chart";
 import { MarginUtilizationChart } from "@/components/performance-charts/margin-utilization-chart";
 import { MFEMAEScatterChart } from "@/components/performance-charts/mfe-mae-scatter-chart";
-import { MaePnlScatterChart } from "@/components/performance-charts/mae-pnl-scatter-chart";
 import { MonthlyReturnsChart } from "@/components/performance-charts/monthly-returns-chart";
 import { PremiumEfficiencyChart } from "@/components/performance-charts/premium-efficiency-chart";
-import { ProfitCaptureChart } from "@/components/performance-charts/profit-capture-chart";
 import { ReturnDistributionChart } from "@/components/performance-charts/return-distribution-chart";
 import { RiskEvolutionChart } from "@/components/performance-charts/risk-evolution-chart";
 import { RollingMetricsChart } from "@/components/performance-charts/rolling-metrics-chart";
@@ -247,11 +243,11 @@ export default function PerformanceBlocksPage() {
           <EquityCurveChart />
           <DrawdownChart />
           <WinLossStreaksChart />
-          <MonthlyReturnsChart />
         </TabsContent>
 
         {/* Tab 2: Returns Analysis */}
         <TabsContent value="returns" className="space-y-6">
+          <MonthlyReturnsChart />
           <ReturnDistributionChart />
           <DayOfWeekChart />
           <TradeSequenceChart />
@@ -279,12 +275,6 @@ export default function PerformanceBlocksPage() {
         {/* Tab 5: Excursion Analysis */}
         <TabsContent value="excursion" className="space-y-6">
           <MFEMAEScatterChart />
-          <MaePnlScatterChart />
-          <ProfitCaptureChart />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ExcursionDistributionChart />
-            <ExcursionRatioChart />
-          </div>
         </TabsContent>
       </Tabs>
     </div>

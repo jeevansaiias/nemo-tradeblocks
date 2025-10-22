@@ -17,6 +17,7 @@ import {
   type NormalizationBasis
 } from "@/lib/calculations/mfe-mae"
 import type { EfficiencyBasis } from "@/lib/metrics/trade-efficiency"
+import { Label } from "@/components/ui/label"
 
 type AxisValueFormat =
   | { type: "currency"; maximumFractionDigits?: number }
@@ -94,8 +95,135 @@ const preferredYAxisOrder = [
   "mfe"
 ]
 
+interface PresetConfig {
+  id: string
+  label: string
+  description: string
+  xMetric: string
+  yMetric: string
+  // Additional layout customizations per preset
+  layoutCustomizations?: Partial<Layout>
+  // Special trace handling (e.g., reference lines, zones)
+  addSpecialTraces?: (points: { point: MFEMAEDataPoint; xValue: number; yValue: number }[], xMetric: string, yMetric: string) => Partial<PlotData>[]
+}
+
+const PRESETS: PresetConfig[] = [
+  {
+    id: "mfe-vs-mae",
+    label: "MFE vs MAE",
+    description: "Classic excursion analysis: compare maximum favorable vs adverse excursions",
+    xMetric: "mae_percent_premium",
+    yMetric: "mfe_percent_premium",
+  },
+  {
+    id: "mae-vs-pl",
+    label: "MAE vs P&L",
+    description: "Risk taken vs reward captured: identify efficient trade outcomes",
+    xMetric: "mae_percent_premium",
+    yMetric: "pl_percent_premium",
+    layoutCustomizations: {
+      shapes: [
+        {
+          type: 'line',
+          xref: 'paper',
+          yref: 'y',
+          x0: 0,
+          x1: 1,
+          y0: 0,
+          y1: 0,
+          line: {
+            color: '#6b7280',
+            width: 1,
+            dash: 'dot'
+          }
+        }
+      ]
+    }
+  },
+  {
+    id: "profit-capture-timeline",
+    label: "Profit Capture Timeline",
+    description: "Track how well you captured peak profits across your trading history",
+    xMetric: "trade_number",
+    yMetric: "profit_capture",
+    addSpecialTraces: (points) => {
+      const profitCaptureValues = points
+        .map(p => p.point.profitCapturePercent)
+        .filter((v): v is number => v !== undefined && isFinite(v))
+
+      if (profitCaptureValues.length === 0) return []
+
+      const avgProfitCapture = profitCaptureValues.reduce((sum, v) => sum + v, 0) / profitCaptureValues.length
+      const tradeNumbers = points.map(p => p.point.tradeNumber)
+      const minTrade = Math.min(...tradeNumbers)
+      const maxTrade = Math.max(...tradeNumbers)
+
+      return [
+        {
+          x: [minTrade, maxTrade],
+          y: [100, 100],
+          type: 'scatter',
+          mode: 'lines',
+          name: '100% Capture',
+          line: { color: '#6b7280', width: 1, dash: 'dot' },
+          hoverinfo: 'skip',
+          showlegend: true
+        },
+        {
+          x: [minTrade, maxTrade],
+          y: [avgProfitCapture, avgProfitCapture],
+          type: 'scatter',
+          mode: 'lines',
+          name: `Average (${avgProfitCapture.toFixed(1)}%)`,
+          line: { color: '#3b82f6', width: 2, dash: 'dash' },
+          hoverinfo: 'skip',
+          showlegend: true
+        }
+      ]
+    },
+    layoutCustomizations: {
+      shapes: [
+        {
+          type: 'rect',
+          xref: 'paper',
+          yref: 'y',
+          x0: 0,
+          x1: 1,
+          y0: 80,
+          y1: 120,
+          fillcolor: 'rgba(34, 197, 94, 0.1)',
+          line: { width: 0 },
+          layer: 'below'
+        }
+      ]
+    }
+  },
+  {
+    id: "excursion-vs-premium",
+    label: "Excursions vs Premium",
+    description: "Analyze how excursions scale with collected premium",
+    xMetric: "premium",
+    yMetric: "mfe",
+  },
+  {
+    id: "excursion-vs-margin",
+    label: "Excursions vs Margin",
+    description: "Evaluate excursion sizes relative to margin requirements",
+    xMetric: "margin",
+    yMetric: "mae",
+  },
+  {
+    id: "excursion-vs-vix",
+    label: "Excursions vs VIX",
+    description: "Discover how volatility regime affects trade excursions",
+    xMetric: "opening_vix",
+    yMetric: "mae_percent_premium",
+  }
+]
+
 export function MFEMAEScatterChart({ className }: { className?: string }) {
   const { data } = usePerformanceStore()
+  const [selectedPreset, setSelectedPreset] = useState<string>("mfe-vs-mae")
   const [xMetric, setXMetric] = useState<string | null>(null)
   const [yMetric, setYMetric] = useState<string | null>(null)
 
@@ -172,6 +300,14 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
       axisLabel: "P&L ($)",
       format: rawCurrencyFormat,
       accessor: point => point.pl ?? null
+    })
+
+    addOption({
+      value: "trade_number",
+      label: "Trade Number",
+      axisLabel: "Trade Number",
+      format: integerFormat,
+      accessor: point => point.tradeNumber ?? null
     })
 
     addOption({
@@ -337,6 +473,16 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     return options
   }, [data])
 
+  // Available presets based on data
+  const availablePresets = useMemo(() => {
+    const availableValues = axisOptions.map(opt => opt.value)
+    return PRESETS.filter(preset =>
+      availableValues.includes(preset.xMetric) &&
+      availableValues.includes(preset.yMetric)
+    )
+  }, [axisOptions])
+
+  // Initialize or update metrics when preset changes
   useEffect(() => {
     if (axisOptions.length === 0) {
       if (xMetric !== null) setXMetric(null)
@@ -345,6 +491,18 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     }
 
     const availableValues = axisOptions.map(option => option.value)
+
+    // Handle preset selection
+    if (selectedPreset !== "custom") {
+      const preset = PRESETS.find(p => p.id === selectedPreset)
+      if (preset && availableValues.includes(preset.xMetric) && availableValues.includes(preset.yMetric)) {
+        if (xMetric !== preset.xMetric) setXMetric(preset.xMetric)
+        if (yMetric !== preset.yMetric) setYMetric(preset.yMetric)
+        return
+      }
+    }
+
+    // Custom mode or preset not available - use fallback logic
     const findFirstAvailable = (preferred: string[], exclude?: string) => {
       for (const value of preferred) {
         if (value === exclude) continue
@@ -371,7 +529,22 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     if (desiredY !== yMetric) {
       setYMetric(desiredY)
     }
-  }, [axisOptions, xMetric, yMetric])
+  }, [axisOptions, xMetric, yMetric, selectedPreset])
+
+  // Detect when user manually changes axes (switch to custom mode)
+  const handleXMetricChange = (value: string) => {
+    setXMetric(value)
+    if (selectedPreset !== "custom") {
+      setSelectedPreset("custom")
+    }
+  }
+
+  const handleYMetricChange = (value: string) => {
+    setYMetric(value)
+    if (selectedPreset !== "custom") {
+      setSelectedPreset("custom")
+    }
+  }
 
   const axisOptionMap = useMemo(() => {
     return new Map(axisOptions.map(option => [option.value, option]))
@@ -519,6 +692,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
       })
     }
 
+    // Add diagonal line for MFE vs MAE charts
     const showDiagonal = (() => {
       if (!xMetric || !yMetric) return false
       if (xMetric === "mae" && yMetric === "mfe") return true
@@ -549,7 +723,15 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
       })
     }
 
-    const layout: Partial<Layout> = {
+    // Add preset-specific traces
+    const currentPreset = selectedPreset !== "custom" ? PRESETS.find(p => p.id === selectedPreset) : null
+    if (currentPreset?.addSpecialTraces) {
+      const specialTraces = currentPreset.addSpecialTraces(points, xMetric ?? "", yMetric ?? "")
+      traces.push(...specialTraces)
+    }
+
+    // Base layout
+    const baseLayout: Partial<Layout> = {
       xaxis: {
         title: { text: selectedX.axisLabel },
         showgrid: true,
@@ -568,76 +750,101 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
         xanchor: "right",
         x: 1
       },
-      hovermode: "closest",
-      annotations: [
-        {
-          text: "Use the axis selectors to compare excursions against pricing, volatility, or any other trade input.",
-          xref: "paper",
-          yref: "paper",
-          x: 0.02,
-          y: 0.98,
-          xanchor: "left",
-          yanchor: "top",
-          showarrow: false,
-          font: {
-            size: 10,
-            color: "#6b7280"
-          },
-          bgcolor: "rgba(255, 255, 255, 0.8)",
-          borderpad: 4
-        }
-      ]
+      hovermode: "closest"
     }
 
-    return { plotData: traces, layout }
-  }, [data, selectedX, selectedY, xMetric, yMetric])
+    // Merge with preset-specific layout customizations
+    const finalLayout: Partial<Layout> = currentPreset?.layoutCustomizations
+      ? { ...baseLayout, ...currentPreset.layoutCustomizations }
+      : baseLayout
 
-  const description = selectedX && selectedY
-    ? `Explore trade excursions by plotting ${selectedY.axisLabel} against ${selectedX.axisLabel}.`
+    return { plotData: traces, layout: finalLayout }
+  }, [data, selectedX, selectedY, xMetric, yMetric, selectedPreset])
+
+  // Get current preset for description
+  const currentPreset = selectedPreset !== "custom" ? PRESETS.find(p => p.id === selectedPreset) : null
+
+  const description = currentPreset
+    ? currentPreset.description
+    : selectedX && selectedY
+    ? `Custom analysis: ${selectedY.axisLabel} vs ${selectedX.axisLabel}`
     : "Backtest theoretical risk versus reward scatter plot"
 
-  const axisSelectors = axisOptions.length > 0 ? (
-    <div className="flex flex-wrap gap-2">
-      <Select value={xMetric ?? undefined} onValueChange={setXMetric}>
-        <SelectTrigger size="sm" className="w-[220px]">
-          <SelectValue placeholder="X-axis metric" />
-        </SelectTrigger>
-        <SelectContent>
-          {axisOptions.map(option => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={yMetric ?? undefined} onValueChange={setYMetric}>
-        <SelectTrigger size="sm" className="w-[220px]">
-          <SelectValue placeholder="Y-axis metric" />
-        </SelectTrigger>
-        <SelectContent>
-          {axisOptions
-            .filter(option => option.value !== xMetric)
-            .map(option => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
+  const controls = axisOptions.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Preset Selector */}
+      <div className="flex items-center gap-2">
+        <Label htmlFor="preset-select" className="text-sm font-medium whitespace-nowrap">
+          View:
+        </Label>
+        <Select value={selectedPreset} onValueChange={setSelectedPreset}>
+          <SelectTrigger id="preset-select" size="sm" className="w-[200px]">
+            <SelectValue placeholder="Select view" />
+          </SelectTrigger>
+          <SelectContent>
+            {availablePresets.map(preset => (
+              <SelectItem key={preset.id} value={preset.id}>
+                {preset.label}
               </SelectItem>
             ))}
-        </SelectContent>
-      </Select>
+            <SelectItem value="custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Axis Selectors - Always rendered but hidden when not in custom mode */}
+      <div className={selectedPreset === "custom" ? "contents" : "hidden"}>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="x-axis-select" className="text-sm font-medium whitespace-nowrap">
+            X:
+          </Label>
+          <Select value={xMetric ?? undefined} onValueChange={handleXMetricChange}>
+            <SelectTrigger id="x-axis-select" size="sm" className="w-[180px]">
+              <SelectValue placeholder="X-axis" />
+            </SelectTrigger>
+            <SelectContent>
+              {axisOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Label htmlFor="y-axis-select" className="text-sm font-medium whitespace-nowrap">
+            Y:
+          </Label>
+          <Select value={yMetric ?? undefined} onValueChange={handleYMetricChange}>
+            <SelectTrigger id="y-axis-select" size="sm" className="w-[180px]">
+              <SelectValue placeholder="Y-axis" />
+            </SelectTrigger>
+            <SelectContent>
+              {axisOptions
+                .filter(option => option.value !== xMetric)
+                .map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
     </div>
   ) : undefined
 
   const tooltip = {
-    flavor: "Customize your opportunity map by pairing MAE/MFE with any trade parameter.",
+    flavor: "Explore trade excursions through preset views or build custom comparisons.",
     detailed:
-      "Each point plots a trade using your chosen axes. Mix and match normalized excursion metrics with inputs like premium, margin, VIX, or commissions to uncover relationships between risk, reward, and market context. Winners and losers remain color coded so you can spot regime shifts and sensitivities quickly."
+      "Start with preset views like 'MFE vs MAE' or 'Profit Capture Timeline' to discover key patterns. Switch to Custom mode to compare any metric combination - excursions vs premium, VIX, commissions, or any other trade parameter. Winners and losers stay color coded to highlight regime shifts and trading efficiency."
   }
 
   if (!data || !data.mfeMaeData || data.mfeMaeData.length === 0) {
     return (
       <ChartWrapper
-        title="🎯 MFE vs MAE Analysis"
+        title="🎯 Excursion Analysis"
         description="Maximum Favorable vs Adverse Excursion scatter plot (backtest theoretical)"
         className={className}
         data={[]}
@@ -650,14 +857,14 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
 
   return (
     <ChartWrapper
-      title="🎯 MFE vs MAE Analysis"
+      title="🎯 Excursion Analysis"
       description={description}
       className={className}
       data={plotData}
       layout={layout}
       style={{ height: "500px" }}
       tooltip={tooltip}
-      actions={axisSelectors}
+      actions={controls}
     />
   )
 }

@@ -47,7 +47,8 @@ export function ExitReasonChart({ className }: ExitReasonChartProps) {
 
     const chartLayout: Partial<Layout> = {
       xaxis: {
-        title: { text: 'Exit Reason' }
+        title: { text: 'Exit Reason', standoff: 20 },
+        tickangle: -45
       },
       yaxis: {
         title: { text: 'Trade Count' }
@@ -66,7 +67,8 @@ export function ExitReasonChart({ className }: ExitReasonChartProps) {
         x: 1
       },
       margin: {
-        r: 80
+        r: 80,
+        b: 120
       }
     }
 
