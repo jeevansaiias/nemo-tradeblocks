@@ -154,7 +154,7 @@ export function MaePnlScatterChart({ className }: MaePnlScatterChartProps) {
             width: 1
           }
         },
-        customdata: winners.map(toCustomData),
+        customdata: winners.map(toCustomData) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Winner - Trade #%{customdata.trade}</b><br>' +
           'Strategy: %{customdata.strategy}<br>' +
@@ -188,7 +188,7 @@ export function MaePnlScatterChart({ className }: MaePnlScatterChartProps) {
             width: 1
           }
         },
-        customdata: losers.map(toCustomData),
+        customdata: losers.map(toCustomData) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Loser - Trade #%{customdata.trade}</b><br>' +
           'Strategy: %{customdata.strategy}<br>' +

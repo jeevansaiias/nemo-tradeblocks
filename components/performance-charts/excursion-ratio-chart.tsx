@@ -63,7 +63,7 @@ export function ExcursionRatioChart({ className, groupBy = 'time' }: ExcursionRa
           pl: d.pl,
           basisLabel: basisLabels[d.basis],
           denominatorLabel: d.denominator ? `$${d.denominator.toLocaleString()}` : '—'
-        })),
+        })) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Trade #%{x}</b><br>' +
           'Ratio: %{y:.2f}<br>' +

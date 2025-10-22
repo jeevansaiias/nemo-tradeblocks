@@ -47,7 +47,7 @@ export default function BlockStatsPage() {
   const [strategyStats, setStrategyStats] = useState<
     Record<string, StrategyStats>
   >({});
-  const [isCalculating, setIsCalculating] = useState(false);
+  const [, setIsCalculating] = useState(false);
   const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
 
   // Get active block from store

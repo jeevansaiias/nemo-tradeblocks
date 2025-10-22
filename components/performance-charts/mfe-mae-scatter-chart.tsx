@@ -87,7 +87,7 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
           maeRaw: d.mae,
           mfeRaw: d.mfe,
           plPercent: `${d.normalizedBy[selectedBasis]!.plPercent.toFixed(1)}%`
-        })),
+        })) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Winner - Trade #%{customdata.trade}</b><br>' +
           'Strategy: %{customdata.strategy}<br>' +
@@ -133,7 +133,7 @@ export function MFEMAEScatterChart({ className }: MFEMAEScatterChartProps) {
           maeRaw: d.mae,
           mfeRaw: d.mfe,
           plPercent: `${d.normalizedBy[selectedBasis]!.plPercent.toFixed(1)}%`
-        })),
+        })) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Loser - Trade #%{customdata.trade}</b><br>' +
           'Strategy: %{customdata.strategy}<br>' +

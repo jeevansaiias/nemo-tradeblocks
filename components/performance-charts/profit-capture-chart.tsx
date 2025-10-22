@@ -64,7 +64,7 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
           mae: d.mae,
           basisLabel: basisLabels[d.basis],
           denominatorLabel: d.denominator ? `$${d.denominator.toLocaleString()}` : '—'
-        })),
+        })) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Trade #%{x}</b><br>' +
           'Profit Capture: %{y:.1f}%<br>' +
@@ -99,7 +99,7 @@ export function ProfitCaptureChart({ className }: ProfitCaptureChartProps) {
           mae: d.mae,
           basisLabel: basisLabels[d.basis],
           denominatorLabel: d.denominator ? `$${d.denominator.toLocaleString()}` : '—'
-        })),
+        })) as unknown as PlotData['customdata'],
         hovertemplate:
           '<b>Trade #%{x}</b><br>' +
           'Profit Capture: %{y:.1f}%<br>' +
