@@ -7,6 +7,15 @@ import {
   computeTotalPremium,
   EfficiencyBasis
 } from '@/lib/metrics/trade-efficiency'
+import {
+  calculateMFEMAEData,
+  calculateMFEMAEStats,
+  createExcursionDistribution,
+  type MFEMAEDataPoint,
+  type MFEMAEStats,
+  type DistributionBucket,
+  type NormalizationBasis
+} from '@/lib/calculations/mfe-mae'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -62,6 +71,9 @@ export interface SnapshotChartData {
   marginUtilization: Array<{ date: string; marginReq: number; fundsAtClose: number; numContracts: number; pl: number }>
   exitReasonBreakdown: Array<{ reason: string; count: number; avgPl: number; totalPl: number }>
   holdingPeriods: Array<{ tradeNumber: number; dateOpened: string; dateClosed?: string; durationHours: number; pl: number; strategy: string }>
+  mfeMaeData: MFEMAEDataPoint[]
+  mfeMaeStats: Partial<Record<NormalizationBasis, MFEMAEStats>>
+  mfeMaeDistribution: DistributionBucket[]
 }
 
 export interface PerformanceSnapshot {
@@ -159,6 +171,11 @@ export async function processChartData(
   const exitReasonBreakdown = calculateExitReasonBreakdown(trades)
   const holdingPeriods = calculateHoldingPeriods(trades)
 
+  // MFE/MAE excursion analysis
+  const mfeMaeData = calculateMFEMAEData(trades)
+  const mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
+  const mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
+
   return {
     equityCurve,
     drawdownData,
@@ -173,7 +190,10 @@ export async function processChartData(
     premiumEfficiency,
     marginUtilization,
     exitReasonBreakdown,
-    holdingPeriods
+    holdingPeriods,
+    mfeMaeData,
+    mfeMaeStats,
+    mfeMaeDistribution
   }
 }
 
