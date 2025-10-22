@@ -822,7 +822,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
             </SelectTrigger>
             <SelectContent>
               {axisOptions
-                .filter(option => option.value !== xMetric)
+                .filter(option => option.value !== xMetric || option.value === yMetric)
                 .map(option => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
