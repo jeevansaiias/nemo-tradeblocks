@@ -18,6 +18,8 @@ export interface PortfolioStats {
   cagr?: number  // Compound Annual Growth Rate
   kellyPercentage?: number
   maxDrawdown: number
+  maxDrawdownRealized?: number  // Closed-equity based drawdown (legacy style)
+  maxDrawdownCompounded?: number  // Normalized compounded drawdown (Option Omega style)
   avgDailyPl: number
   totalCommissions: number
   netPl: number

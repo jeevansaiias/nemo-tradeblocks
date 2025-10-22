@@ -139,6 +139,8 @@ export const portfolioStatsSchema = z.object({
   maxLoss: z.number().finite().max(0),
   sharpeRatio: z.number().finite().optional(),
   maxDrawdown: z.number().finite().max(0),
+  maxDrawdownRealized: z.number().finite().max(0).optional(),
+  maxDrawdownCompounded: z.number().finite().max(0).optional(),
   avgDailyPl: z.number().finite(),
   totalCommissions: z.number().finite().min(0),
   netPl: z.number().finite(),

@@ -114,8 +114,9 @@ export class PortfolioStatsCalculator {
     const grossLoss = Math.abs(losingTradesList.reduce((sum, trade) => sum + trade.pl, 0))
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0
 
-    // Drawdown calculation
+    // Drawdown calculations
     const maxDrawdown = this.calculateMaxDrawdown(validTrades, adjustedDailyLogs)
+    const hybridDrawdowns = this.calculateHybridDrawdowns(validTrades, adjustedDailyLogs)
 
     // Daily P/L calculation
     const avgDailyPl = this.calculateAvgDailyPl(validTrades, adjustedDailyLogs)
@@ -164,6 +165,8 @@ export class PortfolioStatsCalculator {
       monthlyWinRate: periodicWinRates.monthlyWinRate,
       weeklyWinRate: periodicWinRates.weeklyWinRate,
       maxDrawdown,
+      maxDrawdownRealized: hybridDrawdowns?.maxDrawdownRealized,
+      maxDrawdownCompounded: hybridDrawdowns?.maxDrawdownCompounded,
       avgDailyPl,
       totalCommissions,
       netPl,
@@ -286,6 +289,175 @@ export class PortfolioStatsCalculator {
     }
 
     return maxDrawdown
+  }
+
+  /**
+   * Calculate hybrid drawdown metrics: Realized (Closed-Equity) and Compounded (Option Omega-style)
+   */
+  private calculateHybridDrawdowns(trades: Trade[], dailyLogEntries?: DailyLogEntry[]): {
+    maxDrawdownRealized: number
+    maxDrawdownCompounded: number
+  } | undefined {
+    // If we have daily log entries, use them for more accurate calculations
+    if (dailyLogEntries && dailyLogEntries.length > 0) {
+      return this.calculateHybridDrawdownsFromDailyLogs(dailyLogEntries)
+    }
+
+    // Otherwise calculate from trade data
+    if (trades.length === 0) return undefined
+
+    const closedTrades = trades.filter(trade => trade.dateClosed && trade.fundsAtClose !== undefined)
+    if (closedTrades.length === 0) return undefined
+
+    // Sort trades by close date
+    const sortedTrades = [...closedTrades].sort((a, b) => {
+      const dateA = new Date(a.dateClosed!)
+      const dateB = new Date(b.dateClosed!)
+      return dateA.getTime() - dateB.getTime()
+    })
+
+    // Calculate initial capital
+    const firstTrade = sortedTrades[0]
+    const initialCapital = firstTrade.fundsAtClose - firstTrade.pl
+
+    // 1️⃣ Realized Drawdown (Closed-Equity based)
+    let peakEquity = initialCapital
+    let maxDrawdownRealized = 0
+
+    for (const trade of sortedTrades) {
+      const currentEquity = trade.fundsAtClose
+
+      if (currentEquity > peakEquity) {
+        peakEquity = currentEquity
+      }
+
+      if (peakEquity > 0) {
+        const drawdownRealized = ((currentEquity - peakEquity) / peakEquity) * 100
+        if (drawdownRealized < 0) {
+          maxDrawdownRealized = Math.max(maxDrawdownRealized, Math.abs(drawdownRealized))
+        }
+      }
+    }
+
+    // 2️⃣ Compounded Drawdown (Normalized / Option Omega style)
+    const returns: number[] = []
+    let previousEquity = initialCapital
+
+    for (const trade of sortedTrades) {
+      const currentEquity = trade.fundsAtClose
+      const dailyReturn = previousEquity > 0 ? (currentEquity - previousEquity) / previousEquity : 0
+      returns.push(dailyReturn)
+      previousEquity = currentEquity
+    }
+
+    // Calculate compounded equity curve
+    const compoundedEquity: number[] = []
+    let compEquity = 1.0 // Start at 1.0 for normalized calculation
+
+    for (const ret of returns) {
+      compEquity *= (1 + ret)
+      compoundedEquity.push(compEquity)
+    }
+
+    // Calculate max drawdown from compounded curve
+    let compPeak = 1.0
+    let maxDrawdownCompounded = 0
+
+    for (const equity of compoundedEquity) {
+      if (equity > compPeak) {
+        compPeak = equity
+      }
+
+      if (compPeak > 0) {
+        const drawdownCompounded = ((equity - compPeak) / compPeak) * 100
+        if (drawdownCompounded < 0) {
+          maxDrawdownCompounded = Math.max(maxDrawdownCompounded, Math.abs(drawdownCompounded))
+        }
+      }
+    }
+
+    return {
+      maxDrawdownRealized,
+      maxDrawdownCompounded
+    }
+  }
+
+  /**
+   * Calculate hybrid drawdowns from daily log entries
+   */
+  private calculateHybridDrawdownsFromDailyLogs(dailyLogEntries: DailyLogEntry[]): {
+    maxDrawdownRealized: number
+    maxDrawdownCompounded: number
+  } {
+    const sortedEntries = [...dailyLogEntries].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
+
+    // 1️⃣ Realized Drawdown - use equity values directly
+    let peakEquity = 0
+    let maxDrawdownRealized = 0
+
+    // Find the initial equity (add initial trading funds to first day's P/L)
+    if (sortedEntries.length > 0) {
+      peakEquity = sortedEntries[0].tradingFunds - sortedEntries[0].dailyPl
+    }
+
+    for (const entry of sortedEntries) {
+      const currentEquity = entry.tradingFunds
+
+      if (currentEquity > peakEquity) {
+        peakEquity = currentEquity
+      }
+
+      if (peakEquity > 0) {
+        const drawdownRealized = ((currentEquity - peakEquity) / peakEquity) * 100
+        if (drawdownRealized < 0) {
+          maxDrawdownRealized = Math.max(maxDrawdownRealized, Math.abs(drawdownRealized))
+        }
+      }
+    }
+
+    // 2️⃣ Compounded Drawdown - calculate daily returns and compound
+    const returns: number[] = []
+    let previousEquity = sortedEntries.length > 0 ? sortedEntries[0].tradingFunds - sortedEntries[0].dailyPl : 0
+
+    for (const entry of sortedEntries) {
+      const currentEquity = entry.tradingFunds
+      const dailyReturn = previousEquity > 0 ? (currentEquity - previousEquity) / previousEquity : 0
+      returns.push(dailyReturn)
+      previousEquity = currentEquity
+    }
+
+    // Calculate compounded equity curve
+    const compoundedEquity: number[] = []
+    let compEquity = 1.0 // Normalized starting point
+
+    for (const ret of returns) {
+      compEquity *= (1 + ret)
+      compoundedEquity.push(compEquity)
+    }
+
+    // Calculate max drawdown from compounded curve
+    let compPeak = 1.0
+    let maxDrawdownCompounded = 0
+
+    for (const equity of compoundedEquity) {
+      if (equity > compPeak) {
+        compPeak = equity
+      }
+
+      if (compPeak > 0) {
+        const drawdownCompounded = ((equity - compPeak) / compPeak) * 100
+        if (drawdownCompounded < 0) {
+          maxDrawdownCompounded = Math.max(maxDrawdownCompounded, Math.abs(drawdownCompounded))
+        }
+      }
+    }
+
+    return {
+      maxDrawdownRealized,
+      maxDrawdownCompounded
+    }
   }
 
   /**
