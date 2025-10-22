@@ -37,8 +37,12 @@ interface ChartWrapperProps {
   title: string;
   description?: string;
   tooltip?: TooltipContent;
-  children?: React.ReactNode;
   className?: string;
+  actions?: React.ReactNode;
+  headerAddon?: React.ReactNode;
+  contentOverlay?: React.ReactNode;
+  footer?: React.ReactNode;
+  children?: React.ReactNode; // deprecated; retained for backward compatibility
   data: Data[];
   layout: Partial<Layout>;
   config?: Partial<Config>;
@@ -61,6 +65,10 @@ export function ChartWrapper({
   title,
   description,
   tooltip,
+  actions,
+  headerAddon,
+  contentOverlay,
+  footer,
   children,
   className,
   data,
@@ -201,7 +209,7 @@ export function ChartWrapper({
       modeBarButtonsToRemove: [],
       toImageButtonOptions: {
         format: "png" as const,
-  filename: `nemoblocks-${title.toLowerCase().replace(/\s+/g, "-")}`,
+        filename: `tradeblocks-${title.toLowerCase().replace(/\s+/g, "-")}`,
         height: 600,
         width: 1000,
         scale: 2,
@@ -210,6 +218,8 @@ export function ChartWrapper({
     }),
     [config, title]
   );
+
+  const headerActions = actions ?? children
 
   return (
     <Card className={cn("h-full", className)}>
@@ -252,18 +262,24 @@ export function ChartWrapper({
                 {description}
               </CardDescription>
             )}
+            {headerAddon}
           </div>
-          {children}
+          {headerActions}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
         <div ref={plotRef} className="relative min-h-[300px]">
+          {contentOverlay && (
+            <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center">
+              <div className="pointer-events-auto">{contentOverlay}</div>
+            </div>
+          )}
           <Suspense fallback={<ChartSkeleton />}>
             <Plot
               divId={chartId}
               data={data}
               layout={themedLayout}
-              config={enhancedConfig}
+              config={enhancedConfig as unknown as Parameters<typeof Plot>[0]['config']}
               onInitialized={onInitialized}
               onUpdate={onUpdate}
               style={style}
@@ -272,6 +288,11 @@ export function ChartWrapper({
             />
           </Suspense>
         </div>
+        {footer && (
+          <div className="mt-4">
+            {footer}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

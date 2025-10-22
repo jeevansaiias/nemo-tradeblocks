@@ -168,35 +168,6 @@ export function PerformanceMetrics({ className }: PerformanceMetricsProps) {
           />
         </div>
 
-        {/* Hybrid Drawdown Analysis */}
-        {(portfolioStats.maxDrawdownRealized !== undefined || portfolioStats.maxDrawdownCompounded !== undefined) && (
-          <div className="mt-4 pt-4 border-t">
-            <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Hybrid Max Drawdown Analysis</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {portfolioStats.maxDrawdownRealized !== undefined && (
-                <MetricCard
-                  title="Realized Drawdown"
-                  value={portfolioStats.maxDrawdownRealized}
-                  format="percentage"
-                  icon={<AlertTriangle className="h-4 w-4" />}
-                  trend="negative"
-                  subtitle="Closed-equity based (NemoAnalytics style)"
-                />
-              )}
-              {portfolioStats.maxDrawdownCompounded !== undefined && (
-                <MetricCard
-                  title="Compounded Drawdown"
-                  value={portfolioStats.maxDrawdownCompounded}
-                  format="percentage"
-                  icon={<AlertTriangle className="h-4 w-4" />}
-                  trend="negative"
-                  subtitle="Normalized growth-adjusted (Option Omega style)"
-                />
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Additional metrics row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 pt-4 border-t">
           <div className="text-center">

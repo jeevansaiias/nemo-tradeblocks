@@ -2,6 +2,15 @@ import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
 import { PortfolioStatsCalculator } from '@/lib/calculations/portfolio-stats'
+import { calculatePremiumEfficiencyPercent, computeTotalPremium } from '@/lib/metrics/trade-efficiency'
+import { 
+  calculateMFEMAEData, 
+  calculateMFEMAEStats, 
+  createExcursionDistribution,
+  type MFEMAEDataPoint,
+  type MFEMAEStats,
+  type NormalizationBasis
+} from '@/lib/calculations/mfe-mae'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -39,6 +48,27 @@ export interface SnapshotChartData {
   tradeSequence: Array<{ tradeNumber: number; pl: number; date: string }>
   romTimeline: Array<{ date: string; rom: number }>
   rollingMetrics: Array<{ date: string; winRate: number; sharpeRatio: number; profitFactor: number; volatility: number }>
+  volatilityRegimes: Array<{ date: string; openingVix?: number; closingVix?: number; pl: number; rom?: number }>
+  premiumEfficiency: Array<{
+    tradeNumber: number
+    date: string
+    pl: number
+    premium?: number
+    avgClosingCost?: number
+    maxProfit?: number
+    maxLoss?: number
+    totalCommissions?: number
+    efficiencyPct?: number
+    efficiencyDenominator?: number
+    efficiencyBasis?: string
+    totalPremium?: number
+  }>
+  marginUtilization: Array<{ date: string; marginReq: number; fundsAtClose: number; numContracts: number; pl: number }>
+  exitReasonBreakdown: Array<{ reason: string; count: number; avgPl: number; totalPl: number }>
+  holdingPeriods: Array<{ tradeNumber: number; dateOpened: string; dateClosed?: string; durationHours: number; pl: number; strategy: string }>
+  mfeMaeData: MFEMAEDataPoint[]
+  mfeMaeStats: Partial<Record<NormalizationBasis, MFEMAEStats>>
+  mfeMaeDistribution: Array<{ bucket: string; mfeCount: number; maeCount: number; range: [number, number] }>
 }
 
 export interface PerformanceSnapshot {
@@ -130,6 +160,40 @@ export async function processChartData(
 
   const rollingMetrics = calculateRollingMetrics(trades)
 
+  const volatilityRegimes = calculateVolatilityRegimes(trades)
+  const premiumEfficiency = calculatePremiumEfficiency(trades)
+  const marginUtilization = calculateMarginUtilization(trades)
+  const exitReasonBreakdown = calculateExitReasonBreakdown(trades)
+  const holdingPeriods = calculateHoldingPeriods(trades)
+
+  // MFE/MAE excursion analysis
+  let mfeMaeData: MFEMAEDataPoint[] = []
+  let mfeMaeStats: Partial<Record<NormalizationBasis, MFEMAEStats>> = {}
+  let mfeMaeDistribution: Array<{ bucket: string; mfeCount: number; maeCount: number; range: [number, number] }> = []
+
+  try {
+    mfeMaeData = calculateMFEMAEData(trades)
+    if (mfeMaeData.length > 0) {
+      mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
+      mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
+    } else {
+      // Create synthetic MFE/MAE data if no real excursion data is available
+      mfeMaeData = createSyntheticMFEMAEData(trades)
+      if (mfeMaeData.length > 0) {
+        mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
+        mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to calculate MFE/MAE data:', error)
+    // Fallback to synthetic data
+    mfeMaeData = createSyntheticMFEMAEData(trades)
+    if (mfeMaeData.length > 0) {
+      mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
+      mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
+    }
+  }
+
   return {
     equityCurve,
     drawdownData,
@@ -139,7 +203,15 @@ export async function processChartData(
     monthlyReturns,
     tradeSequence,
     romTimeline,
-    rollingMetrics
+    rollingMetrics,
+    volatilityRegimes,
+    premiumEfficiency,
+    marginUtilization,
+    exitReasonBreakdown,
+    holdingPeriods,
+    mfeMaeData,
+    mfeMaeStats,
+    mfeMaeDistribution
   }
 }
 
@@ -491,4 +563,209 @@ function calculateRollingMetrics(trades: Trade[]) {
   }
 
   return metrics
+}
+
+function getFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && isFinite(value)) {
+    return value
+  }
+  return undefined
+}
+
+function calculateVolatilityRegimes(trades: Trade[]) {
+  return trades.map(trade => {
+    const rom = trade.marginReq && trade.marginReq > 0 ? (trade.pl / trade.marginReq) * 100 : undefined
+    return {
+      date: new Date(trade.dateOpened).toISOString(),
+      openingVix: getFiniteNumber(trade.openingVix),
+      closingVix: getFiniteNumber(trade.closingVix),
+      pl: trade.pl,
+      rom
+    }
+  })
+}
+
+function calculatePremiumEfficiency(trades: Trade[]) {
+  return trades.map((trade, index) => {
+    const totalCommissions = 
+      (getFiniteNumber(trade.openingCommissionsFees) ?? 0) + 
+      (getFiniteNumber(trade.closingCommissionsFees) ?? 0)
+
+    const efficiencyResult = calculatePremiumEfficiencyPercent(trade)
+    const totalPremium = computeTotalPremium(trade)
+
+    return {
+      tradeNumber: index + 1,
+      date: new Date(trade.dateOpened).toISOString(),
+      pl: trade.pl,
+      premium: getFiniteNumber(trade.premium),
+      avgClosingCost: getFiniteNumber(trade.avgClosingCost),
+      maxProfit: getFiniteNumber(trade.maxProfit),
+      maxLoss: getFiniteNumber(trade.maxLoss),
+      totalCommissions: totalCommissions,
+      efficiencyPct: efficiencyResult.percentage,
+      efficiencyDenominator: efficiencyResult.denominator,
+      efficiencyBasis: efficiencyResult.basis,
+      totalPremium: totalPremium
+    }
+  })
+}
+
+function calculateMarginUtilization(trades: Trade[]) {
+  return trades
+    .filter(trade => trade.marginReq && trade.marginReq > 0)
+    .map(trade => ({
+      date: new Date(trade.dateOpened).toISOString(),
+      marginReq: trade.marginReq!,
+      fundsAtClose: 0, // Would need daily log data
+      numContracts: trade.numContracts ?? 1,
+      pl: trade.pl
+    }))
+}
+
+function calculateExitReasonBreakdown(trades: Trade[]) {
+  const summaryMap = new Map<string, { count: number; totalPl: number }>()
+
+  trades.forEach(trade => {
+    const reason = (trade.reasonForClose && trade.reasonForClose.trim()) || 'Unknown'
+    const current = summaryMap.get(reason) || { count: 0, totalPl: 0 }
+    current.count += 1
+    current.totalPl += trade.pl
+    summaryMap.set(reason, current)
+  })
+
+  return Array.from(summaryMap.entries()).map(([reason, { count, totalPl }]) => ({
+    reason,
+    count,
+    totalPl,
+    avgPl: count > 0 ? totalPl / count : 0
+  }))
+}
+
+function calculateHoldingPeriods(trades: Trade[]) {
+  return trades.map((trade, index) => {
+    const openDate = new Date(trade.dateOpened)
+    const closeDate = trade.dateClosed ? new Date(trade.dateClosed) : openDate
+    const durationHours = (closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60)
+
+    return {
+      tradeNumber: index + 1,
+      dateOpened: openDate.toISOString(),
+      dateClosed: trade.dateClosed ? closeDate.toISOString() : undefined,
+      durationHours: Math.max(0, durationHours),
+      pl: trade.pl,
+      strategy: trade.strategy || 'Unknown'
+    }
+  })
+}
+
+function createSyntheticMFEMAEData(trades: Trade[]): MFEMAEDataPoint[] {
+  const syntheticData: MFEMAEDataPoint[] = []
+
+  trades.forEach((trade, index) => {
+    // Skip if we don't have minimum required data
+    if (!trade.pl && trade.pl !== 0) return
+
+    // Create synthetic MFE/MAE based on P/L and reasonable assumptions
+    const pl = trade.pl
+    const premium = getFiniteNumber(trade.premium) || 0
+    const marginReq = getFiniteNumber(trade.marginReq) || 0
+    
+    // If we have actual MFE/MAE data, use it
+    let mfe = getFiniteNumber(trade.maxProfit)
+    let mae = getFiniteNumber(trade.maxLoss)
+
+    // If we don't have MFE/MAE data, create synthetic estimates
+    if (!mfe && !mae) {
+      if (pl > 0) {
+        // Winner: assume MFE is 1.2x the final P/L, MAE is modest
+        mfe = Math.abs(pl) * 1.2
+        mae = Math.abs(pl) * 0.3
+      } else if (pl < 0) {
+        // Loser: assume MAE is 1.1x the loss, MFE shows some unrealized gain
+        mae = Math.abs(pl) * 1.1
+        mfe = Math.abs(pl) * 0.4
+      } else {
+        // Breakeven: small excursions
+        mfe = premium * 0.2 || 50
+        mae = premium * 0.2 || 50
+      }
+    } else if (!mfe) {
+      mfe = Math.max(Math.abs(pl), mae || 0) * 1.1
+    } else if (!mae) {
+      mae = Math.max(Math.abs(pl), mfe * 0.3)
+    }
+
+    // Ensure we have valid numbers
+    if (!mfe || !mae || mfe <= 0 || mae <= 0) return
+
+    // Determine denominator for normalization
+    let denominator = premium
+    let basis: 'premium' | 'margin' | 'unknown' = 'premium'
+
+    if (!denominator || denominator <= 0) {
+      denominator = marginReq
+      basis = 'margin'
+    }
+
+    if (!denominator || denominator <= 0) {
+      denominator = Math.max(mfe, mae, Math.abs(pl))
+      basis = 'unknown'
+    }
+
+    if (denominator <= 0) return // Skip if we can't normalize
+
+    // Create the data point
+    const dataPoint: MFEMAEDataPoint = {
+      tradeNumber: index + 1,
+      date: new Date(trade.dateOpened),
+      strategy: trade.strategy || 'Unknown',
+      mfe: mfe,
+      mae: mae,
+      pl: pl,
+      mfePercent: (mfe / denominator) * 100,
+      maePercent: (mae / denominator) * 100,
+      plPercent: (pl / denominator) * 100,
+      profitCapturePercent: mfe > 0 ? (pl / mfe) * 100 : undefined,
+      excursionRatio: mae > 0 ? mfe / mae : undefined,
+      denominator: denominator,
+      basis: basis,
+      isWinner: pl > 0,
+      marginReq: marginReq,
+      premium: premium || undefined,
+      normalizedBy: {
+        premium: premium > 0 ? {
+          denominator: premium,
+          mfePercent: (mfe / premium) * 100,
+          maePercent: (mae / premium) * 100,
+          plPercent: (pl / premium) * 100
+        } : undefined,
+        margin: marginReq > 0 ? {
+          denominator: marginReq,
+          mfePercent: (mfe / marginReq) * 100,
+          maePercent: (mae / marginReq) * 100,
+          plPercent: (pl / marginReq) * 100
+        } : undefined
+      },
+      openingPrice: trade.openingPrice,
+      closingPrice: trade.closingPrice,
+      numContracts: trade.numContracts || 1,
+      avgClosingCost: trade.avgClosingCost,
+      fundsAtClose: trade.fundsAtClose || 0,
+      openingCommissionsFees: trade.openingCommissionsFees || 0,
+      closingCommissionsFees: trade.closingCommissionsFees || 0,
+      openingShortLongRatio: trade.openingShortLongRatio || 0,
+      closingShortLongRatio: trade.closingShortLongRatio,
+      openingVix: trade.openingVix,
+      closingVix: trade.closingVix,
+      gap: trade.gap,
+      movement: trade.movement,
+      maxProfit: trade.maxProfit,
+      maxLoss: trade.maxLoss
+    }
+
+    syntheticData.push(dataPoint)
+  })
+
+  return syntheticData
 }

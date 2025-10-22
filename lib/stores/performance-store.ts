@@ -11,7 +11,6 @@ import {
 export interface DateRange {
   from: Date | undefined
   to: Date | undefined
-  preset: 'all' | 'ytd' | '1y' | '6m' | '3m' | '1m'
 }
 
 export interface ChartSettings {
@@ -47,8 +46,7 @@ interface PerformanceStore {
 
 const initialDateRange: DateRange = {
   from: undefined,
-  to: undefined,
-  preset: 'all'
+  to: undefined
 }
 
 const initialChartSettings: ChartSettings = {
