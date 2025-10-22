@@ -475,10 +475,13 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
 
   // Available presets based on data
   const availablePresets = useMemo(() => {
-    const availableValues = axisOptions.map(opt => opt.value)
+    if (axisOptions.length === 0) {
+      return []
+    }
+
+    const availableValues = new Set(axisOptions.map(opt => opt.value))
     return PRESETS.filter(preset =>
-      availableValues.includes(preset.xMetric) &&
-      availableValues.includes(preset.yMetric)
+      availableValues.has(preset.xMetric) && availableValues.has(preset.yMetric)
     )
   }, [axisOptions])
 
@@ -491,6 +494,19 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     }
 
     const availableValues = axisOptions.map(option => option.value)
+
+    // Keep selectedPreset valid
+    if (availablePresets.length === 0) {
+      if (selectedPreset !== "custom") {
+        setSelectedPreset("custom")
+      }
+    } else if (selectedPreset !== "custom") {
+      const presetExists = availablePresets.some(preset => preset.id === selectedPreset)
+      if (!presetExists) {
+        setSelectedPreset(availablePresets[0].id)
+        return
+      }
+    }
 
     // Handle preset selection
     if (selectedPreset !== "custom") {
@@ -529,7 +545,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     if (desiredY !== yMetric) {
       setYMetric(desiredY)
     }
-  }, [axisOptions, xMetric, yMetric, selectedPreset])
+  }, [axisOptions, availablePresets, xMetric, yMetric, selectedPreset])
 
   // Detect when user manually changes axes (switch to custom mode)
   const handleXMetricChange = (value: string) => {
@@ -549,6 +565,29 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
   const axisOptionMap = useMemo(() => {
     return new Map(axisOptions.map(option => [option.value, option]))
   }, [axisOptions])
+
+  // Helper to build typed custom-data payloads for Plotly
+  interface TooltipData {
+    trade: number
+    strategy: string
+    date: string
+    xLabel: string
+    yLabel: string
+    xFormatted: string
+    yFormatted: string
+    maeRaw: string
+    mfeRaw: string
+    pl: string
+    profitCapture: string
+    excursionRatio: string
+    basisLabel: string
+    premiumDenominator: string
+    marginDenominator: string
+    premiumPlPercent: string
+    marginPlPercent: string
+  }
+
+  type PlotCustomData = TooltipData
 
   const selectedX = xMetric ? axisOptionMap.get(xMetric) ?? null : null
   const selectedY = yMetric ? axisOptionMap.get(yMetric) ?? null : null
@@ -578,7 +617,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     const winners = points.filter(entry => entry.point.isWinner)
     const losers = points.filter(entry => !entry.point.isWinner)
 
-    const toCustomData = (entry: { point: MFEMAEDataPoint; xValue: number; yValue: number }) => {
+    const toCustomData = (entry: { point: MFEMAEDataPoint; xValue: number; yValue: number }): PlotCustomData => {
       const { point, xValue, yValue } = entry
       const premiumMetrics = point.normalizedBy?.premium
       const marginMetrics = point.normalizedBy?.margin
@@ -617,6 +656,8 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     }
 
     const traces: Partial<PlotData>[] = []
+    const winnerCustomData = winners.map(toCustomData)
+    const loserCustomData = losers.map(toCustomData)
 
     if (winners.length > 0) {
       traces.push({
@@ -634,7 +675,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
             width: 1
           }
         },
-        customdata: winners.map(toCustomData) as unknown as PlotData["customdata"],
+        customdata: winnerCustomData as unknown as PlotData["customdata"],
         hovertemplate:
           "<b>Winner - Trade #%{customdata.trade}</b><br>" +
           "Strategy: %{customdata.strategy}<br>" +
@@ -671,7 +712,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
             width: 1
           }
         },
-        customdata: losers.map(toCustomData) as unknown as PlotData["customdata"],
+        customdata: loserCustomData as unknown as PlotData["customdata"],
         hovertemplate:
           "<b>Loser - Trade #%{customdata.trade}</b><br>" +
           "Strategy: %{customdata.strategy}<br>" +
