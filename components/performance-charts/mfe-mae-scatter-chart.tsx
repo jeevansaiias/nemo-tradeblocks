@@ -44,7 +44,7 @@ const efficiencyBasisLabels: Record<EfficiencyBasis, string> = {
   unknown: "Unknown Basis"
 }
 
-function isFiniteNumber(value: number | null | undefined): value is number {
+function isFiniteNumber(value: number | null): value is number {
   return typeof value === "number" && Number.isFinite(value)
 }
 
