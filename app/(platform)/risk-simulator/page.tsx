@@ -2,51 +2,51 @@
 
 import { MultiSelect } from "@/components/multi-select";
 import {
-  DrawdownDistributionChart,
-  ReturnDistributionChart,
+    DrawdownDistributionChart,
+    ReturnDistributionChart,
 } from "@/components/risk-simulator/distribution-charts";
 import { StatisticsCards } from "@/components/risk-simulator/statistics-cards";
 import { TradingFrequencyCard } from "@/components/risk-simulator/trading-frequency-card";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
-  runMonteCarloSimulation,
-  type MonteCarloParams,
-  type MonteCarloResult,
+    runMonteCarloSimulation,
+    type MonteCarloParams,
+    type MonteCarloResult,
 } from "@/lib/calculations/monte-carlo";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
-import { getTradesByBlock } from "@/lib/db/trades-store";
 import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";
-import { Trade } from "@/lib/models/trade";
+import { getTradesByBlock } from "@/lib/db/trades-store";
 import { DailyLogEntry } from "@/lib/models/daily-log";
+import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
 import {
-  getDefaultSimulationPeriod,
-  percentageToTrades,
-  timeToTrades,
-  type TimeUnit,
+    getDefaultSimulationPeriod,
+    percentageToTrades,
+    timeToTrades,
+    type TimeUnit,
 } from "@/lib/utils/time-conversions";
 import { HelpCircle, Play, RotateCcw } from "lucide-react";
 import { useTheme } from "next-themes";

@@ -5,28 +5,28 @@ import { MarginStatisticsTable } from "@/components/position-sizing/margin-stati
 import { PortfolioSummary } from "@/components/position-sizing/portfolio-summary";
 import { StrategyKellyTable } from "@/components/position-sizing/strategy-kelly-table";
 import {
-  StrategyAnalysis,
-  StrategyResults,
+    StrategyAnalysis,
+    StrategyResults,
 } from "@/components/position-sizing/strategy-results";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import {
-  calculateKellyMetrics,
-  calculateStrategyKellyMetrics,
+    calculateKellyMetrics,
+    calculateStrategyKellyMetrics,
 } from "@/lib/calculations/kelly";
 import {
-  buildMarginTimeline,
-  calculateMaxMarginPct,
-  type MarginMode,
+    buildMarginTimeline,
+    calculateMaxMarginPct,
+    type MarginMode,
 } from "@/lib/calculations/margin-timeline";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";

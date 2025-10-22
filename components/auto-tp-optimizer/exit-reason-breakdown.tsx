@@ -1,13 +1,16 @@
 'use client';
 
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Cell,
 } from 'recharts';
+import { formatInt, formatPercentRaw } from '@/lib/utils/format';
 
 interface ExitReasonData {
   reason: string;
@@ -40,34 +43,32 @@ export function ExitReasonBreakdown({
   return (
     <div className="space-y-4">
       <ResponsiveContainer width="100%" height={250}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={({ name, value }) => `${name}: ${value}`}
-            outerRadius={80}
-            fill="#8884d8"
-            dataKey="value"
-          >
-            {data.map((_, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={COLORS[index % COLORS.length]}
-              />
-            ))}
-          </Pie>
+        <BarChart
+          data={chartData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="name" 
+            angle={-45}
+            textAnchor="end"
+            height={80}
+            fontSize={12}
+          />
+          <YAxis 
+            label={{ value: 'Number of Trades', angle: -90, position: 'insideLeft' }}
+            fontSize={12}
+          />
           <Tooltip
-            content={({ active, payload }) => {
+            content={({ active, payload, label }) => {
               if (active && payload && payload[0]) {
                 const data = payload[0].payload;
                 return (
                   <div className="rounded border border-border bg-background p-2 text-xs shadow-lg">
-                    <p className="font-semibold">{data.name}</p>
-                    <p>Count: {data.value}</p>
+                    <p className="font-semibold">{label}</p>
+                    <p>Count: {formatInt(data.value, false)}</p>
                     <p>
-                      Avg Missed: {data.avg_missed_profit.toFixed(2)}%
+                      Avg Missed: {formatPercentRaw(data.avg_missed_profit)}
                     </p>
                   </div>
                 );
@@ -75,8 +76,15 @@ export function ExitReasonBreakdown({
               return null;
             }}
           />
-          <Legend />
-        </PieChart>
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {data.map((_, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+              />
+            ))}
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
 
       {/* Stats Table */}
@@ -96,9 +104,9 @@ export function ExitReasonBreakdown({
               <span className="font-medium">{item.reason}</span>
             </div>
             <div className="text-right">
-              <div>{item.count} trades</div>
+              <div>{formatInt(item.count, false)} trades</div>
               <div className="text-muted-foreground">
-                Missed: {item.avg_missed_profit.toFixed(2)}%
+                Missed: {formatPercentRaw(item.avg_missed_profit)}
               </div>
             </div>
           </div>
