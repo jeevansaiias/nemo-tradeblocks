@@ -3,7 +3,15 @@
 import { useBlockStore } from "@/lib/stores/block-store";
 import { usePerformanceStore } from "@/lib/stores/performance-store";
 import { format } from "date-fns";
-import { AlertTriangle, CalendarIcon, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  CalendarIcon,
+  Gauge,
+  Loader2,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 
@@ -231,11 +239,31 @@ export default function PerformanceBlocksPage() {
       {/* Tabbed Interface */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="returns">Returns Analysis</TabsTrigger>
-          <TabsTrigger value="risk">Risk & Margin</TabsTrigger>
-          <TabsTrigger value="efficiency">Trade Efficiency</TabsTrigger>
-          <TabsTrigger value="excursion">Excursion Analysis</TabsTrigger>
+          <TabsTrigger value="overview" className="px-2.5 sm:px-3">
+            <code className="flex items-center gap-1 text-[13px] [&>svg]:h-4 [&>svg]:w-4">
+              <BarChart3 /> Overview
+            </code>
+          </TabsTrigger>
+          <TabsTrigger value="returns" className="px-2.5 sm:px-3">
+            <code className="flex items-center gap-1 text-[13px] [&>svg]:h-4 [&>svg]:w-4">
+              <TrendingUp /> Returns Analysis
+            </code>
+          </TabsTrigger>
+          <TabsTrigger value="risk" className="px-2.5 sm:px-3">
+            <code className="flex items-center gap-1 text-[13px] [&>svg]:h-4 [&>svg]:w-4">
+              <Gauge /> Risk & Margin
+            </code>
+          </TabsTrigger>
+          <TabsTrigger value="efficiency" className="px-2.5 sm:px-3">
+            <code className="flex items-center gap-1 text-[13px] [&>svg]:h-4 [&>svg]:w-4">
+              <Zap /> Trade Efficiency
+            </code>
+          </TabsTrigger>
+          <TabsTrigger value="excursion" className="px-2.5 sm:px-3">
+            <code className="flex items-center gap-1 text-[13px] [&>svg]:h-4 [&>svg]:w-4">
+              <AlertTriangle /> Excursion Analysis (Beta)
+            </code>
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview */}
