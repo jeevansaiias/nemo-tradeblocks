@@ -778,7 +778,7 @@ export default function PositionSizingPage() {
               variant="outline"
               className="gap-2 border-dashed border-primary/40 bg-primary/5"
             >
-              <AlertCircle className="h-4 w-4 text-primary" aria-hidden />
+              <AlertCircle className="h-4 w-4 text-primary" aria-hidden={true} />
               <AlertTitle className="text-sm font-semibold">
                 Pending changes
               </AlertTitle>
