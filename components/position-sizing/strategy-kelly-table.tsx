@@ -126,7 +126,7 @@ export function StrategyKellyTable({
                         <div className="flex items-center gap-1">
                           <Input
                             type="number"
-                            inputMode="decimal"
+                            inputMode="numeric"
                             value={kellyValue}
                             onChange={(e) =>
                               onKellyChange(strategy.name, Number(e.target.value))
