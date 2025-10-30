@@ -119,12 +119,29 @@ export function StrategyKellyTable({
                           }
                           min={0}
                           max={200}
-                          step={5}
+                          step={1}
                           className="flex-1"
+                          aria-label={`Kelly percentage slider for ${strategy.name}`}
                         />
-                        <span className="text-sm font-medium w-12 text-right">
-                          {kellyValue}%
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={kellyValue}
+                            onChange={(e) =>
+                              onKellyChange(strategy.name, Number(e.target.value))
+                            }
+                            onBlur={(e) =>
+                              onKellyChange(strategy.name, Number(e.target.value))
+                            }
+                            min={0}
+                            max={200}
+                            step={1}
+                            className="h-9 w-20 text-right"
+                            aria-label={`Kelly percentage input for ${strategy.name}`}
+                          />
+                          <span className="text-sm font-medium text-muted-foreground">%</span>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
