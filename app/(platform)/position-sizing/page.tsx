@@ -8,13 +8,9 @@ import {
   StrategyAnalysis,
   StrategyResults,
 } from "@/components/position-sizing/strategy-results";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
 import {
   HoverCard,
   HoverCardContent,
@@ -23,7 +19,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -31,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import {
   calculateKellyMetrics,
   calculateStrategyKellyMetrics,
@@ -100,10 +96,11 @@ export default function PositionSizingPage() {
         setDailyLog(loadedDailyLog);
 
         // Auto-detect starting capital (prefer daily log when available)
-        const calculatedCapital = PortfolioStatsCalculator.calculateInitialCapital(
-          loadedTrades,
-          loadedDailyLog.length > 0 ? loadedDailyLog : undefined
-        );
+        const calculatedCapital =
+          PortfolioStatsCalculator.calculateInitialCapital(
+            loadedTrades,
+            loadedDailyLog.length > 0 ? loadedDailyLog : undefined
+          );
         setStartingCapital(calculatedCapital > 0 ? calculatedCapital : 100000);
 
         // Initialize all strategies as selected with 100%
@@ -258,12 +255,7 @@ export default function PositionSizingPage() {
         portfolioKellyPct: runPortfolioKellyPct,
       },
     };
-  }, [
-    lastRunConfig,
-    trades,
-    dailyLog,
-    strategyData,
-  ]);
+  }, [lastRunConfig, trades, dailyLog, strategyData]);
 
   const hasPendingChanges = useMemo(() => {
     if (!lastRunConfig) {
@@ -575,7 +567,9 @@ export default function PositionSizingPage() {
                 id="portfolio-kelly"
                 type="number"
                 value={portfolioKellyInput}
-                onChange={(e) => handlePortfolioKellyInputChange(e.target.value)}
+                onChange={(e) =>
+                  handlePortfolioKellyInputChange(e.target.value)
+                }
                 onBlur={commitPortfolioKellyInput}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -604,14 +598,25 @@ export default function PositionSizingPage() {
                       </div>
                       <div className="px-4 pb-4 space-y-3 text-xs text-muted-foreground leading-relaxed">
                         <p className="text-sm text-foreground">
-                          Choose how the simulator scales capital requirements when trades stack.
+                          Choose how the simulator scales capital requirements
+                          when trades stack.
                         </p>
                         <ul className="list-disc list-inside space-y-1">
                           <li>
-                            <span className="font-medium text-foreground">Fixed Capital:</span> Uses your starting balance as a constant baseline. Pick this when you size positions with a flat dollar amount per trade.
+                            <span className="font-medium text-foreground">
+                              Fixed Capital:
+                            </span>{" "}
+                            Uses your starting balance as a constant baseline.
+                            Pick this when you size positions with a flat dollar
+                            amount per trade.
                           </li>
                           <li>
-                            <span className="font-medium text-foreground">Compounding:</span> Recalculates margin against current equity so requirements grow or shrink with account performance.
+                            <span className="font-medium text-foreground">
+                              Compounding:
+                            </span>{" "}
+                            Recalculates margin against current equity so
+                            requirements grow or shrink with account
+                            performance.
                           </li>
                         </ul>
                       </div>
@@ -685,8 +690,9 @@ export default function PositionSizingPage() {
                     onClick={() => {
                       const newValues: Record<string, number> = {};
                       selectedStrategies.forEach((strategy) => {
-                        newValues[strategy] =
-                          normalizeKellyValue(allStrategiesKellyPct);
+                        newValues[strategy] = normalizeKellyValue(
+                          allStrategiesKellyPct
+                        );
                       });
                       setKellyValues((prev) => ({ ...prev, ...newValues }));
                     }}
@@ -697,7 +703,9 @@ export default function PositionSizingPage() {
                 <div className="flex gap-2 text-xs text-muted-foreground">
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(normalizeKellyValue(25))}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(25))
+                    }
                     className="hover:text-foreground"
                   >
                     25%
@@ -705,7 +713,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(normalizeKellyValue(50))}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(50))
+                    }
                     className="hover:text-foreground"
                   >
                     50%
@@ -713,7 +723,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(normalizeKellyValue(75))}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(75))
+                    }
                     className="hover:text-foreground"
                   >
                     75%
@@ -721,7 +733,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(normalizeKellyValue(100))}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(100))
+                    }
                     className="hover:text-foreground"
                   >
                     100%
@@ -729,7 +743,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(normalizeKellyValue(125))}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(125))
+                    }
                     className="hover:text-foreground"
                   >
                     125%
@@ -737,7 +753,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(normalizeKellyValue(150))}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(150))
+                    }
                     className="hover:text-foreground"
                   >
                     150%
@@ -775,18 +793,21 @@ export default function PositionSizingPage() {
         <>
           {hasPendingChanges && (
             <Alert
-              variant="outline"
+              variant="default"
               className="gap-2 border-dashed border-primary/40 bg-primary/5"
             >
-              <AlertCircle className="h-4 w-4 text-primary" aria-hidden={true} />
+              <AlertCircle
+                className="h-4 w-4 text-primary"
+                aria-hidden={true}
+              />
               <AlertTitle className="text-sm font-semibold">
                 Pending changes
               </AlertTitle>
               <AlertDescription className="text-xs text-muted-foreground">
                 Current results reflect the last run with $
-                {results.config.startingCapital.toLocaleString()} starting capital
-                at {results.config.portfolioKellyPct}% portfolio Kelly. Click Run
-                Allocation to refresh with your latest settings.
+                {results.config.startingCapital.toLocaleString()} starting
+                capital at {results.config.portfolioKellyPct}% portfolio Kelly.
+                Click Run Allocation to refresh with your latest settings.
               </AlertDescription>
             </Alert>
           )}
