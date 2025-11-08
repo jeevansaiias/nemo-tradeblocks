@@ -37,10 +37,10 @@ import {
   type MonteCarloResult,
 } from "@/lib/calculations/monte-carlo";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
-import { getTradesByBlock } from "@/lib/db/trades-store";
 import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";
-import { Trade } from "@/lib/models/trade";
+import { getTradesByBlock } from "@/lib/db/trades-store";
 import { DailyLogEntry } from "@/lib/models/daily-log";
+import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
 import {
   getDefaultSimulationPeriod,
@@ -76,6 +76,16 @@ export default function RiskSimulatorPage() {
   const [seedValue, setSeedValue] = useState(42);
   const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
 
+  // Worst-case scenario parameters
+  const [worstCaseEnabled, setWorstCaseEnabled] = useState(false);
+  const [worstCasePercentage, setWorstCasePercentage] = useState(5);
+  const [worstCaseMode, setWorstCaseMode] = useState<"pool" | "guarantee">(
+    "pool"
+  );
+  const [worstCaseBasedOn, setWorstCaseBasedOn] = useState<
+    "simulation" | "historical"
+  >("simulation");
+
   // Chart display options
   const [scaleType, setScaleType] = useState<"linear" | "log">("linear");
   const [showIndividualPaths, setShowIndividualPaths] = useState(false);
@@ -100,6 +110,14 @@ export default function RiskSimulatorPage() {
       value: strategy,
     }));
   };
+
+  const tradesForWorstCase = useMemo(() => {
+    if (selectedStrategies.length > 0) {
+      const selected = new Set(selectedStrategies);
+      return trades.filter((trade) => selected.has(trade.strategy || ""));
+    }
+    return trades;
+  }, [selectedStrategies, trades]);
 
   // Auto-calculate trades per year from actual data
   const calculatedTradesPerYear = useMemo(() => {
@@ -173,6 +191,50 @@ export default function RiskSimulatorPage() {
     );
   }, [simulationPeriodValue, simulationPeriodUnit, tradesPerYear]);
 
+  const worstCaseSimulationBudget = useMemo(() => {
+    if (!worstCaseEnabled || simulationLength <= 0) {
+      return 0;
+    }
+    const requested = Math.ceil((simulationLength * worstCasePercentage) / 100);
+    return Math.min(simulationLength, Math.max(1, requested));
+  }, [worstCaseEnabled, simulationLength, worstCasePercentage]);
+
+  const historicalWorstCaseRequest = useMemo(() => {
+    if (
+      !worstCaseEnabled ||
+      worstCaseBasedOn !== "historical" ||
+      tradesForWorstCase.length === 0
+    ) {
+      return 0;
+    }
+
+    const counts = tradesForWorstCase.reduce((acc, trade) => {
+      const strategy = trade.strategy || "Unknown";
+      acc.set(strategy, (acc.get(strategy) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>());
+
+    let totalRequested = 0;
+    for (const count of counts.values()) {
+      totalRequested += Math.max(
+        1,
+        Math.round((count * worstCasePercentage) / 100)
+      );
+    }
+    return totalRequested;
+  }, [
+    tradesForWorstCase,
+    worstCaseBasedOn,
+    worstCaseEnabled,
+    worstCasePercentage,
+  ]);
+
+  const shouldShowHistoricalCapHint =
+    worstCaseEnabled &&
+    worstCaseBasedOn === "historical" &&
+    historicalWorstCaseRequest > worstCaseSimulationBudget &&
+    worstCaseSimulationBudget > 0;
+
   const runSimulation = async () => {
     if (!activeBlockId || trades.length === 0) {
       setError("No active block or trades available");
@@ -243,6 +305,10 @@ export default function RiskSimulatorPage() {
         tradesPerYear: effectiveTradesPerYear,
         randomSeed: useFixedSeed ? seedValue : undefined,
         normalizeTo1Lot,
+        worstCaseEnabled,
+        worstCasePercentage,
+        worstCaseMode,
+        worstCaseBasedOn,
       };
 
       const simulationResult = runMonteCarloSimulation(filteredTrades, params);
@@ -769,6 +835,310 @@ export default function RiskSimulatorPage() {
               </p>
             </div>
           </div>
+
+          {/* Worst-Case Scenario Injection */}
+          <Card>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Label className="text-base font-semibold">
+                    Worst-Case Scenario Testing
+                  </Label>
+                  <HoverCard>
+                    <HoverCardTrigger asChild>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground/60 cursor-help" />
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-96 p-0 overflow-hidden">
+                      <div className="space-y-3">
+                        <div className="bg-primary/5 border-b px-4 py-3">
+                          <h4 className="text-sm font-semibold text-primary">
+                            Worst-Case Scenario Testing
+                          </h4>
+                        </div>
+                        <div className="px-4 pb-4 space-y-3">
+                          <p className="text-sm font-medium text-foreground leading-relaxed">
+                            Inject synthetic maximum-loss trades to stress-test
+                            your portfolio against catastrophic scenarios.
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            For each strategy, this creates trades that lose the
+                            full allocated margin (worst possible outcome). If a
+                            strategy does not report margin, we fall back to its
+                            recorded max loss (or largest historical loser) so
+                            the stress still reflects that strategy&apos;s risk.
+                          </p>
+                        </div>
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
+                </div>
+
+                {/* Enable Toggle */}
+                <div className="flex items-center gap-4">
+                  <Switch
+                    id="worst-case-enabled"
+                    checked={worstCaseEnabled}
+                    onCheckedChange={setWorstCaseEnabled}
+                  />
+                  <Label
+                    htmlFor="worst-case-enabled"
+                    className="cursor-pointer font-medium"
+                  >
+                    Enable worst-case maximum-loss trades
+                  </Label>
+                </div>
+
+                {worstCaseEnabled && (
+                  <div className="space-y-4 pl-6 border-l-2 border-primary/20">
+                    {/* Percentage Slider */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">
+                          Percentage of max-loss trades
+                        </Label>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-72 p-0 overflow-hidden">
+                            <div className="space-y-3">
+                              <div className="bg-primary/5 border-b px-4 py-3">
+                                <h4 className="text-sm font-semibold text-primary">
+                                  Percentage of Max-Loss Trades
+                                </h4>
+                              </div>
+                              <div className="px-4 pb-4">
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  Controls how many max-loss trades are created.
+                                  In pool mode, they&apos;re added to the
+                                  resample pool. In guarantee mode, they&apos;re
+                                  forced into every simulation. When margin data
+                                  is missing, we automatically use that
+                                  strategy&apos;s largest recorded loss so the
+                                  test still reflects its downside.
+                                </p>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Slider
+                          value={[worstCasePercentage]}
+                          onValueChange={(values) =>
+                            setWorstCasePercentage(values[0])
+                          }
+                          min={1}
+                          max={20}
+                          step={1}
+                          className="flex-1"
+                        />
+                        <div className="w-16 text-right font-medium">
+                          {worstCasePercentage}%
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {worstCaseBasedOn === "simulation" ? (
+                          <>
+                            Exactly {worstCasePercentage}% of the simulation
+                            horizon (≈ {worstCaseSimulationBudget} synthetic
+                            trades) split evenly across strategies.
+                          </>
+                        ) : (
+                          <>
+                            Weighted by each strategy&apos;s historical trade
+                            count, but capped at {worstCasePercentage}% of the
+                            simulation (≈ {worstCaseSimulationBudget} trades) so
+                            the &quot;Force {worstCasePercentage}%&quot; promise
+                            stays accurate.
+                          </>
+                        )}
+                      </p>
+                      {shouldShowHistoricalCapHint && (
+                        <p className="text-[11px] text-amber-600">
+                          ℹ️ Weighting by historical data would create ~
+                          {historicalWorstCaseRequest} synthetic trades, but
+                          we&apos;re capping it at {worstCaseSimulationBudget}{" "}
+                          trades ({worstCasePercentage}% of your{" "}
+                          {simulationLength}-trade simulation) to keep the
+                          percentage accurate. The budget is distributed fairly
+                          across strategies.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Injection Mode */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">
+                          Injection mode
+                        </Label>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-80 p-0 overflow-hidden">
+                            <div className="space-y-3">
+                              <div className="bg-primary/5 border-b px-4 py-3">
+                                <h4 className="text-sm font-semibold text-primary">
+                                  Injection Modes
+                                </h4>
+                              </div>
+                              <div className="px-4 pb-4 space-y-3">
+                                <div>
+                                  <p className="text-xs font-medium text-foreground">
+                                    Add to resample pool:
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Max-loss trades are added to the pool and
+                                    sampled randomly. They may appear 0, 1, or
+                                    multiple times per simulation. More
+                                    conservative approach.
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-foreground">
+                                    Guarantee in every simulation:
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Each simulation MUST include the exact
+                                    percentage of max-loss trades. We swap out
+                                    baseline draws (instead of appending) so the
+                                    simulation horizon stays the same while the
+                                    losses are randomly interspersed.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="worst-case-pool"
+                            name="worst-case-mode"
+                            checked={worstCaseMode === "pool"}
+                            onChange={() => setWorstCaseMode("pool")}
+                            className="cursor-pointer"
+                            aria-label="worst-case-pool"
+                          />
+                          <Label
+                            htmlFor="worst-case-pool"
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            Add to pool (may randomly appear)
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="worst-case-guarantee"
+                            name="worst-case-mode"
+                            checked={worstCaseMode === "guarantee"}
+                            onChange={() => setWorstCaseMode("guarantee")}
+                            className="cursor-pointer"
+                            aria-label="worst-case-guarantee"
+                          />
+                          <Label
+                            htmlFor="worst-case-guarantee"
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            Force {worstCasePercentage}% into every simulation
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Percentage Basis */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">
+                          Percentage based on
+                        </Label>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-80 p-0 overflow-hidden">
+                            <div className="space-y-3">
+                              <div className="bg-primary/5 border-b px-4 py-3">
+                                <h4 className="text-sm font-semibold text-primary">
+                                  Percentage Calculation Basis
+                                </h4>
+                              </div>
+                              <div className="px-4 pb-4 space-y-3">
+                                <div>
+                                  <p className="text-xs font-medium text-foreground">
+                                    Simulation length (recommended):
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Percentage is based on the simulation
+                                    length. For example, 5% of a 500-trade
+                                    simulation would add ~25 max-loss trades
+                                    (divided evenly across strategies). More
+                                    intuitive for stress testing.
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-foreground">
+                                    Historical data count:
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Percentage is based on historical trade
+                                    count per strategy. With large datasets,
+                                    this can inject many worst-case trades.
+                                    Better for proportional historical analysis.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="worst-case-simulation"
+                            name="worst-case-based-on"
+                            checked={worstCaseBasedOn === "simulation"}
+                            onChange={() => setWorstCaseBasedOn("simulation")}
+                            className="cursor-pointer"
+                            aria-label="worst-case-simulation"
+                          />
+                          <Label
+                            htmlFor="worst-case-simulation"
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            Simulation length
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="worst-case-historical"
+                            name="worst-case-based-on"
+                            checked={worstCaseBasedOn === "historical"}
+                            onChange={() => setWorstCaseBasedOn("historical")}
+                            className="cursor-pointer"
+                            aria-label="worst-case-historical"
+                          />
+                          <Label
+                            htmlFor="worst-case-historical"
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            Historical data count
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Advanced Settings */}
           <Accordion type="single" collapsible>
