@@ -48,6 +48,18 @@ export interface MonteCarloParams {
 
   /** Normalize trades to 1-lot by scaling P&L by numContracts (optional) */
   normalizeTo1Lot?: boolean;
+
+  /** Enable worst-case scenario injection (optional) */
+  worstCaseEnabled?: boolean;
+
+  /** Percentage of trades that should be max-loss scenarios (0-100) */
+  worstCasePercentage?: number;
+
+  /** How to inject worst-case trades: add to pool or guarantee in every simulation */
+  worstCaseMode?: "pool" | "guarantee";
+
+  /** What to base the percentage on: simulation length (default) or historical data */
+  worstCaseBasedOn?: "simulation" | "historical";
 }
 
 /**
@@ -219,6 +231,233 @@ function createSeededRandom(seed: number): () => number {
     state = (state * 1664525 + 1013904223) % 4294967296;
     return state / 4294967296;
   };
+}
+
+/**
+ * Create synthetic maximum-loss trades for worst-case scenario testing
+ *
+ * For each strategy in the provided trades:
+ * - Finds the maximum margin requirement
+ * - Calculates average number of contracts
+ * - Creates synthetic trades that lose the full allocated margin
+ *
+ * @param trades - All available trades
+ * @param percentage - Percentage of trades to create as max-loss (0-100)
+ * @param simulationLength - Length of the simulation (number of trades)
+ * @param basedOn - Whether to base percentage on "simulation" length or "historical" data count
+ * @returns Array of synthetic max-loss trades
+ */
+export function createSyntheticMaxLossTrades(
+  trades: Trade[],
+  percentage: number,
+  simulationLength: number,
+  basedOn: "simulation" | "historical" = "simulation"
+): Trade[] {
+  if (percentage <= 0 || trades.length === 0 || simulationLength <= 0) {
+    return [];
+  }
+
+  // Group trades by strategy
+  const strategiesMap = new Map<string, Trade[]>();
+  for (const trade of trades) {
+    const strategy = trade.strategy || "Unknown";
+    if (!strategiesMap.has(strategy)) {
+      strategiesMap.set(strategy, []);
+    }
+    strategiesMap.get(strategy)!.push(trade);
+  }
+
+  if (strategiesMap.size === 0) {
+    return [];
+  }
+
+  const requestedBudget = Math.ceil((simulationLength * percentage) / 100);
+  const cappedBudget = Math.min(
+    simulationLength,
+    Math.max(1, requestedBudget)
+  );
+
+  if (cappedBudget <= 0) {
+    return [];
+  }
+
+  const strategyEntries = Array.from(strategiesMap.entries());
+  const weights = strategyEntries.map(([, strategyTrades]) =>
+    basedOn === "historical" ? strategyTrades.length : 1
+  );
+  const allocations = allocateSyntheticCounts(weights, cappedBudget);
+
+  const syntheticTrades: Trade[] = [];
+
+  strategyEntries.forEach(([strategyName, strategyTrades], index) => {
+    const numLosers = allocations[index];
+    if (numLosers === 0) {
+      return;
+    }
+
+    let maxMargin = 0;
+    let fallbackRisk = 0;
+    let fallbackSource: "maxLoss" | "historicalPL" | null = null;
+    let totalContracts = 0;
+    let validContractCount = 0;
+
+    for (const trade of strategyTrades) {
+      if (trade.marginReq && trade.marginReq > maxMargin) {
+        maxMargin = trade.marginReq;
+      }
+
+      if (trade.numContracts) {
+        totalContracts += trade.numContracts;
+        validContractCount++;
+      }
+
+      const candidateMaxLoss = Math.abs(trade.maxLoss ?? 0);
+      if (candidateMaxLoss > fallbackRisk) {
+        fallbackRisk = candidateMaxLoss;
+        fallbackSource = candidateMaxLoss > 0 ? "maxLoss" : fallbackSource;
+      }
+
+      const candidateHistoricalPL = Math.abs(trade.pl ?? 0);
+      if (candidateHistoricalPL > fallbackRisk) {
+        fallbackRisk = candidateHistoricalPL;
+        fallbackSource =
+          candidateHistoricalPL > 0 ? "historicalPL" : fallbackSource;
+      }
+    }
+
+    let riskAmount = maxMargin;
+    let fallbackLabel: string | null = null;
+
+    if (riskAmount <= 0 && fallbackRisk > 0) {
+      riskAmount = fallbackRisk;
+      fallbackLabel =
+        fallbackSource === "maxLoss"
+          ? " (historical max loss)"
+          : " (largest historical loss)";
+    }
+
+    if (riskAmount <= 0) {
+      return;
+    }
+
+    const avgContracts =
+      validContractCount > 0
+        ? Math.max(1, Math.round(totalContracts / validContractCount))
+        : 1;
+
+    const earliestDate = strategyTrades.reduce(
+      (earliest, trade) =>
+        trade.dateOpened < earliest ? trade.dateOpened : earliest,
+      strategyTrades[0].dateOpened
+    );
+
+    const reasonForClose =
+      fallbackLabel === null
+        ? "Synthetic worst-case scenario"
+        : `Synthetic worst-case scenario${fallbackLabel}`;
+
+    for (let i = 0; i < numLosers; i++) {
+      const syntheticTrade: Trade = {
+        dateOpened: new Date(earliestDate),
+        timeOpened: "00:00:00",
+        openingPrice: 0,
+        legs: "SYNTHETIC_MAX_LOSS",
+        premium: 0,
+        closingPrice: 0,
+        dateClosed: new Date(earliestDate),
+        timeClosed: "00:00:00",
+        avgClosingCost: 0,
+        reasonForClose,
+        pl: -riskAmount,
+        numContracts: avgContracts,
+        fundsAtClose: 0,
+        marginReq: riskAmount,
+        strategy: strategyName,
+        openingCommissionsFees: 0,
+        closingCommissionsFees: 0,
+        openingShortLongRatio: 0,
+        closingShortLongRatio: 0,
+        openingVix: 0,
+        closingVix: 0,
+        gap: 0,
+        movement: 0,
+        maxProfit: 0,
+        maxLoss: -riskAmount,
+      };
+
+      syntheticTrades.push(syntheticTrade);
+    }
+  });
+
+  return syntheticTrades;
+}
+
+function allocateSyntheticCounts(weights: number[], budget: number): number[] {
+  if (weights.length === 0) {
+    return [];
+  }
+
+  if (budget <= 0) {
+    return new Array(weights.length).fill(0);
+  }
+
+  const positiveWeights = weights.map((weight) => (weight > 0 ? weight : 0));
+  const totalWeight = positiveWeights.reduce((sum, weight) => sum + weight, 0);
+
+  if (totalWeight === 0) {
+    const evenShare = Math.floor(budget / weights.length);
+    let remainder = budget - evenShare * weights.length;
+    return weights.map((_, index) => {
+      if (remainder > 0) {
+        remainder--;
+        return evenShare + 1;
+      }
+      return evenShare;
+    });
+  }
+
+  const rawAllocations = positiveWeights.map((weight) =>
+    weight === 0 ? 0 : (weight / totalWeight) * budget
+  );
+  const allocations = rawAllocations.map((value) => Math.floor(value));
+  let remainder = budget - allocations.reduce((sum, value) => sum + value, 0);
+
+  const order = rawAllocations
+    .map((value, index) => ({
+      index,
+      fraction: positiveWeights[index] === 0 ? -1 : value - allocations[index],
+    }))
+    .sort((a, b) => {
+      if (b.fraction === a.fraction) {
+        return a.index - b.index;
+      }
+      return b.fraction - a.fraction;
+    });
+
+  let cursor = 0;
+  while (remainder > 0 && cursor < order.length) {
+    const target = order[cursor];
+    if (target.fraction >= 0) {
+      allocations[target.index]++;
+      remainder--;
+    }
+    cursor++;
+  }
+
+  cursor = 0;
+  while (remainder > 0 && order.length > 0) {
+    const target = order[cursor % order.length];
+    if (target.fraction >= 0) {
+      allocations[target.index]++;
+      remainder--;
+    } else {
+      cursor++;
+      continue;
+    }
+    cursor++;
+  }
+
+  return allocations;
 }
 
 /**
@@ -652,6 +891,52 @@ export function runMonteCarloSimulation(
     );
   }
 
+  // Handle worst-case scenario injection
+  let worstCaseTrades: number[] = [];
+  if (params.worstCaseEnabled && params.worstCasePercentage && params.worstCasePercentage > 0) {
+    // Create synthetic max-loss trades
+    const syntheticTrades = createSyntheticMaxLossTrades(
+      trades,
+      params.worstCasePercentage,
+      params.simulationLength,
+      params.worstCaseBasedOn || "simulation"
+    );
+
+    // Convert synthetic trades to P&L values based on resample method
+    if (params.resampleMethod === "percentage") {
+      // For percentage mode, convert to percentage returns
+      // Use the initial capital as the basis for percentage calculation
+      // since we don't know the exact capital at each synthetic trade time
+      const capital = params.historicalInitialCapital || params.initialCapital;
+      worstCaseTrades = syntheticTrades.map((t) => {
+        const pl = params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl;
+        // Calculate percentage return based on capital, not margin
+        // This gives a realistic percentage loss relative to portfolio size
+        return pl / capital;
+      });
+    } else {
+      // For trades/daily mode, use P&L directly
+      worstCaseTrades = syntheticTrades.map((t) =>
+        params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl
+      );
+    }
+
+    // If mode is "pool", add to resample pool
+    if (params.worstCaseMode === "pool") {
+      resamplePool = [...resamplePool, ...worstCaseTrades];
+    }
+  }
+
+  const enforcedGuaranteeTrades =
+    params.worstCaseEnabled &&
+    params.worstCaseMode === "guarantee" &&
+    params.simulationLength > 0
+      ? worstCaseTrades.slice(
+          0,
+          Math.min(worstCaseTrades.length, params.simulationLength)
+        )
+      : [];
+
   // Run all simulations
   const simulations: SimulationPath[] = [];
 
@@ -660,11 +945,32 @@ export function runMonteCarloSimulation(
     const seed = params.randomSeed !== undefined ? params.randomSeed + i : undefined;
 
     // Resample P&Ls
-    const resampledPLs = resampleWithReplacement(
+    const guaranteeActive = enforcedGuaranteeTrades.length > 0;
+    const baselineSampleSize = guaranteeActive
+      ? Math.max(0, params.simulationLength - enforcedGuaranteeTrades.length)
+      : params.simulationLength;
+
+    let resampledPLs = resampleWithReplacement(
       resamplePool,
-      params.simulationLength,
+      baselineSampleSize,
       seed
     );
+
+    if (guaranteeActive) {
+      const combined = [...resampledPLs];
+      const rng = seed !== undefined ? createSeededRandom(seed + 999999) : Math.random;
+
+      for (const worstCase of enforcedGuaranteeTrades) {
+        const randomPosition = Math.floor(rng() * (combined.length + 1));
+        combined.splice(randomPosition, 0, worstCase);
+      }
+
+      if (combined.length > params.simulationLength) {
+        combined.length = params.simulationLength;
+      }
+
+      resampledPLs = combined;
+    }
 
     // Run simulation
     const simulation = runSingleSimulation(
