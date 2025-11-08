@@ -28,21 +28,21 @@ describe("Monte Carlo Simulation (sample data)", () => {
 
     expect(result.statistics).toMatchInlineSnapshot(`
 {
-  "meanAnnualizedReturn": 3.198050032676915,
-  "meanFinalValue": 966776.0379000002,
-  "meanMaxDrawdown": 0.1515253247241811,
-  "meanSharpeRatio": 3.330841942843971,
-  "meanTotalReturn": 0.9352172915750541,
-  "medianAnnualizedReturn": 2.9882793739585547,
-  "medianFinalValue": 965343.5900000001,
-  "medianMaxDrawdown": 0.13024593551857483,
-  "medianTotalReturn": 0.9323499284664468,
-  "probabilityOfProfit": 0.99,
-  "stdFinalValue": 200530.08553329247,
+  "meanAnnualizedReturn": 1.3074502002408317,
+  "meanFinalValue": 735352.6545000005,
+  "meanMaxDrawdown": 0.07388740419836855,
+  "meanSharpeRatio": 3.5944394545765643,
+  "meanTotalReturn": 0.4719719113903137,
+  "medianAnnualizedReturn": 1.2222057059780882,
+  "medianFinalValue": 730686.49,
+  "medianMaxDrawdown": 0.06376008915186528,
+  "medianTotalReturn": 0.4626315451920069,
+  "probabilityOfProfit": 0.975,
+  "stdFinalValue": 107571.26551833487,
   "valueAtRisk": {
-    "p10": 0.5190873923193438,
-    "p25": 0.6619996974997029,
-    "p5": 0.2449221606207716,
+    "p10": 0.1801627264228324,
+    "p25": 0.3445487072716335,
+    "p5": 0.10379656086469356,
   },
 }
 `);

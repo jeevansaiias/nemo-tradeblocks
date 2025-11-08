@@ -8,6 +8,7 @@ import {
   IconReportAnalytics,
   IconRouteSquare,
   IconStack2,
+  IconTimelineEvent,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
 import Link from "next/link";
@@ -60,6 +61,12 @@ const navData = {
       title: "Correlation Matrix",
       href: "/correlation-matrix",
       icon: IconChartHistogram,
+    },
+    {
+      title: "Walk-Forward",
+      href: "/walk-forward",
+      icon: IconTimelineEvent,
+      badge: "New",
     },
     {
       title: "Comparison Blocks",
