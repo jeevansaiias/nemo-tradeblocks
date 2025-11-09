@@ -13,6 +13,8 @@ import { PortfolioStatsCalculator } from '@/lib/calculations/portfolio-stats';
 import { Trade } from '@/lib/models/trade';
 import { DailyLogEntry } from '@/lib/models/daily-log';
 import { CsvTestDataLoader } from '../data/csv-loader';
+import { mockTrades as portfolioSnapshotTrades } from '../data/mock-trades';
+import { normalizeTradesToOneLot } from '@/lib/utils/trade-normalization';
 
 describe('PortfolioStatsCalculator', () => {
   let calculator: PortfolioStatsCalculator;
@@ -505,5 +507,30 @@ describe('PortfolioStatsCalculator', () => {
       expect(stats.winRate).toBe(1);
       // Without daily logs, some metrics may be undefined
     });
+  });
+});
+
+describe('PortfolioStatsCalculator normalization impact', () => {
+  it('keeps normalized drawdowns in line with raw data for mock trades', () => {
+    const calculator = new PortfolioStatsCalculator();
+    const rawStats = calculator.calculatePortfolioStats(portfolioSnapshotTrades);
+    const normalizedTrades = normalizeTradesToOneLot(portfolioSnapshotTrades);
+    const normalizedStats = calculator.calculatePortfolioStats(normalizedTrades);
+
+    expect(normalizedStats.maxDrawdown).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(normalizedStats.maxDrawdown - rawStats.maxDrawdown)).toBeLessThan(1);
+  });
+
+  it('keeps normalized drawdowns reasonable for CSV fixtures', async () => {
+    const { trades, source } = await CsvTestDataLoader.loadTrades();
+    if (source !== 'csv') {
+      return;
+    }
+    const calculator = new PortfolioStatsCalculator();
+    const rawStats = calculator.calculatePortfolioStats(trades);
+    const normalizedTrades = normalizeTradesToOneLot(trades);
+    const normalizedStats = calculator.calculatePortfolioStats(normalizedTrades);
+
+    expect(normalizedStats.maxDrawdown).toBeLessThan(rawStats.maxDrawdown + 5);
   });
 });
