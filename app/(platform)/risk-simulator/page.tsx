@@ -49,7 +49,7 @@ import {
   type TimeUnit,
 } from "@/lib/utils/time-conversions";
 import { estimateTradesPerYear } from "@/lib/utils/trade-frequency";
-import { HelpCircle, Play, RotateCcw } from "lucide-react";
+import { HelpCircle, Loader2, Play, RotateCcw } from "lucide-react";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import type { Data } from "plotly.js";
@@ -248,6 +248,8 @@ export default function RiskSimulatorPage() {
     setError(null);
 
     try {
+      // Give React a chance to render the loading state before crunching numbers
+      await new Promise((resolve) => setTimeout(resolve, 16));
       // Filter trades by selected strategies if any are selected
       const filteredTrades =
         selectedStrategies.length > 0
@@ -368,7 +370,21 @@ export default function RiskSimulatorPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      {isRunning && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/70 backdrop-blur">
+          <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border bg-card px-6 py-5 text-center shadow-2xl">
+            <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            <div className="text-sm font-medium text-foreground">
+              Crunching {numSimulations.toLocaleString()} simulations
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This usually takes a few seconds. You can tweak settings once the
+              run completes.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Trading Frequency Card */}
       <TradingFrequencyCard
         trades={trades}
@@ -1364,8 +1380,13 @@ export default function RiskSimulatorPage() {
               onClick={runSimulation}
               disabled={isRunning}
               className="gap-2"
+              aria-busy={isRunning}
             >
-              <Play className="h-4 w-4" />
+              {isRunning ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
               {isRunning ? "Running Simulation..." : "Run Simulation"}
             </Button>
             <Button
