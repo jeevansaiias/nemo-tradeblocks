@@ -403,7 +403,7 @@ export function createSyntheticMaxLossTrades(
         maxProfit: 0,
         maxLoss: -maxAbsoluteLoss,
         syntheticCapitalRatio:
-          maxRelativeLoss > 0 ? Math.abs(maxRelativeLoss) : undefined,
+          maxRelativeLoss > 0 ? maxRelativeLoss : undefined,
       };
 
       syntheticTrades.push(syntheticTrade);
