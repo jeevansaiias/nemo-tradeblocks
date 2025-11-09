@@ -1,8 +1,9 @@
 "use client"
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ChartWrapper } from './chart-wrapper'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { Layout, PlotData } from 'plotly.js'
 
 interface TradeSequenceChartProps {
@@ -10,8 +11,11 @@ interface TradeSequenceChartProps {
   showTrend?: boolean
 }
 
+type ViewMode = 'dollars' | 'percent'
+
 export function TradeSequenceChart({ className, showTrend = true }: TradeSequenceChartProps) {
   const { data } = usePerformanceStore()
+  const [viewMode, setViewMode] = useState<ViewMode>('dollars')
 
   const { plotData, layout } = useMemo(() => {
     if (!data?.tradeSequence || data.tradeSequence.length === 0) {
@@ -21,10 +25,22 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
     const { tradeSequence } = data
 
     const tradeNumbers = tradeSequence.map(t => t.tradeNumber)
-    const returns = tradeSequence.map(t => t.pl)
+    const returns = viewMode === 'dollars'
+      ? tradeSequence.map(t => t.pl)
+      : tradeSequence.map(t => t.rom)
     const colors = returns.map(ret => ret > 0 ? '#22c55e' : '#ef4444')
 
     const traces: Partial<PlotData>[] = []
+
+    const hoverTemplate = viewMode === 'dollars'
+      ? '<b>Trade #%{x}</b><br>Return: $%{y:.1f}<extra></extra>'
+      : '<b>Trade #%{x}</b><br>Return: %{y:.1f}%<extra></extra>'
+
+    const trendHoverTemplate = viewMode === 'dollars'
+      ? '<b>Trend Line</b><br>Trade: %{x}<br>Trend: $%{y:.1f}<extra></extra>'
+      : '<b>Trend Line</b><br>Trade: %{x}<br>Trend: %{y:.1f}%<extra></extra>'
+
+    const yAxisTitle = viewMode === 'dollars' ? 'Return ($)' : 'Return (%)'
 
     // Scatter plot for trade returns
     traces.push({
@@ -38,7 +54,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
         size: 6,
         opacity: 0.8
       },
-      hovertemplate: '<b>Trade #%{x}</b><br>Return: $%{y:.1f}<extra></extra>'
+      hovertemplate: hoverTemplate
     })
 
     // Add trend line if enabled and we have enough data
@@ -66,7 +82,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
           width: 2,
           dash: 'dash'
         },
-        hovertemplate: '<b>Trend Line</b><br>Trade: %{x}<br>Trend: $%{y:.1f}<extra></extra>'
+        hovertemplate: trendHoverTemplate
       })
     }
 
@@ -76,7 +92,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
         showgrid: true
       },
       yaxis: {
-        title: { text: 'Return ($)' },
+        title: { text: yAxisTitle },
         showgrid: true,
         zeroline: true,
         zerolinewidth: 1
@@ -106,12 +122,31 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
     }
 
     return { plotData: traces, layout: chartLayout }
-  }, [data, showTrend])
+  }, [data, showTrend, viewMode])
 
   const tooltip = {
     flavor: "Every building block placed in order - your complete construction timeline with all the additions and reconstructions.",
     detailed: "This chronological view shows every trade outcome and helps identify improvement trends, clustering of similar results, and overall progression. You can spot if your wins are getting bigger, losses smaller, or if certain periods produced notably different results due to market conditions or strategy evolution."
   }
+
+  const toggleControls = (
+    <ToggleGroup
+      type="single"
+      value={viewMode}
+      onValueChange={(value) => {
+        if (value) setViewMode(value as ViewMode)
+      }}
+      variant="outline"
+      size="sm"
+    >
+      <ToggleGroupItem value="dollars" aria-label="View in dollars">
+        Dollars
+      </ToggleGroupItem>
+      <ToggleGroupItem value="percent" aria-label="View in percent">
+        Percent
+      </ToggleGroupItem>
+    </ToggleGroup>
+  )
 
   if (!data || !data.tradeSequence || data.tradeSequence.length === 0) {
     return (
@@ -123,6 +158,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
         layout={{}}
         style={{ height: '300px' }}
         tooltip={tooltip}
+        actions={toggleControls}
       />
     )
   }
@@ -136,6 +172,7 @@ export function TradeSequenceChart({ className, showTrend = true }: TradeSequenc
       layout={layout}
       style={{ height: '350px' }}
       tooltip={tooltip}
+      actions={toggleControls}
     />
   )
 }
