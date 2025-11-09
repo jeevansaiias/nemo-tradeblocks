@@ -60,6 +60,9 @@ export interface MonteCarloParams {
 
   /** What to base the percentage on: simulation length (default) or historical data */
   worstCaseBasedOn?: "simulation" | "historical";
+
+  /** How to size each synthetic loss: absolute historical dollars or scale to account capital */
+  worstCaseSizing?: "absolute" | "relative";
 }
 
 /**
@@ -295,15 +298,24 @@ export function createSyntheticMaxLossTrades(
       return;
     }
 
-    let maxMargin = 0;
-    let fallbackRisk = 0;
-    let fallbackSource: "maxLoss" | "historicalPL" | null = null;
+    let maxAbsoluteLoss = 0;
+    let fallbackSource: "margin" | "maxLoss" | "historicalPL" | null = null;
+    let maxRelativeLoss = 0;
     let totalContracts = 0;
     let validContractCount = 0;
 
     for (const trade of strategyTrades) {
-      if (trade.marginReq && trade.marginReq > maxMargin) {
-        maxMargin = trade.marginReq;
+      const capitalBeforeTrade = Math.max(1, trade.fundsAtClose - trade.pl);
+
+      if (trade.marginReq && trade.marginReq > 0) {
+        if (trade.marginReq > maxAbsoluteLoss) {
+          maxAbsoluteLoss = trade.marginReq;
+          fallbackSource = "margin";
+        }
+        const ratio = trade.marginReq / capitalBeforeTrade;
+        if (ratio > maxRelativeLoss) {
+          maxRelativeLoss = ratio;
+        }
       }
 
       if (trade.numContracts) {
@@ -312,33 +324,40 @@ export function createSyntheticMaxLossTrades(
       }
 
       const candidateMaxLoss = Math.abs(trade.maxLoss ?? 0);
-      if (candidateMaxLoss > fallbackRisk) {
-        fallbackRisk = candidateMaxLoss;
-        fallbackSource = candidateMaxLoss > 0 ? "maxLoss" : fallbackSource;
+      if (candidateMaxLoss > 0) {
+        if (candidateMaxLoss > maxAbsoluteLoss) {
+          maxAbsoluteLoss = candidateMaxLoss;
+          fallbackSource = "maxLoss";
+        }
+        const ratio = candidateMaxLoss / capitalBeforeTrade;
+        if (ratio > maxRelativeLoss) {
+          maxRelativeLoss = ratio;
+        }
       }
 
-      const candidateHistoricalPL = Math.abs(trade.pl ?? 0);
-      if (candidateHistoricalPL > fallbackRisk) {
-        fallbackRisk = candidateHistoricalPL;
-        fallbackSource =
-          candidateHistoricalPL > 0 ? "historicalPL" : fallbackSource;
+      const realizedLoss = trade.pl < 0 ? Math.abs(trade.pl) : 0;
+      if (realizedLoss > 0) {
+        if (realizedLoss > maxAbsoluteLoss) {
+          maxAbsoluteLoss = realizedLoss;
+          fallbackSource = "historicalPL";
+        }
+        const ratio = realizedLoss / capitalBeforeTrade;
+        if (ratio > maxRelativeLoss) {
+          maxRelativeLoss = ratio;
+        }
       }
     }
 
-    let riskAmount = maxMargin;
-    let fallbackLabel: string | null = null;
-
-    if (riskAmount <= 0 && fallbackRisk > 0) {
-      riskAmount = fallbackRisk;
-      fallbackLabel =
-        fallbackSource === "maxLoss"
-          ? " (historical max loss)"
-          : " (largest historical loss)";
-    }
-
-    if (riskAmount <= 0) {
+    if (maxAbsoluteLoss <= 0) {
       return;
     }
+
+    const fallbackLabel =
+      fallbackSource && fallbackSource !== "margin"
+        ? fallbackSource === "maxLoss"
+          ? " (historical max loss)"
+          : " (largest historical loss)"
+        : null;
 
     const avgContracts =
       validContractCount > 0
@@ -368,10 +387,10 @@ export function createSyntheticMaxLossTrades(
         timeClosed: "00:00:00",
         avgClosingCost: 0,
         reasonForClose,
-        pl: -riskAmount,
+        pl: -maxAbsoluteLoss,
         numContracts: avgContracts,
         fundsAtClose: 0,
-        marginReq: riskAmount,
+        marginReq: maxAbsoluteLoss,
         strategy: strategyName,
         openingCommissionsFees: 0,
         closingCommissionsFees: 0,
@@ -382,7 +401,9 @@ export function createSyntheticMaxLossTrades(
         gap: 0,
         movement: 0,
         maxProfit: 0,
-        maxLoss: -riskAmount,
+        maxLoss: -maxAbsoluteLoss,
+        syntheticCapitalRatio:
+          maxRelativeLoss > 0 ? Math.abs(maxRelativeLoss) : undefined,
       };
 
       syntheticTrades.push(syntheticTrade);
@@ -903,22 +924,36 @@ export function runMonteCarloSimulation(
     );
 
     // Convert synthetic trades to P&L values based on resample method
+    const requestedLossSizing = params.worstCaseSizing || "relative";
+    const capitalBasisRaw =
+      params.historicalInitialCapital || params.initialCapital || 0;
+    const canUseRelative = requestedLossSizing === "relative" && capitalBasisRaw > 0;
+    const lossSizing = canUseRelative ? "relative" : "absolute";
+    const capitalBasis = capitalBasisRaw > 0 ? capitalBasisRaw : 1;
+
     if (params.resampleMethod === "percentage") {
-      // For percentage mode, convert to percentage returns
-      // Use the initial capital as the basis for percentage calculation
-      // since we don't know the exact capital at each synthetic trade time
-      const capital = params.historicalInitialCapital || params.initialCapital;
       worstCaseTrades = syntheticTrades.map((t) => {
+        if (lossSizing === "relative") {
+          const ratio = t.syntheticCapitalRatio;
+          if (ratio && ratio > 0) {
+            return -Math.abs(ratio);
+          }
+          return t.pl / capitalBasis;
+        }
         const pl = params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl;
-        // Calculate percentage return based on capital, not margin
-        // This gives a realistic percentage loss relative to portfolio size
-        return pl / capital;
+        return pl / capitalBasis;
       });
     } else {
-      // For trades/daily mode, use P&L directly
-      worstCaseTrades = syntheticTrades.map((t) =>
-        params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl
-      );
+      worstCaseTrades = syntheticTrades.map((t) => {
+        if (lossSizing === "relative") {
+          const ratio = t.syntheticCapitalRatio;
+          if (ratio && ratio > 0) {
+            return -Math.abs(ratio) * capitalBasis;
+          }
+          return (params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl);
+        }
+        return params.normalizeTo1Lot ? scaleTradeToOneLot(t) : t.pl;
+      });
     }
 
     // If mode is "pool", add to resample pool

@@ -188,6 +188,24 @@ describe("createSyntheticMaxLossTrades", () => {
     const syntheticTrades = createSyntheticMaxLossTrades(trades, 10, 100, "historical");
     expect(syntheticTrades[0].numContracts).toBe(20); // Average of 10, 20, 30 = 20
   });
+
+  it("should record the worst loss as a percentage of capital", () => {
+    const trades: Trade[] = [
+      createTrade({
+        pl: -1000,
+        marginReq: 10000,
+        strategy: "Ratio",
+        numContracts: 1,
+        fundsAtClose: 110000,
+      }),
+    ];
+
+    const syntheticTrades = createSyntheticMaxLossTrades(trades, 10, 100, "simulation");
+    expect(syntheticTrades[0].syntheticCapitalRatio).toBeCloseTo(
+      10000 / (110000 - -1000),
+      4
+    );
+  });
 });
 
 describe("runMonteCarloSimulation with worst-case injection", () => {
@@ -345,6 +363,45 @@ describe("runMonteCarloSimulation with worst-case injection", () => {
     };
 
     expect(() => runMonteCarloSimulation(baseTrades, params)).not.toThrow();
+  });
+
+  it("should scale losses relative to capital when requested", () => {
+    const heavyMarginTrades: Trade[] = Array.from({ length: 40 }, (_, i) =>
+      createTrade({
+        pl: 2000,
+        marginReq: 500000,
+        fundsAtClose: 1000000 + i * 1000,
+        strategy: "Heavy",
+      })
+    );
+
+    const paramsAbsolute: MonteCarloParams = {
+      ...baseParams,
+      initialCapital: 100000,
+      worstCaseEnabled: true,
+      worstCasePercentage: 10,
+      worstCaseMode: "guarantee",
+      worstCaseSizing: "absolute",
+    };
+
+    const paramsRelative: MonteCarloParams = {
+      ...paramsAbsolute,
+      worstCaseSizing: "relative",
+    };
+
+    const absoluteResult = runMonteCarloSimulation(
+      heavyMarginTrades,
+      paramsAbsolute
+    );
+    const relativeResult = runMonteCarloSimulation(
+      heavyMarginTrades,
+      paramsRelative
+    );
+
+    expect(absoluteResult.statistics.meanFinalValue).toBeLessThanOrEqual(0);
+    expect(relativeResult.statistics.meanFinalValue).toBeGreaterThan(
+      absoluteResult.statistics.meanFinalValue
+    );
   });
 
   it("should produce different results between pool and guarantee modes", () => {

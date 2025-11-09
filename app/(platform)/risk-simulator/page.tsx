@@ -85,6 +85,9 @@ export default function RiskSimulatorPage() {
   const [worstCaseBasedOn, setWorstCaseBasedOn] = useState<
     "simulation" | "historical"
   >("simulation");
+  const [worstCaseSizing, setWorstCaseSizing] = useState<
+    "absolute" | "relative"
+  >("relative");
 
   // Chart display options
   const [scaleType, setScaleType] = useState<"linear" | "log">("linear");
@@ -309,6 +312,7 @@ export default function RiskSimulatorPage() {
         worstCasePercentage,
         worstCaseMode,
         worstCaseBasedOn,
+        worstCaseSizing,
       };
 
       const simulationResult = runMonteCarloSimulation(filteredTrades, params);
@@ -910,11 +914,15 @@ export default function RiskSimulatorPage() {
                               <div className="px-4 pb-4">
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                   Controls how many max-loss trades are created.
-                                  In pool mode, they&apos;re added to the
-                                  resample pool. In guarantee mode, they&apos;re
-                                  forced into every simulation. When margin data
-                                  is missing, we automatically use that
-                                  strategy&apos;s largest recorded loss so the
+                                  In pool mode, they&apos;re added to the resample
+                                  pool. In guarantee mode, they&apos;re forced into
+                                  every simulation. Loss size is scaled to your
+                                  starting capital by default so 1% really means
+                                  “a 1% hit to the account per strategy.”
+                                  Disable that below if you want to inject the
+                                  raw historical dollar margins instead. When
+                                  margin data is missing, we automatically use
+                                  that strategy&apos;s largest recorded loss so the
                                   test still reflects its downside.
                                 </p>
                               </div>
@@ -1046,6 +1054,85 @@ export default function RiskSimulatorPage() {
                             className="cursor-pointer text-sm font-normal"
                           >
                             Force {worstCasePercentage}% into every simulation
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Loss Sizing */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">Loss sizing</Label>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-80 p-0 overflow-hidden">
+                            <div className="space-y-3">
+                              <div className="bg-primary/5 border-b px-4 py-3">
+                                <h4 className="text-sm font-semibold text-primary">
+                                  How max-loss size is calculated
+                                </h4>
+                              </div>
+                              <div className="px-4 pb-4 space-y-3 text-xs text-muted-foreground leading-relaxed">
+                                <p>
+                                  <span className="font-medium text-foreground">
+                                    Scale to account size (recommended):
+                                  </span>
+                                  &nbsp;Uses each strategy&apos;s worst observed
+                                  loss as a percentage of account capital, then
+                                  applies it to your current starting capital.
+                                  A 1% slider therefore means “1% of the account”
+                                  instead of “historical dollars.”
+                                </p>
+                                <p>
+                                  <span className="font-medium text-foreground">
+                                    Use historical dollars:
+                                  </span>
+                                  &nbsp;Injects the raw worst-case dollar amount
+                                  from the trade log. Pick this if you want to
+                                  replay the exact historical blow-ups and
+                                  you&apos;re confident those dollar figures match
+                                  today&apos;s allocations.
+                                </p>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="worst-case-sizing-relative"
+                            name="worst-case-sizing"
+                            checked={worstCaseSizing === "relative"}
+                            onChange={() => setWorstCaseSizing("relative")}
+                            className="cursor-pointer"
+                            aria-label="worst-case-sizing-relative"
+                          />
+                          <Label
+                            htmlFor="worst-case-sizing-relative"
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            Scale to account size
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="worst-case-sizing-absolute"
+                            name="worst-case-sizing"
+                            checked={worstCaseSizing === "absolute"}
+                            onChange={() => setWorstCaseSizing("absolute")}
+                            className="cursor-pointer"
+                            aria-label="worst-case-sizing-absolute"
+                          />
+                          <Label
+                            htmlFor="worst-case-sizing-absolute"
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            Use historical dollars
                           </Label>
                         </div>
                       </div>
