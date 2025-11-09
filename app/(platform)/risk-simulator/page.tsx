@@ -246,6 +246,7 @@ export default function RiskSimulatorPage() {
 
     setIsRunning(true);
     setError(null);
+    setResult(null);
 
     try {
       // Give React a chance to render the loading state before crunching numbers
@@ -370,21 +371,7 @@ export default function RiskSimulatorPage() {
   }
 
   return (
-    <div className="relative space-y-6">
-      {isRunning && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/70 backdrop-blur">
-          <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-xl border bg-card px-6 py-5 text-center shadow-2xl">
-            <Loader2 className="h-7 w-7 animate-spin text-primary" />
-            <div className="text-sm font-medium text-foreground">
-              Crunching {numSimulations.toLocaleString()} simulations
-            </div>
-            <p className="text-xs text-muted-foreground">
-              This usually takes a few seconds. You can tweak settings once the
-              run completes.
-            </p>
-          </div>
-        </div>
-      )}
+    <div className="space-y-6">
       {/* Trading Frequency Card */}
       <TradingFrequencyCard
         trades={trades}
@@ -1408,7 +1395,17 @@ export default function RiskSimulatorPage() {
       </Card>
 
       {/* Results */}
-      {result && (
+      {isRunning ? (
+        <Card className="flex flex-col items-center gap-3 border-dashed border-primary/40 p-6 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <div className="text-sm font-medium text-foreground">
+            Generating simulation results...
+          </div>
+          <p className="text-xs text-muted-foreground">
+            We&apos;ll show updated charts as soon as the calculations finish.
+          </p>
+        </Card>
+      ) : result ? (
         <>
           {/* Equity Curve Chart */}
           <Card className="p-6">
@@ -1471,7 +1468,7 @@ export default function RiskSimulatorPage() {
             <DrawdownDistributionChart result={result} />
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }
