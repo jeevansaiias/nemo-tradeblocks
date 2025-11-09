@@ -45,6 +45,9 @@ import {
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { SizingModeToggle } from "@/components/sizing-mode-toggle";
+
+const PERFORMANCE_STORAGE_KEY_PREFIX = "performance:normalizeTo1Lot:";
 
 export default function PerformanceBlocksPage() {
   // Block store
@@ -66,6 +69,8 @@ export default function PerformanceBlocksPage() {
     data,
     setDateRange,
     setSelectedStrategies,
+    normalizeTo1Lot,
+    setNormalizeTo1Lot,
   } = usePerformanceStore();
 
   // Local state for date range picker
@@ -97,6 +102,25 @@ export default function PerformanceBlocksPage() {
 
     fetchPerformanceData(activeBlockId).catch(console.error);
   }, [activeBlockId, fetchPerformanceData]);
+
+  useEffect(() => {
+    if (!activeBlockId || typeof window === "undefined") return;
+
+    const storageKey = `${PERFORMANCE_STORAGE_KEY_PREFIX}${activeBlockId}`;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored !== null) {
+      setNormalizeTo1Lot(stored === "true");
+    } else {
+      setNormalizeTo1Lot(false);
+    }
+  }, [activeBlockId, setNormalizeTo1Lot]);
+
+  useEffect(() => {
+    if (!activeBlockId || typeof window === "undefined") return;
+
+    const storageKey = `${PERFORMANCE_STORAGE_KEY_PREFIX}${activeBlockId}`;
+    window.localStorage.setItem(storageKey, normalizeTo1Lot ? "true" : "false");
+  }, [activeBlockId, normalizeTo1Lot]);
 
   // Helper functions
   const getStrategyOptions = () => {
@@ -234,6 +258,13 @@ export default function PerformanceBlocksPage() {
             className="w-full"
           />
         </div>
+        <SizingModeToggle
+          id="performance-normalize"
+          className="flex-1 min-w-[240px]"
+          checked={normalizeTo1Lot}
+          onCheckedChange={setNormalizeTo1Lot}
+          title="Normalize to 1-lot"
+        />
       </div>
 
       {/* Tabbed Interface */}

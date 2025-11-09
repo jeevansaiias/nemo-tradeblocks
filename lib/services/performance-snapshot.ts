@@ -16,6 +16,7 @@ import {
   type DistributionBucket,
   type NormalizationBasis
 } from '@/lib/calculations/mfe-mae'
+import { normalizeTradesToOneLot } from '@/lib/utils/trade-normalization'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -32,6 +33,7 @@ interface SnapshotOptions {
   dailyLogs?: DailyLogEntry[]
   filters?: SnapshotFilters
   riskFreeRate?: number
+  normalizeTo1Lot?: boolean
 }
 
 export interface SnapshotChartData {
@@ -84,12 +86,21 @@ export interface PerformanceSnapshot {
 }
 
 export async function buildPerformanceSnapshot(options: SnapshotOptions): Promise<PerformanceSnapshot> {
+  const normalizeTo1Lot = Boolean(options.normalizeTo1Lot)
   const riskFreeRate = typeof options.riskFreeRate === 'number' ? options.riskFreeRate : 2.0
   const strategies = options.filters?.strategies?.length ? options.filters?.strategies : undefined
   const dateRange = options.filters?.dateRange
 
-  let filteredTrades = [...options.trades]
-  let filteredDailyLogs = options.dailyLogs ? [...options.dailyLogs] : undefined
+  const sourceTrades = normalizeTo1Lot
+    ? normalizeTradesToOneLot(options.trades)
+    : options.trades
+
+  let filteredTrades = [...sourceTrades]
+  let filteredDailyLogs = normalizeTo1Lot
+    ? undefined
+    : options.dailyLogs
+      ? [...options.dailyLogs]
+      : undefined
 
   if (dateRange?.from || dateRange?.to) {
     filteredTrades = filteredTrades.filter(trade => {

@@ -36,11 +36,13 @@ interface PerformanceStore {
   selectedStrategies: string[]
   data: PerformanceData | null
   chartSettings: ChartSettings
+  normalizeTo1Lot: boolean
   setDateRange: (dateRange: DateRange) => void
   setSelectedStrategies: (strategies: string[]) => void
   updateChartSettings: (settings: Partial<ChartSettings>) => void
   fetchPerformanceData: (blockId: string) => Promise<void>
   applyFilters: () => Promise<void>
+  setNormalizeTo1Lot: (value: boolean) => void
   reset: () => void
 }
 
@@ -81,6 +83,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   selectedStrategies: [],
   data: null,
   chartSettings: initialChartSettings,
+  normalizeTo1Lot: false,
 
   setDateRange: (dateRange) => {
     set({ dateRange })
@@ -98,6 +101,11 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     }))
   },
 
+  setNormalizeTo1Lot: (value) => {
+    set({ normalizeTo1Lot: value })
+    get().applyFilters().catch(console.error)
+  },
+
   fetchPerformanceData: async (blockId: string) => {
     set({ isLoading: true, error: null })
 
@@ -108,12 +116,14 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         getDailyLogsByBlock(blockId)
       ])
 
-      const filters = buildSnapshotFilters(get().dateRange, get().selectedStrategies)
+      const state = get()
+      const filters = buildSnapshotFilters(state.dateRange, state.selectedStrategies)
       const snapshot = await buildPerformanceSnapshot({
         trades,
         dailyLogs,
         filters,
-        riskFreeRate: 2.0
+        riskFreeRate: 2.0,
+        normalizeTo1Lot: state.normalizeTo1Lot
       })
 
       set({
@@ -136,7 +146,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   },
 
   applyFilters: async () => {
-    const { data, dateRange, selectedStrategies } = get()
+    const { data, dateRange, selectedStrategies, normalizeTo1Lot } = get()
     if (!data) return
 
     const filters = buildSnapshotFilters(dateRange, selectedStrategies)
@@ -145,7 +155,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       trades: data.allTrades,
       dailyLogs: data.allDailyLogs,
       filters,
-      riskFreeRate: 2.0
+      riskFreeRate: 2.0,
+      normalizeTo1Lot
     })
 
     set(state => ({
@@ -166,7 +177,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       dateRange: initialDateRange,
       selectedStrategies: [],
       data: null,
-      chartSettings: initialChartSettings
+      chartSettings: initialChartSettings,
+      normalizeTo1Lot: false
     })
   }
 }))
