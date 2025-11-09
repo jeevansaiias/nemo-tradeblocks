@@ -202,7 +202,7 @@ describe("createSyntheticMaxLossTrades", () => {
 
     const syntheticTrades = createSyntheticMaxLossTrades(trades, 10, 100, "simulation");
     expect(syntheticTrades[0].syntheticCapitalRatio).toBeCloseTo(
-      10000 / (110000 - -1000),
+      10000 / (110000 + 1000),
       4
     );
   });
