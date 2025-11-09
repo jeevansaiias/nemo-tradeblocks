@@ -524,10 +524,8 @@ describe('PortfolioStatsCalculator normalization impact', () => {
   it('keeps normalized drawdowns reasonable for CSV fixtures', async () => {
     const { trades, source } = await CsvTestDataLoader.loadTrades();
     if (source !== 'csv') {
-      expect(true).toBe(true);
       return;
     }
-
     const calculator = new PortfolioStatsCalculator();
     const rawStats = calculator.calculatePortfolioStats(trades);
     const normalizedTrades = normalizeTradesToOneLot(trades);
