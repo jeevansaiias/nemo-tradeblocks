@@ -870,9 +870,8 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                         const shouldShowTooltip =
                           option.label.length > 40;
 
-                        const badgeContent = (
+                        const badgeElement = (
                           <Badge
-                            key={value}
                             className={cn(
                               getBadgeAnimationClass(),
                               multiSelectVariants({ variant }),
@@ -947,14 +946,16 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                         return shouldShowTooltip ? (
                           <Tooltip key={value}>
                             <TooltipTrigger asChild>
-                              {badgeContent}
+                              {badgeElement}
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="max-w-xs">{option.label}</p>
                             </TooltipContent>
                           </Tooltip>
                         ) : (
-                          badgeContent
+                          <React.Fragment key={value}>
+                            {badgeElement}
+                          </React.Fragment>
                         );
                       })
                       .filter(Boolean)}
