@@ -6,6 +6,7 @@
 
 import { Card } from "@/components/ui/card";
 import { MarginTimeline } from "@/lib/calculations/margin-timeline";
+import { truncateStrategyName } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import type { Data } from "plotly.js";
@@ -53,9 +54,12 @@ export function MarginChart({
           x: marginTimeline.dates,
           y: series,
           mode: "lines",
-          name: strategyName,
+          name: truncateStrategyName(strategyName, 40),
           line: { dash: "dot" },
-          hovertemplate: hoverTemplate,
+          hovertemplate: hoverTemplate.replace(
+            "%{fullData.name}",
+            strategyName
+          ),
         });
       }
     }
