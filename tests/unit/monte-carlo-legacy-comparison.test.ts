@@ -1,15 +1,20 @@
+import {
+  runMonteCarloSimulation,
+  type MonteCarloParams,
+} from "@/lib/calculations/monte-carlo";
 import { CsvTestDataLoader } from "../data/csv-loader";
-import { runMonteCarloSimulation, type MonteCarloParams } from "@/lib/calculations/monte-carlo";
 
 describe("Monte Carlo legacy comparison", () => {
- it("prints stats for legacy parameter set", async () => {
+  it("prints stats for legacy parameter set", async () => {
     const { trades } = await CsvTestDataLoader.loadTestData();
 
     const params: MonteCarloParams = {
       numSimulations: 1000,
       simulationLength: Math.min(252, trades.length),
       resampleMethod: "trades",
-      initialCapital: trades[0] ? trades[0].fundsAtClose - trades[0].pl : 100000,
+      initialCapital: trades[0]
+        ? trades[0].fundsAtClose - trades[0].pl
+        : 100000,
       tradesPerYear: 125,
       randomSeed: 42,
     };
@@ -18,21 +23,21 @@ describe("Monte Carlo legacy comparison", () => {
 
     expect(result.statistics).toMatchInlineSnapshot(`
 {
-  "meanAnnualizedReturn": 0.13867884101856834,
-  "meanFinalValue": 2188854.2997999983,
-  "meanMaxDrawdown": 0.029376660624827317,
-  "meanSharpeRatio": 2.55361078539622,
-  "meanTotalReturn": 0.300641413869577,
-  "medianAnnualizedReturn": 0.13982832259955802,
-  "medianFinalValue": 2191026.3899999997,
-  "medianMaxDrawdown": 0.02720128093515751,
-  "medianTotalReturn": 0.3019320938700867,
+  "meanAnnualizedReturn": 0.11753863961340699,
+  "meanFinalValue": 3990519.993459993,
+  "meanMaxDrawdown": 0.015921245623771414,
+  "meanSharpeRatio": 3.520797443565685,
+  "meanTotalReturn": 0.2516373591238308,
+  "medianAnnualizedReturn": 0.1178781683758825,
+  "medianFinalValue": 3991298.739999995,
+  "medianMaxDrawdown": 0.014818941209153055,
+  "medianTotalReturn": 0.25188161507652596,
   "probabilityOfProfit": 1,
-  "stdFinalValue": 140614.83406927538,
+  "stdFinalValue": 162541.74285933183,
   "valueAtRisk": {
-    "p10": 0.1914275655481033,
-    "p25": 0.2453121680031447,
-    "p5": 0.16704045354370586,
+    "p10": 0.18809136361814727,
+    "p25": 0.21530255773486684,
+    "p5": 0.16488850637757374,
   },
 }
 `);

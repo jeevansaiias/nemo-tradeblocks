@@ -106,7 +106,11 @@ export function StrategyKellyTable({
                         aria-label={`Select ${strategy.name}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{strategy.name}</TableCell>
+                    <TableCell className="font-medium max-w-[200px]">
+                      <div className="truncate" title={strategy.name}>
+                        {strategy.name}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {strategy.tradeCount}
                     </TableCell>

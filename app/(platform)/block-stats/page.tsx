@@ -7,6 +7,7 @@ import { StrategyBreakdownTable } from "@/components/strategy-breakdown-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SizingModeToggle } from "@/components/sizing-mode-toggle";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import { getDailyLogsByBlock, getTradesByBlock } from "@/lib/db";
 import {
@@ -30,9 +31,12 @@ import { useEffect, useState } from "react";
 
 // Strategy options will be dynamically generated from trades
 
+const NORMALIZE_STORAGE_KEY_PREFIX = "block-stats:normalizeTo1Lot:";
+
 export default function BlockStatsPage() {
   const [riskFreeRate, setRiskFreeRate] = useState("2");
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([]);
+  const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
 
   // Data fetching state
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -67,6 +71,25 @@ export default function BlockStatsPage() {
       loadBlocks().catch(console.error);
     }
   }, [isInitialized, loadBlocks]);
+
+  useEffect(() => {
+    if (!activeBlock?.id || typeof window === "undefined") return;
+
+    const storageKey = `${NORMALIZE_STORAGE_KEY_PREFIX}${activeBlock.id}`;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored !== null) {
+      setNormalizeTo1Lot(stored === "true");
+    } else {
+      setNormalizeTo1Lot(false);
+    }
+  }, [activeBlock?.id]);
+
+  useEffect(() => {
+    if (!activeBlock?.id || typeof window === "undefined") return;
+
+    const storageKey = `${NORMALIZE_STORAGE_KEY_PREFIX}${activeBlock.id}`;
+    window.localStorage.setItem(storageKey, normalizeTo1Lot ? "true" : "false");
+  }, [activeBlock?.id, normalizeTo1Lot]);
 
   // Fetch trades and daily logs when active block changes
   useEffect(() => {
@@ -125,6 +148,7 @@ export default function BlockStatsPage() {
               ? { strategies: selectedStrategies }
               : undefined,
           riskFreeRate: riskFree,
+          normalizeTo1Lot,
         });
 
         setFilteredTrades(snapshot.filteredTrades);
@@ -150,7 +174,7 @@ export default function BlockStatsPage() {
     // Use a small delay to avoid closing the popover during selection
     const timeoutId = setTimeout(calculateMetrics, 0);
     return () => clearTimeout(timeoutId);
-  }, [trades, dailyLogs, riskFreeRate, selectedStrategies]);
+  }, [trades, dailyLogs, riskFreeRate, selectedStrategies, normalizeTo1Lot]);
 
   // Helper functions
   const getDateRange = () => {
@@ -408,6 +432,13 @@ export default function BlockStatsPage() {
             className="w-full"
           />
         </div>
+        <SizingModeToggle
+          id="block-stats-normalize"
+          className="flex-1 min-w-[240px]"
+          checked={normalizeTo1Lot}
+          onCheckedChange={setNormalizeTo1Lot}
+          title="Normalize to 1-lot"
+        />
       </div>
 
       {/* Basic Overview */}

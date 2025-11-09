@@ -1,6 +1,9 @@
-import { CsvTestDataLoader } from "../data/csv-loader";
-import { runMonteCarloSimulation, type MonteCarloParams } from "@/lib/calculations/monte-carlo";
+import {
+  runMonteCarloSimulation,
+  type MonteCarloParams,
+} from "@/lib/calculations/monte-carlo";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
+import { CsvTestDataLoader } from "../data/csv-loader";
 
 /**
  * Integration test that runs the Monte Carlo simulator against the real CSV sample data.
@@ -13,7 +16,8 @@ describe("Monte Carlo Simulation (sample data)", () => {
     expect(testData.sources.trades).toBe("csv");
     const { trades } = testData;
 
-    const initialCapital = PortfolioStatsCalculator.calculateInitialCapital(trades);
+    const initialCapital =
+      PortfolioStatsCalculator.calculateInitialCapital(trades);
 
     const params: MonteCarloParams = {
       numSimulations: 200,
@@ -28,21 +32,21 @@ describe("Monte Carlo Simulation (sample data)", () => {
 
     expect(result.statistics).toMatchInlineSnapshot(`
 {
-  "meanAnnualizedReturn": 1.3074502002408317,
-  "meanFinalValue": 735352.6545000005,
-  "meanMaxDrawdown": 0.07388740419836855,
-  "meanSharpeRatio": 3.5944394545765643,
-  "meanTotalReturn": 0.4719719113903137,
-  "medianAnnualizedReturn": 1.2222057059780882,
-  "medianFinalValue": 730686.49,
-  "medianMaxDrawdown": 0.06376008915186528,
-  "medianTotalReturn": 0.4626315451920069,
-  "probabilityOfProfit": 0.975,
-  "stdFinalValue": 107571.26551833487,
+  "meanAnnualizedReturn": 2.3518888898262995,
+  "meanFinalValue": 881977.2490000003,
+  "meanMaxDrawdown": 0.06654026237990762,
+  "meanSharpeRatio": 5.107875423948693,
+  "meanTotalReturn": 0.7639544980000008,
+  "medianAnnualizedReturn": 2.334757552759915,
+  "medianFinalValue": 887254.4300000011,
+  "medianMaxDrawdown": 0.06191360238799595,
+  "medianTotalReturn": 0.7745088600000022,
+  "probabilityOfProfit": 1,
+  "stdFinalValue": 109828.43413814143,
   "valueAtRisk": {
-    "p10": 0.1801627264228324,
-    "p25": 0.3445487072716335,
-    "p5": 0.10379656086469356,
+    "p10": 0.4860375480000019,
+    "p25": 0.6124258900000016,
+    "p5": 0.4101904420000007,
   },
 }
 `);

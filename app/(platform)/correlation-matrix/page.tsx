@@ -17,6 +17,7 @@ import {
 import { getTradesByBlock } from "@/lib/db/trades-store";
 import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
+import { truncateStrategyName } from "@/lib/utils";
 import { Info } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Data, Layout } from "plotly.js";
@@ -73,6 +74,11 @@ export default function CorrelationMatrixPage() {
     const { strategies, correlationData } = correlationMatrix;
     const isDark = theme === "dark";
 
+    // Truncate strategy names for axis labels
+    const truncatedStrategies = strategies.map((s) =>
+      truncateStrategyName(s, 40)
+    );
+
     // Create heatmap with better contrast
     // Different colorscales for light and dark modes
     const colorscale = isDark
@@ -99,8 +105,8 @@ export default function CorrelationMatrixPage() {
 
     const heatmapData = {
       z: correlationData,
-      x: strategies,
-      y: strategies,
+      x: truncatedStrategies,
+      y: truncatedStrategies,
       type: "heatmap" as const,
       colorscale,
       zmid: 0,
@@ -124,8 +130,12 @@ export default function CorrelationMatrixPage() {
           })
         ) as unknown as string,
       },
+      // Use full strategy names in hover tooltip
       hovertemplate:
-        "<b>%{y} ↔ %{x}</b><br>Correlation: %{z:.3f}<extra></extra>",
+        "<b>%{customdata[0]} ↔ %{customdata[1]}</b><br>Correlation: %{z:.3f}<extra></extra>",
+      customdata: correlationData.map((row, yIndex) =>
+        row.map((_, xIndex) => [strategies[yIndex], strategies[xIndex]])
+      ),
       colorbar: {
         title: { text: "Correlation", side: "right" },
         tickmode: "linear",

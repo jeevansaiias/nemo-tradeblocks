@@ -16,6 +16,7 @@ import {
   type DistributionBucket,
   type NormalizationBasis
 } from '@/lib/calculations/mfe-mae'
+import { normalizeTradesToOneLot } from '@/lib/utils/trade-normalization'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -32,12 +33,13 @@ interface SnapshotOptions {
   dailyLogs?: DailyLogEntry[]
   filters?: SnapshotFilters
   riskFreeRate?: number
+  normalizeTo1Lot?: boolean
 }
 
 export interface SnapshotChartData {
   equityCurve: Array<{ date: string; equity: number; highWaterMark: number; tradeNumber: number }>
   drawdownData: Array<{ date: string; drawdownPct: number }>
-  dayOfWeekData: Array<{ day: string; count: number; avgPl: number }>
+  dayOfWeekData: Array<{ day: string; count: number; avgPl: number; avgPlPercent: number }>
   returnDistribution: number[]
   streakData: {
     winDistribution: Record<number, number>
@@ -50,7 +52,8 @@ export interface SnapshotChartData {
     }
   }
   monthlyReturns: Record<number, Record<number, number>>
-  tradeSequence: Array<{ tradeNumber: number; pl: number; date: string }>
+  monthlyReturnsPercent: Record<number, Record<number, number>>
+  tradeSequence: Array<{ tradeNumber: number; pl: number; rom: number; date: string }>
   romTimeline: Array<{ date: string; rom: number }>
   rollingMetrics: Array<{ date: string; winRate: number; sharpeRatio: number; profitFactor: number; volatility: number }>
   volatilityRegimes: Array<{ date: string; openingVix?: number; closingVix?: number; pl: number; rom?: number }>
@@ -84,12 +87,21 @@ export interface PerformanceSnapshot {
 }
 
 export async function buildPerformanceSnapshot(options: SnapshotOptions): Promise<PerformanceSnapshot> {
+  const normalizeTo1Lot = Boolean(options.normalizeTo1Lot)
   const riskFreeRate = typeof options.riskFreeRate === 'number' ? options.riskFreeRate : 2.0
   const strategies = options.filters?.strategies?.length ? options.filters?.strategies : undefined
   const dateRange = options.filters?.dateRange
 
-  let filteredTrades = [...options.trades]
-  let filteredDailyLogs = options.dailyLogs ? [...options.dailyLogs] : undefined
+  const sourceTrades = normalizeTo1Lot
+    ? normalizeTradesToOneLot(options.trades)
+    : options.trades
+
+  let filteredTrades = [...sourceTrades]
+  let filteredDailyLogs = normalizeTo1Lot
+    ? undefined
+    : options.dailyLogs
+      ? [...options.dailyLogs]
+      : undefined
 
   if (dateRange?.from || dateRange?.to) {
     filteredTrades = filteredTrades.filter(trade => {
@@ -149,10 +161,12 @@ export async function processChartData(
   const streakData = calculateStreakData(trades)
 
   const monthlyReturns = calculateMonthlyReturns(trades)
+  const monthlyReturnsPercent = calculateMonthlyReturnsPercent(trades, dailyLogs)
 
   const tradeSequence = trades.map((trade, index) => ({
     tradeNumber: index + 1,
     pl: trade.pl,
+    rom: trade.marginReq && trade.marginReq > 0 ? (trade.pl / trade.marginReq) * 100 : 0,
     date: new Date(trade.dateOpened).toISOString()
   }))
 
@@ -183,6 +197,7 @@ export async function processChartData(
     returnDistribution,
     streakData,
     monthlyReturns,
+    monthlyReturnsPercent,
     tradeSequence,
     romTimeline,
     rollingMetrics,
@@ -402,7 +417,12 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
 
 function calculateDayOfWeekData(trades: Trade[]) {
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const dayData: Record<string, { count: number; totalPl: number }> = {}
+  const dayData: Record<string, {
+    count: number
+    totalPl: number
+    totalPlPercent: number
+    percentSampleCount: number
+  }> = {}
 
   trades.forEach(trade => {
     const tradeDate = trade.dateOpened instanceof Date ? trade.dateOpened : new Date(trade.dateOpened)
@@ -412,16 +432,23 @@ function calculateDayOfWeekData(trades: Trade[]) {
     const day = dayNames[pythonWeekday]
 
     if (!dayData[day]) {
-      dayData[day] = { count: 0, totalPl: 0 }
+      dayData[day] = { count: 0, totalPl: 0, totalPlPercent: 0, percentSampleCount: 0 }
     }
     dayData[day].count++
     dayData[day].totalPl += trade.pl
+
+    // Calculate percentage return (ROM) if margin is available
+    if (trade.marginReq && trade.marginReq > 0) {
+      dayData[day].totalPlPercent += (trade.pl / trade.marginReq) * 100
+      dayData[day].percentSampleCount++
+    }
   })
 
   return Object.entries(dayData).map(([day, data]) => ({
     day,
     count: data.count,
-    avgPl: data.count > 0 ? data.totalPl / data.count : 0
+    avgPl: data.count > 0 ? data.totalPl / data.count : 0,
+    avgPlPercent: data.percentSampleCount > 0 ? data.totalPlPercent / data.percentSampleCount : 0
   }))
 }
 
@@ -513,6 +540,192 @@ function calculateMonthlyReturns(trades: Trade[]) {
   })
 
   return monthlyReturns
+}
+
+function calculateMonthlyReturnsPercent(
+  trades: Trade[],
+  dailyLogs?: DailyLogEntry[]
+): Record<number, Record<number, number>> {
+  // If daily logs are available, use them for accurate balance tracking
+  if (dailyLogs && dailyLogs.length > 0) {
+    return calculateMonthlyReturnsPercentFromDailyLogs(trades, dailyLogs)
+  }
+
+  // Fallback to trade-based calculation
+  return calculateMonthlyReturnsPercentFromTrades(trades)
+}
+
+function calculateMonthlyReturnsPercentFromDailyLogs(
+  trades: Trade[],
+  dailyLogs: DailyLogEntry[]
+): Record<number, Record<number, number>> {
+  const sortedLogs = [...dailyLogs].sort((a, b) =>
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+
+  if (sortedLogs.length === 0) {
+    return {}
+  }
+
+  // Pre-compute trade-based percents for fallback months without balance data
+  const tradeBasedPercents = calculateMonthlyReturnsPercentFromTrades(trades)
+
+  // Group trades by month to get P&L per month
+  const monthlyPL: Record<string, number> = {}
+  trades.forEach(trade => {
+    const date = new Date(trade.dateOpened)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
+    monthlyPL[monthKey] = (monthlyPL[monthKey] || 0) + trade.pl
+  })
+
+  // Get starting balance for each month from daily logs
+  const monthlyBalances: Record<string, { startBalance: number; endBalance: number }> = {}
+
+  sortedLogs.forEach((log, index) => {
+    const date = new Date(log.date)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
+
+    const balance = getEquityValueFromDailyLog(log)
+
+    if (!monthlyBalances[monthKey]) {
+      monthlyBalances[monthKey] = { startBalance: balance, endBalance: balance }
+    } else {
+      monthlyBalances[monthKey].endBalance = balance
+    }
+  })
+
+  // Calculate percentage returns
+  const monthlyReturnsPercent: Record<number, Record<number, number>> = {}
+  const years = new Set<number>()
+
+  Object.keys(monthlyPL).forEach(monthKey => {
+    const [yearStr, monthStr] = monthKey.split('-')
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
+    years.add(year)
+
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+
+    const pl = monthlyPL[monthKey] || 0
+    const balanceData = monthlyBalances[monthKey]
+
+    if (balanceData && balanceData.startBalance > 0) {
+      // Calculate percentage: (monthPL / startingBalance) * 100
+      monthlyReturnsPercent[year][month] = (pl / balanceData.startBalance) * 100
+    } else {
+      const fallbackPercent = tradeBasedPercents[year]?.[month]
+      monthlyReturnsPercent[year][month] = typeof fallbackPercent === 'number' ? fallbackPercent : 0
+    }
+  })
+
+  // Fill in zeros for months without data
+  Array.from(years).sort().forEach(year => {
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+    for (let month = 1; month <= 12; month++) {
+      if (monthlyReturnsPercent[year][month] === undefined) {
+        monthlyReturnsPercent[year][month] = 0
+      }
+    }
+  })
+
+  return monthlyReturnsPercent
+}
+
+function calculateMonthlyReturnsPercentFromTrades(
+  trades: Trade[]
+): Record<number, Record<number, number>> {
+  if (trades.length === 0) {
+    return {}
+  }
+
+  // Sort trades by date
+  const sortedTrades = [...trades].sort((a, b) =>
+    new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+  )
+
+  // Calculate initial capital
+  let runningCapital = PortfolioStatsCalculator.calculateInitialCapital(sortedTrades)
+  if (!isFinite(runningCapital) || runningCapital <= 0) {
+    runningCapital = 100000
+  }
+
+  // Group trades by month
+  const monthlyData: Record<string, { pl: number; startingCapital: number }> = {}
+  const years = new Set<number>()
+
+  sortedTrades.forEach(trade => {
+    const date = new Date(trade.dateOpened)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
+
+    years.add(year)
+
+    if (!monthlyData[monthKey]) {
+      monthlyData[monthKey] = {
+        pl: 0,
+        startingCapital: runningCapital
+      }
+    }
+
+    monthlyData[monthKey].pl += trade.pl
+  })
+
+  // Calculate percentage returns and update running capital
+  const monthlyReturnsPercent: Record<number, Record<number, number>> = {}
+  const sortedMonthKeys = Object.keys(monthlyData).sort()
+
+  sortedMonthKeys.forEach(monthKey => {
+    const [yearStr, monthStr] = monthKey.split('-')
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
+
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+
+    const { pl, startingCapital } = monthlyData[monthKey]
+
+    if (startingCapital > 0) {
+      monthlyReturnsPercent[year][month] = (pl / startingCapital) * 100
+    } else {
+      monthlyReturnsPercent[year][month] = 0
+    }
+
+    // Update capital for next month (compounding)
+    runningCapital = startingCapital + pl
+
+    // Update startingCapital for any remaining trades in future months
+    const currentMonthIndex = sortedMonthKeys.indexOf(monthKey)
+    if (currentMonthIndex < sortedMonthKeys.length - 1) {
+      const nextMonthKey = sortedMonthKeys[currentMonthIndex + 1]
+      if (monthlyData[nextMonthKey]) {
+        monthlyData[nextMonthKey].startingCapital = runningCapital
+      }
+    }
+  })
+
+  // Fill in zeros for months without data
+  Array.from(years).sort().forEach(year => {
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+    for (let month = 1; month <= 12; month++) {
+      if (monthlyReturnsPercent[year][month] === undefined) {
+        monthlyReturnsPercent[year][month] = 0
+      }
+    }
+  })
+
+  return monthlyReturnsPercent
 }
 
 function calculateRollingMetrics(trades: Trade[]) {

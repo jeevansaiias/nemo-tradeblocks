@@ -257,7 +257,11 @@ export function MarginStatisticsTable({
               {/* Portfolio row */}
               {portfolioStats.map((stat) => (
                 <TableRow key={stat.name} className="font-semibold">
-                  <TableCell>{stat.name}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <div className="truncate" title={stat.name}>
+                      {stat.name}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     {stat.historicalMax.toFixed(1)}%
                   </TableCell>
@@ -282,7 +286,11 @@ export function MarginStatisticsTable({
               {/* Strategy rows */}
               {strategyStats.map((stat) => (
                 <TableRow key={stat.name}>
-                  <TableCell className="text-sm">{stat.name}</TableCell>
+                  <TableCell className="text-sm max-w-[200px]">
+                    <div className="truncate" title={stat.name}>
+                      {stat.name}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right text-sm">
                     {stat.historicalMax.toFixed(1)}%
                   </TableCell>

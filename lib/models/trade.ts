@@ -44,6 +44,11 @@ export interface Trade {
   movement?: number
   maxProfit?: number
   maxLoss?: number
+  /**
+   * Synthetic-only: ratio of the worst observed loss to account capital at the time
+   * Used to scale synthetic losses relative to current account size
+   */
+  syntheticCapitalRatio?: number
 }
 
 /**
