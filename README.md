@@ -35,11 +35,16 @@ TradeBlocks is a Next.js 15 analytics workspace for evaluating options trading p
    Open a browser of your choice and visit:
    
    ```bash
-   http://localhose:3000 
+   http://localhost:3000 
    ```
    Tips:
    - Use http (not https).
    - The root route redirects to `/blocks` where you can manage portfolios.
+   - To update your local tradeblocks:
+     ```bash
+         cd tradeblocks
+         git pull original master 
+     ```
 
 ### Importing Data
 1. Navigate to **Block Management** (`/blocks`) and select **New Block**.
