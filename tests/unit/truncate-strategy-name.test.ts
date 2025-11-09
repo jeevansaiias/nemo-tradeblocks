@@ -15,7 +15,7 @@ describe("truncateStrategyName", () => {
   });
 
   it("should not truncate strategy names exactly at the max length", () => {
-    const exactName = "exactly forty characters in this name!!"; // 39 chars
+    const exactName = "exactly forty characters in this name!!"; // 40 chars
     expect(truncateStrategyName(exactName)).toBe(exactName);
   });
 
