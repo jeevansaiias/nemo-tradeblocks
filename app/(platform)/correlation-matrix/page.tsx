@@ -22,6 +22,8 @@ import {
   calculateCorrelationMatrix,
   CorrelationAlignment,
   CorrelationDateBasis,
+  CorrelationMethod,
+  CorrelationMatrix,
   CorrelationNormalization,
 } from "@/lib/calculations/correlation";
 import { getTradesByBlock } from "@/lib/db/trades-store";
@@ -40,13 +42,22 @@ export default function CorrelationMatrixPage() {
   );
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
-  const [method, setMethod] = useState<"pearson" | "spearman" | "kendall">(
-    "kendall"
-  );
+  const [method, setMethod] = useState<CorrelationMethod>("kendall");
   const [alignment, setAlignment] = useState<CorrelationAlignment>("shared");
   const [normalization, setNormalization] =
     useState<CorrelationNormalization>("raw");
   const [dateBasis, setDateBasis] = useState<CorrelationDateBasis>("opened");
+
+  const analyticsContext = useMemo(
+    () =>
+      formatAnalyticsContext({
+        method,
+        alignment,
+        normalization,
+        dateBasis,
+      }),
+    [method, alignment, normalization, dateBasis]
+  );
 
   useEffect(() => {
     async function loadTrades() {
@@ -569,13 +580,7 @@ export default function CorrelationMatrixPage() {
                   {analytics.averageCorrelation.toFixed(2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {analytics.strategyCount} strategies · {method.charAt(0).toUpperCase() + method.slice(1)}, {alignment === "shared"
-                    ? "Shared days"
-                    : "Zero-filled"}, {normalization === "raw"
-                      ? "Raw P/L"
-                      : normalization === "margin"
-                      ? "Margin-normalized"
-                      : "1-lot normalized"}, {dateBasis === "opened" ? "Opened dates" : "Closed dates"}
+                  {analytics.strategyCount} strategies · {analyticsContext}
                 </div>
               </div>
             </div>
@@ -630,4 +635,38 @@ function escapeCsvValue(value: string | number): string {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;
+}
+
+interface AnalyticsContextArgs {
+  method: CorrelationMethod;
+  alignment: CorrelationAlignment;
+  normalization: CorrelationNormalization;
+  dateBasis: CorrelationDateBasis;
+}
+
+function formatAnalyticsContext({
+  method,
+  alignment,
+  normalization,
+  dateBasis,
+}: AnalyticsContextArgs): string {
+  const methodLabel =
+    method === "pearson"
+      ? "Pearson"
+      : method === "spearman"
+      ? "Spearman"
+      : "Kendall";
+
+  const alignmentLabel = alignment === "shared" ? "Shared days" : "Zero-filled";
+
+  const normalizationLabel =
+    normalization === "raw"
+      ? "Raw P/L"
+      : normalization === "margin"
+      ? "Margin-normalized"
+      : "1-lot normalized";
+
+  const dateLabel = dateBasis === "opened" ? "Opened dates" : "Closed dates";
+
+  return [methodLabel, alignmentLabel, normalizationLabel, dateLabel].join(", ");
 }

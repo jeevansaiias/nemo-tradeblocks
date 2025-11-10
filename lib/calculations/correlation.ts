@@ -268,8 +268,9 @@ function normalizeReturn(
       return trade.pl / trade.marginReq;
     }
     case "notional": {
-      const notional = Math.abs(trade.openingPrice || 0) *
-        Math.abs(trade.numContracts || 0);
+      const notional = Math.abs(
+        (trade.openingPrice || 0) * (trade.numContracts || 0)
+      );
       if (!notional) {
         return null;
       }
