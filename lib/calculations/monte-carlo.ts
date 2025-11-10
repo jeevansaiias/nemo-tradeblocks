@@ -427,14 +427,17 @@ function allocateSyntheticCounts(weights: number[], budget: number): number[] {
 
   if (totalWeight === 0) {
     const evenShare = Math.floor(budget / weights.length);
+    const allocations = new Array(weights.length).fill(evenShare);
     let remainder = budget - evenShare * weights.length;
-    return weights.map((_, index) => {
-      if (remainder > 0) {
-        remainder--;
-        return evenShare + 1;
-      }
-      return evenShare;
-    });
+    let cursor = 0;
+
+    while (remainder > 0 && allocations.length > 0) {
+      allocations[cursor % allocations.length]++;
+      cursor++;
+      remainder--;
+    }
+
+    return allocations;
   }
 
   const rawAllocations = positiveWeights.map((weight) =>

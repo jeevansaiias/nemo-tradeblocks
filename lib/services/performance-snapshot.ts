@@ -583,7 +583,7 @@ function calculateMonthlyReturnsPercentFromDailyLogs(
   // Get starting balance for each month from daily logs
   const monthlyBalances: Record<string, { startBalance: number; endBalance: number }> = {}
 
-  sortedLogs.forEach((log, index) => {
+  sortedLogs.forEach(log => {
     const date = new Date(log.date)
     const year = date.getUTCFullYear()
     const month = date.getUTCMonth() + 1
