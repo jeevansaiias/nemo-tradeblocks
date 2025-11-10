@@ -55,16 +55,24 @@ export function calculateCorrelationMatrix(
       continue;
     }
 
+    if (dateBasis === "closed" && !trade.dateClosed) {
+      continue;
+    }
+
     const strategy = trade.strategy;
     const dateKey = getTradeDateKey(trade, dateBasis);
+    const normalizedReturn = normalizeReturn(trade, normalization);
+
+    if (normalizedReturn === null) {
+      continue;
+    }
 
     if (!strategyDailyReturns[strategy]) {
       strategyDailyReturns[strategy] = {};
     }
 
     strategyDailyReturns[strategy][dateKey] =
-      (strategyDailyReturns[strategy][dateKey] || 0) +
-      normalizeReturn(trade, normalization);
+      (strategyDailyReturns[strategy][dateKey] || 0) + normalizedReturn;
 
     allDates.add(dateKey);
   }
@@ -251,11 +259,11 @@ function getRanks(values: number[]): number[] {
 function normalizeReturn(
   trade: Trade,
   mode: CorrelationNormalization
-): number {
+): number | null {
   switch (mode) {
     case "margin": {
       if (!trade.marginReq) {
-        return 0;
+        return null;
       }
       return trade.pl / trade.marginReq;
     }
@@ -263,7 +271,7 @@ function normalizeReturn(
       const notional = Math.abs(trade.openingPrice || 0) *
         Math.abs(trade.numContracts || 0);
       if (!notional) {
-        return 0;
+        return null;
       }
       return trade.pl / notional;
     }
@@ -276,10 +284,12 @@ function getTradeDateKey(
   trade: Trade,
   basis: CorrelationDateBasis
 ): string {
-  const date = basis === "closed" ? trade.dateClosed ?? trade.dateOpened : trade.dateOpened;
+  const date = basis === "closed" ? trade.dateClosed : trade.dateOpened;
 
   if (!date) {
-    throw new Error("Trade is missing required date information for correlation calculation");
+    throw new Error(
+      "Trade is missing required date information for correlation calculation"
+    );
   }
 
   return date.toISOString().split("T")[0];
@@ -304,7 +314,7 @@ export function calculateCorrelationAnalytics(
   for (let i = 0; i < strategies.length; i++) {
     for (let j = i + 1; j < strategies.length; j++) {
       const value = correlationData[i][j];
-      sumCorrelation += Math.abs(value);
+      sumCorrelation += value;
       count++;
 
       // Strongest is the most positive correlation

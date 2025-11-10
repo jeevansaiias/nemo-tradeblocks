@@ -2,7 +2,14 @@
 
 import { ChartWrapper } from "@/components/performance-charts/chart-wrapper";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,10 +28,10 @@ import { getTradesByBlock } from "@/lib/db/trades-store";
 import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
 import { truncateStrategyName } from "@/lib/utils";
-import { Info } from "lucide-react";
+import { Download, HelpCircle, Info } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Data, Layout } from "plotly.js";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export default function CorrelationMatrixPage() {
   const { theme } = useTheme();
@@ -34,7 +41,7 @@ export default function CorrelationMatrixPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState<"pearson" | "spearman" | "kendall">(
-    "pearson"
+    "kendall"
   );
   const [alignment, setAlignment] = useState<CorrelationAlignment>("shared");
   const [normalization, setNormalization] =
@@ -179,6 +186,40 @@ export default function CorrelationMatrixPage() {
     return { plotData: [heatmapData as unknown as Data], layout: heatmapLayout };
   }, [correlationMatrix, theme]);
 
+  const isDark = theme === "dark";
+
+  const activeBlock = useBlockStore(
+    (state) => state.blocks.find((block) => block.id === activeBlockId)
+  );
+
+  const handleDownloadCsv = useCallback(() => {
+    if (!correlationMatrix) {
+      return;
+    }
+
+    const csv = buildCorrelationCsv(correlationMatrix, {
+      blockName: activeBlock?.name ?? "n/a",
+      method,
+      alignment,
+      normalization,
+      dateBasis,
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const filename = `correlation-${method}-${new Date()
+      .toISOString()
+      .split("T")[0]}.csv`;
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [correlationMatrix, method, alignment, normalization, dateBasis, activeBlock?.name]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -210,122 +251,234 @@ export default function CorrelationMatrixPage() {
     );
   }
 
-  const isDark = theme === "dark";
-
   return (
     <div className="space-y-6">
-      {/* Explanation Banner */}
+      {/* Info Banner */}
       <Card className="border-l-4 border-l-blue-500 dark:border-l-blue-400">
         <CardContent className="pt-6">
-          <div className="space-y-4">
-            {/* Title */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <Info className="h-5 w-5" />
-              </div>
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <Info className="h-5 w-5" />
+            </div>
+            <div className="space-y-2">
               <h3 className="text-base font-semibold">What does this show?</h3>
-            </div>
-
-            {/* Description */}
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              This correlation matrix shows how your trading strategies move
-              together. Values range from -1 to +1:
-            </p>
-
-            {/* Correlation Types */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="flex items-start gap-3 rounded-lg border bg-card p-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: isDark ? 'rgba(153, 27, 27, 0.2)' : 'rgba(103, 0, 31, 0.1)' }}>
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: isDark ? '#991b1b' : '#67001f' }} />
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                This heatmap shows how your trading strategies move together. High positive correlation (+1.0) means strategies
+                move in the same direction, while negative correlation (-1.0) means they move opposite. Low correlation (~0)
+                indicates good diversification.
+              </p>
+              <div className="flex flex-wrap items-center gap-4 pt-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="font-medium">PEARSON</Badge>
+                  <span className="text-muted-foreground">Linear relationships</span>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium" style={{ color: isDark ? '#fca5a5' : '#dc2626' }}>
-                    +1.0
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Perfect positive correlation (strategies always move together)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg border bg-card p-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(247, 247, 247, 0.8)' }}>
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: isDark ? '#334155' : '#f7f7f7', border: '1px solid', borderColor: isDark ? '#64748b' : '#cbd5e1' }} />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    0.0
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    No correlation (strategies move independently)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-lg border bg-card p-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: isDark ? 'rgba(30, 64, 175, 0.2)' : 'rgba(5, 48, 97, 0.1)' }}>
-                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: isDark ? '#1e40af' : '#053061' }} />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium" style={{ color: isDark ? '#93c5fd' : '#2563eb' }}>
-                    -1.0
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Perfect negative correlation (strategies move opposite)
-                  </p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-400 font-medium">
+                    KENDALL/SPEARMAN
+                  </Badge>
+                  <span className="text-muted-foreground">Rank-based (handles outliers better)</span>
                 </div>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            {/* Method Badges */}
-            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/50 p-3 text-xs">
+      {/* Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Calculation Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Method */}
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="font-medium">
-                  PEARSON
-                </Badge>
-                <span className="text-muted-foreground">
-                  Linear relationships (normal)
-                </span>
+                <Label htmlFor="method-select">Method</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">Correlation Method</h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          Choose how to measure strategy relationships
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          <strong>Kendall (recommended):</strong> Rank-based, robust to outliers. Best for options strategies with non-linear payoffs.<br/>
+                          <strong>Spearman:</strong> Another rank-based method, similar to Kendall but faster for large datasets.<br/>
+                          <strong>Pearson:</strong> Measures linear relationships. Best for normally distributed returns.
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
               </div>
-              <div className="hidden sm:block text-muted-foreground">•</div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-400 font-medium">
-                  SPEARMAN/KENDALL
-                </Badge>
-                <span className="text-muted-foreground">
-                  Rank-based (non-linear patterns)
-                </span>
-              </div>
+              <Select
+                value={method}
+                onValueChange={(value) =>
+                  setMethod(value as "pearson" | "spearman" | "kendall")
+                }
+              >
+                <SelectTrigger id="method-select">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kendall">Kendall (Rank)</SelectItem>
+                  <SelectItem value="spearman">Spearman (Rank)</SelectItem>
+                  <SelectItem value="pearson">Pearson (Linear)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {method === "pearson" && "Linear correlation"}
+                {method === "kendall" && "Rank-based, outlier-resistant"}
+                {method === "spearman" && "Rank-based, fast"}
+              </p>
             </div>
 
-            {/* Current settings */}
-            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
-              <div className="rounded-lg border bg-card/30 p-3">
-                <div className="text-sm font-medium text-foreground">Alignment</div>
-                <p>
-                  {alignment === "shared"
-                    ? "Shared trading days only. Missing days are ignored to avoid synthetic P/L."
-                    : "Zero-fill missing days. Treats no-trade days as 0 P/L for comparison."}
-                </p>
+            {/* Alignment */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="alignment-select">Alignment</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">Date Alignment</h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          How to handle days when strategies don&apos;t trade
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          <strong>Shared days (recommended):</strong> Only correlates on days where both strategies traded. Avoids artificial zeros.<br/>
+                          <strong>Zero-fill:</strong> Treats non-trading days as $0 P/L. Can distort correlation for strategies that trade different frequencies.
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
               </div>
-              <div className="rounded-lg border bg-card/30 p-3">
-                <div className="text-sm font-medium text-foreground">Return basis</div>
-                <p>
-                  {normalization === "raw"
-                    ? "Raw P/L values"
-                    : normalization === "margin"
-                    ? "P/L divided by margin requirement"
-                    : "P/L divided by opening price × contracts (notional)"}
-                </p>
+              <Select
+                value={alignment}
+                onValueChange={(value) =>
+                  setAlignment(value as CorrelationAlignment)
+                }
+              >
+                <SelectTrigger id="alignment-select">
+                  <SelectValue placeholder="Alignment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="shared">Shared days</SelectItem>
+                  <SelectItem value="zero-pad">Zero-fill</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {alignment === "shared" && "Only common trading days"}
+                {alignment === "zero-pad" && "Fill missing days with $0"}
+              </p>
+            </div>
+
+            {/* Return basis */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="return-basis-select">Return Basis</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">Return Normalization</h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          How to scale returns for comparison
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          <strong>Raw P/L:</strong> Absolute dollar returns (default).<br/>
+                          <strong>Margin-normalized:</strong> Returns divided by margin requirement. Better for comparing strategies with different capital requirements.<br/>
+                          <strong>1-lot normalized:</strong> Per-contract basis. Divides P/L by trade size (price × contracts) to show returns as if each trade was 1 lot.
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
               </div>
-              <div className="rounded-lg border bg-card/30 p-3">
-                <div className="text-sm font-medium text-foreground">Date basis</div>
-                <p>
-                  {dateBasis === "opened"
-                    ? "Groups trades by opening date (entry timing)."
-                    : "Groups trades by closing date to reflect realized P/L."}
-                </p>
+              <Select
+                value={normalization}
+                onValueChange={(value) =>
+                  setNormalization(value as CorrelationNormalization)
+                }
+              >
+                <SelectTrigger id="return-basis-select">
+                  <SelectValue placeholder="Return basis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="raw">Raw P/L</SelectItem>
+                  <SelectItem value="margin">Margin-normalized</SelectItem>
+                  <SelectItem value="notional">1-lot normalized</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {normalization === "raw" && "Absolute dollar amounts"}
+                {normalization === "margin" && "P/L ÷ Margin required"}
+                {normalization === "notional" && "Per-contract returns"}
+              </p>
+            </div>
+
+            {/* Date basis */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="date-basis-select">Date Basis</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">Date Basis</h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm font-medium text-foreground leading-relaxed">
+                          Which date to use for grouping trades
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          <strong>Opened date (recommended):</strong> Groups by when trades were entered. Shows entry timing correlation.<br/>
+                          <strong>Closed date:</strong> Groups by when trades were closed. Shows exit timing and P/L realization correlation.
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
               </div>
+              <Select
+                value={dateBasis}
+                onValueChange={(value) =>
+                  setDateBasis(value as CorrelationDateBasis)
+                }
+              >
+                <SelectTrigger id="date-basis-select">
+                  <SelectValue placeholder="Date basis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="opened">Opened date</SelectItem>
+                  <SelectItem value="closed">Closed date</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {dateBasis === "opened" && "Group by entry date"}
+                {dateBasis === "closed" && "Group by exit date"}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -335,100 +488,40 @@ export default function CorrelationMatrixPage() {
       <ChartWrapper
         title="Correlation Heatmap"
         description="Visual representation of strategy correlations"
+        tooltip={{
+          flavor: "Measures how your trading strategies move together over time.",
+          detailed: "Red colors indicate positive correlation (strategies tend to win/lose together), blue indicates negative correlation (strategies move opposite), and white indicates no correlation. Use this to identify diversification opportunities and understand portfolio risk."
+        }}
         data={plotData}
         layout={layout}
         style={{ height: "600px" }}
-      >
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Method:</span>
-            <Select
-              value={method}
-              onValueChange={(value) =>
-                setMethod(value as "pearson" | "spearman" | "kendall")
-              }
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pearson">Pearson (Linear)</SelectItem>
-                <SelectItem value="spearman">Spearman (Rank)</SelectItem>
-                <SelectItem value="kendall">Kendall (Rank)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Alignment:</span>
-            <Select
-              value={alignment}
-              onValueChange={(value) =>
-                setAlignment(value as CorrelationAlignment)
-              }
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Alignment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="shared">Shared days (default)</SelectItem>
-                <SelectItem value="zero-pad">Zero-fill missing days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Return basis:</span>
-            <Select
-              value={normalization}
-              onValueChange={(value) =>
-                setNormalization(value as CorrelationNormalization)
-              }
-            >
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Return basis" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="raw">Raw P/L</SelectItem>
-                <SelectItem value="margin">P/L ÷ Margin Req.</SelectItem>
-                <SelectItem value="notional">P/L ÷ (Price × Contracts)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Date basis:</span>
-            <Select
-              value={dateBasis}
-              onValueChange={(value) =>
-                setDateBasis(value as CorrelationDateBasis)
-              }
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Date basis" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="opened">Opened date</SelectItem>
-                <SelectItem value="closed">Closed date</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </ChartWrapper>
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={handleDownloadCsv}
+            disabled={!correlationMatrix}
+          >
+            <Download className="h-4 w-4" />
+            Download CSV
+          </Button>
+        }
+      />
 
       {/* Quick Analysis */}
       {analytics && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">📊 Quick Analysis</CardTitle>
+            <CardTitle className="text-lg">Quick Analysis</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-1">
-                <div className="text-sm font-medium" style={{ color: isDark ? '#fca5a5' : '#dc2626' }}>
+                <div className="text-sm font-medium text-muted-foreground">
                   Strongest:
                 </div>
-                <div className="text-2xl font-bold" style={{ color: isDark ? '#991b1b' : '#67001f' }}>
+                <div className="text-2xl font-bold" style={{ color: isDark ? '#fca5a5' : '#dc2626' }}>
                   {analytics.strongest.value.toFixed(2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -437,10 +530,10 @@ export default function CorrelationMatrixPage() {
               </div>
 
               <div className="space-y-1">
-                <div className="text-sm font-medium" style={{ color: isDark ? '#93c5fd' : '#2563eb' }}>
+                <div className="text-sm font-medium text-muted-foreground">
                   Weakest:
                 </div>
-                <div className="text-2xl font-bold" style={{ color: isDark ? '#1e40af' : '#053061' }}>
+                <div className="text-2xl font-bold" style={{ color: isDark ? '#93c5fd' : '#2563eb' }}>
                   {analytics.weakest.value.toFixed(2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -449,22 +542,40 @@ export default function CorrelationMatrixPage() {
               </div>
 
               <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Average:
+                <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                  <span>Average</span>
+                  <HoverCard>
+                    <HoverCardTrigger asChild>
+                      <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground/70" />
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-80 p-0 overflow-hidden">
+                      <div className="space-y-3">
+                        <div className="bg-primary/5 border-b px-4 py-3">
+                          <h4 className="text-sm font-semibold text-primary">Average Correlation</h4>
+                        </div>
+                        <div className="px-4 pb-4 space-y-3">
+                          <p className="text-sm font-medium text-foreground leading-relaxed">
+                            Signed mean of all off-diagonal correlations
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Positive values indicate strategies tend to move together on average. Negative values suggest strategies tend to offset each other. Values near zero indicate diverse, uncorrelated strategies.
+                          </p>
+                        </div>
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
                 </div>
                 <div className="text-2xl font-bold">
                   {analytics.averageCorrelation.toFixed(2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {analytics.strategyCount} strategies · {alignment === "shared"
+                  {analytics.strategyCount} strategies · {method.charAt(0).toUpperCase() + method.slice(1)}, {alignment === "shared"
                     ? "Shared days"
-                    : "Zero-filled"}
-                  , {normalization === "raw"
-                    ? "Raw P/L"
-                    : normalization === "margin"
-                    ? "Margin-normalized"
-                    : "Notional-normalized"}
-                  , {dateBasis === "opened" ? "Opened dates" : "Closed dates"}
+                    : "Zero-filled"}, {normalization === "raw"
+                      ? "Raw P/L"
+                      : normalization === "margin"
+                      ? "Margin-normalized"
+                      : "1-lot normalized"}, {dateBasis === "opened" ? "Opened dates" : "Closed dates"}
                 </div>
               </div>
             </div>
@@ -473,4 +584,50 @@ export default function CorrelationMatrixPage() {
       )}
     </div>
   );
+}
+
+interface CsvMeta {
+  blockName: string;
+  method: string;
+  alignment: string;
+  normalization: string;
+  dateBasis: string;
+}
+
+function buildCorrelationCsv(
+  matrix: CorrelationMatrix,
+  meta: CsvMeta
+): string {
+  const rows: string[] = [];
+  const addRow = (values: (string | number)[]) => {
+    rows.push(values.map(escapeCsvValue).join(","));
+  };
+
+  addRow(["Generated At", new Date().toISOString()]);
+  addRow(["Block", meta.blockName]);
+  addRow(["Method", meta.method]);
+  addRow(["Alignment", meta.alignment]);
+  addRow(["Return Basis", meta.normalization]);
+  addRow(["Date Basis", meta.dateBasis]);
+  addRow(["Strategy Count", matrix.strategies.length]);
+
+  rows.push("");
+
+  addRow(["Strategy", ...matrix.strategies]);
+  matrix.correlationData.forEach((row, index) => {
+    addRow([
+      matrix.strategies[index],
+      ...row.map((value) => value.toFixed(6)),
+    ]);
+  });
+
+  return rows.join("\n");
+}
+
+function escapeCsvValue(value: string | number): string {
+  const stringValue = String(value ?? "");
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
 }

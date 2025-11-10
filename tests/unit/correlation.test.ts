@@ -1,4 +1,4 @@
-import { calculateCorrelationMatrix } from '@/lib/calculations/correlation';
+import { calculateCorrelationAnalytics, calculateCorrelationMatrix } from '@/lib/calculations/correlation';
 import { Trade } from '@/lib/models/trade';
 
 describe('Correlation Calculations', () => {
@@ -190,5 +190,52 @@ describe('Correlation Calculations', () => {
 
     expect(opened.correlationData[0][1]).toBe(0);
     expect(closed.correlationData[0][1]).toBeCloseTo(1, 5);
+  });
+
+  it('should ignore trades without closed dates when using closed basis', () => {
+    const trades: Trade[] = [
+      { dateOpened: new Date('2025-01-01'), strategy: 'OpenOnly', pl: 100 } as Trade,
+      { dateOpened: new Date('2025-01-02'), dateClosed: new Date('2025-01-03'), strategy: 'Closer', pl: 200 } as Trade,
+      { dateOpened: new Date('2025-01-05'), dateClosed: new Date('2025-01-06'), strategy: 'Closer', pl: -50 } as Trade,
+    ];
+
+    const result = calculateCorrelationMatrix(trades, {
+      method: 'pearson',
+      dateBasis: 'closed',
+    });
+
+    expect(result.strategies).toEqual(['Closer']);
+  });
+
+  it('should drop strategies with no valid normalized returns', () => {
+    const trades: Trade[] = [
+      { dateOpened: new Date('2025-01-01'), strategy: 'NoMargin', pl: 100 } as Trade,
+      { dateOpened: new Date('2025-01-02'), strategy: 'NoMargin', pl: -50 } as Trade,
+      { dateOpened: new Date('2025-01-01'), strategy: 'WithMargin', pl: 200, marginReq: 2000 } as Trade,
+      { dateOpened: new Date('2025-01-02'), strategy: 'WithMargin', pl: -100, marginReq: 1000 } as Trade,
+    ];
+
+    const result = calculateCorrelationMatrix(trades, {
+      method: 'pearson',
+      normalization: 'margin',
+    });
+
+    expect(result.strategies).toEqual(['WithMargin']);
+  });
+
+  it('should report signed average correlation in analytics', () => {
+    const matrix = {
+      strategies: ['A', 'B', 'C'],
+      correlationData: [
+        [1, 0.5, -0.5],
+        [0.5, 1, 0.2],
+        [-0.5, 0.2, 1],
+      ],
+    };
+
+    const analytics = calculateCorrelationAnalytics(matrix);
+    const expectedAverage = (0.5 - 0.5 + 0.2) / 3;
+
+    expect(analytics.averageCorrelation).toBeCloseTo(expectedAverage, 5);
   });
 });
