@@ -19,7 +19,6 @@ import {
 import type { EfficiencyBasis } from "@/lib/metrics/trade-efficiency"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
 
 type AxisValueFormat =
   | { type: "currency"; maximumFractionDigits?: number }
@@ -952,9 +951,9 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
 
     const points = data.mfeMaeData
       .map(point => {
-        const ratio = point.shortLongRatioChange
-        const pct = point.shortLongRatioChangePct
-        const plPercent = point.normalizedBy?.premium?.plPercent ?? point.normalizedBy?.margin?.plPercent ?? point.plPercent
+        const ratio = point.shortLongRatioChange ?? null
+        const pct = point.shortLongRatioChangePct ?? null
+        const plPercent = point.normalizedBy?.premium?.plPercent ?? point.normalizedBy?.margin?.plPercent ?? point.plPercent ?? null
 
         if (activeSlrMode === "ratio" && !isFiniteNumber(ratio)) return null
         if (activeSlrMode === "percent" && !isFiniteNumber(pct)) return null
