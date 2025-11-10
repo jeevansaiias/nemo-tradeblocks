@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from "react"
 import { Download, History, Loader2, TrendingUp, AlertTriangle } from "lucide-react"
-import { IconTimelineEvent } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -174,41 +173,44 @@ export default function WalkForwardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <IconTimelineEvent className="h-4 w-4 text-primary" />
-            Walk-Forward Optimization
-          </div>
-          <h1 className="text-2xl font-semibold">Validate performance across shifting regimes</h1>
+      {/* How to Use This Page */}
+      <Card className="p-6">
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">How to Use This Page</h2>
           <p className="text-sm text-muted-foreground">
-            Stress test your block&apos;s sizing and risk assumptions with rolling IS/OOS windows,
-            then compare degradation, stability, and parameter drift.
+            Walk-forward analysis validates your strategy&apos;s performance by repeatedly optimizing
+            on historical data (in-sample) and testing on unseen future data (out-of-sample).
+          </p>
+          <ul className="space-y-2 text-sm text-muted-foreground list-disc list-inside">
+            <li>
+              Configure your in-sample and out-of-sample windows to match your trading timeframe
+              and available data.
+            </li>
+            <li>
+              Choose an optimization target (e.g., Sharpe Ratio, Net Profit) that aligns with
+              your risk tolerance and goals.
+            </li>
+            <li>
+              Define parameter ranges for position sizing and risk controls to sweep through
+              different combinations.
+            </li>
+            <li>
+              Run the analysis to see how optimal parameters change across different market
+              regimes and whether performance degrades out-of-sample.
+            </li>
+            <li>
+              Review the efficiency metrics and consistency scores to assess if your strategy
+              is robust or overfit to specific market conditions.
+            </li>
+          </ul>
+          <p className="text-xs text-muted-foreground italic">
+            A robust strategy should maintain reasonable performance (60-80% efficiency) in
+            out-of-sample periods. High degradation suggests overfitting to historical data.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            disabled={!results}
-            onClick={() => handleExport("csv")}
-            size="sm"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!results}
-            onClick={() => handleExport("json")}
-            size="sm"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export JSON
-          </Button>
-        </div>
-      </div>
+      </Card>
 
-      <WalkForwardPeriodSelector blockId={activeBlockId} blockName={activeBlock.name} />
+      <WalkForwardPeriodSelector blockId={activeBlockId} />
 
       <RobustnessMetrics results={results?.results ?? null} targetMetricLabel={targetMetricLabel} />
 
@@ -220,8 +222,32 @@ export default function WalkForwardPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2 overflow-hidden">
           <CardHeader className="pb-2">
-            <CardTitle>Window Comparison</CardTitle>
-            <CardDescription>Evaluate each walk-forward step at a glance.</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Window Comparison</CardTitle>
+                <CardDescription>Evaluate each walk-forward step at a glance.</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!results}
+                  onClick={() => handleExport("csv")}
+                  size="sm"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!results}
+                  onClick={() => handleExport("json")}
+                  size="sm"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  JSON
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {results && results.results.periods.length > 0 ? (

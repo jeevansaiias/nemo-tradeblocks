@@ -66,7 +66,7 @@ const navData = {
       title: "Walk-Forward",
       href: "/walk-forward",
       icon: IconTimelineEvent,
-      badge: "New",
+      badge: "Beta",
     },
     {
       title: "Comparison Blocks",

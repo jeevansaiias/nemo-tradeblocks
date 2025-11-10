@@ -1,11 +1,7 @@
 "use client"
 
-import {
-  IconPlayerPlay,
-  IconAdjustmentsHorizontal,
-  IconHeartRateMonitor,
-} from "@tabler/icons-react"
-import { Loader2, Square } from "lucide-react"
+import { IconPlayerPlay } from "@tabler/icons-react"
+import { HelpCircle, Loader2, Square } from "lucide-react"
 import { useMemo } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -17,12 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { WalkForwardOptimizationTarget } from "@/lib/models/walk-forward"
 import { WALK_FORWARD_PRESETS, useWalkForwardStore } from "@/lib/stores/walk-forward-store"
 
 interface PeriodSelectorProps {
   blockId?: string | null
-  blockName?: string
 }
 
 const TARGET_OPTIONS: Array<{ value: WalkForwardOptimizationTarget; label: string }> = [
@@ -78,7 +74,7 @@ const PARAMETER_METADATA: Record<
   },
 }
 
-export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelectorProps) {
+export function WalkForwardPeriodSelector({ blockId }: PeriodSelectorProps) {
   const config = useWalkForwardStore((state) => state.config)
   const presets = useWalkForwardStore((state) => state.presets)
   const updateConfig = useWalkForwardStore((state) => state.updateConfig)
@@ -211,15 +207,8 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
 
   return (
     <Card>
-      <CardHeader className="space-y-2">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <IconHeartRateMonitor className="h-4 w-4 text-primary" />
-          {blockName ? `Target Block: ${blockName}` : "No block selected"}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <IconAdjustmentsHorizontal className="h-5 w-5 text-primary" />
-          <CardTitle>Walk-Forward Configuration</CardTitle>
-        </div>
+      <CardHeader>
+        <CardTitle>Configuration</CardTitle>
         <CardDescription>
           Define in-sample / out-of-sample cadence, optimization target, and risk sweeps. Use
           presets for quick-start configurations.
@@ -235,7 +224,31 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <Label>In-Sample Days</Label>
+            <div className="flex items-center gap-2">
+              <Label>In-Sample Days</Label>
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80 p-0 overflow-hidden">
+                  <div className="space-y-3">
+                    <div className="bg-primary/5 border-b px-4 py-3">
+                      <h4 className="text-sm font-semibold text-primary">In-Sample Window</h4>
+                    </div>
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        The historical period used for optimization and parameter tuning.
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        During this window, the algorithm tests different parameter combinations to find
+                        the optimal settings based on your chosen metric. Larger windows provide more
+                        data but may include outdated market regimes. Default: 45 days (range: 30-60 days).
+                      </p>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
             <Input
               type="number"
               min={10}
@@ -244,7 +257,31 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
             />
           </div>
           <div className="space-y-1">
-            <Label>Out-of-Sample Days</Label>
+            <div className="flex items-center gap-2">
+              <Label>Out-of-Sample Days</Label>
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80 p-0 overflow-hidden">
+                  <div className="space-y-3">
+                    <div className="bg-primary/5 border-b px-4 py-3">
+                      <h4 className="text-sm font-semibold text-primary">Out-of-Sample Window</h4>
+                    </div>
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        The forward-testing period to validate optimized parameters on unseen data.
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        This simulates real trading by applying optimized parameters to future data they
+                        were never trained on. Performance here reveals whether your strategy is robust
+                        or overfit. Default: 15 days (typically 1/3 of in-sample, range: 10-20 days).
+                      </p>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
             <Input
               type="number"
               min={5}
@@ -253,7 +290,32 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
             />
           </div>
           <div className="space-y-1">
-            <Label>Step Size (Days)</Label>
+            <div className="flex items-center gap-2">
+              <Label>Step Size (Days)</Label>
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80 p-0 overflow-hidden">
+                  <div className="space-y-3">
+                    <div className="bg-primary/5 border-b px-4 py-3">
+                      <h4 className="text-sm font-semibold text-primary">Step Size</h4>
+                    </div>
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        How many days to advance between each walk-forward iteration.
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Smaller steps create more overlapping windows and test results, giving finer
+                        granularity but increasing computation time. Larger steps move faster through
+                        history with less overlap. Default: 15 days (equal to OOS window for
+                        non-overlapping periods, range: 10-20 days).
+                      </p>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
             <Input
               type="number"
               min={1}
@@ -265,7 +327,32 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1">
-            <Label>Optimization Target</Label>
+            <div className="flex items-center gap-2">
+              <Label>Optimization Target</Label>
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80 p-0 overflow-hidden">
+                  <div className="space-y-3">
+                    <div className="bg-primary/5 border-b px-4 py-3">
+                      <h4 className="text-sm font-semibold text-primary">Optimization Target</h4>
+                    </div>
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        The performance metric to maximize when finding optimal parameters.
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Each in-sample window tests all parameter combinations and selects the one
+                        with the highest value for this metric. Choose based on your priorities:
+                        risk-adjusted returns (Sharpe/Sortino), total profit (Net P/L), or consistency
+                        (Win Rate, Profit Factor).
+                      </p>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
             <Select
               value={config.optimizationTarget}
               onValueChange={(value) =>
@@ -286,7 +373,30 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Min IS Trades</Label>
+              <div className="flex items-center gap-2">
+                <Label>Min IS Trades</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">
+                          Minimum In-Sample Trades
+                        </h4>
+                      </div>
+                      <div className="px-4 pb-4">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Skip windows with fewer than this many trades in the optimization period.
+                          Too few trades produce unreliable parameter estimates. Default: 15 trades
+                          (minimum recommended for meaningful optimization).
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
               <Input
                 type="number"
                 min={5}
@@ -297,7 +407,29 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
               />
             </div>
             <div className="space-y-1">
-              <Label>Min OOS Trades</Label>
+              <div className="flex items-center gap-2">
+                <Label>Min OOS Trades</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">
+                          Minimum Out-of-Sample Trades
+                        </h4>
+                      </div>
+                      <div className="px-4 pb-4">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Skip windows with fewer than this many trades in the validation period. At
+                          least 5-10 trades needed to meaningfully assess out-of-sample performance.
+                        </p>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
               <Input
                 type="number"
                 min={1}
@@ -312,7 +444,40 @@ export function WalkForwardPeriodSelector({ blockId, blockName }: PeriodSelector
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Parameter Sweeps</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">Parameter Sweeps</p>
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground/60 cursor-help" />
+                </HoverCardTrigger>
+                <HoverCardContent className="w-96 p-0 overflow-hidden">
+                  <div className="space-y-3">
+                    <div className="bg-primary/5 border-b px-4 py-3">
+                      <h4 className="text-sm font-semibold text-primary">Parameter Sweeps</h4>
+                    </div>
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        Define ranges for position sizing and risk control parameters to test.
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        For each in-sample window, the optimizer tests all combinations within these
+                        ranges to find the best settings. Wider ranges explore more possibilities but
+                        increase computation time exponentially. Use presets for quick-start
+                        configurations, then fine-tune based on results.
+                      </p>
+                      <div className="text-xs text-muted-foreground space-y-1 border-t border-border pt-2">
+                        <p className="font-medium">Example:</p>
+                        <p className="font-mono text-[10px] bg-muted/50 p-2 rounded">
+                          Kelly: 0.5-1.5 (step 0.1) = 11 values<br />
+                          Max DD: 10-20 (step 2) = 6 values<br />
+                          Total: 11 × 6 = 66 combinations
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">{presetButtons}</div>
           </div>
           <div className="grid gap-3 md:grid-cols-2">{renderParameterControls()}</div>
