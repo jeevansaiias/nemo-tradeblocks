@@ -57,6 +57,8 @@ export interface MFEMAEDataPoint {
   movement?: number
   maxProfit?: number
   maxLoss?: number
+  shortLongRatioChange?: number
+  shortLongRatioChangePct?: number
 }
 
 /**
@@ -133,6 +135,15 @@ export function calculateTradeExcursionMetrics(trade: Trade, tradeNumber: number
 
   const normalizedBy: MFEMAEDataPoint['normalizedBy'] = {}
 
+  const hasOpeningSLR = typeof trade.openingShortLongRatio === 'number' && isFinite(trade.openingShortLongRatio) && trade.openingShortLongRatio !== 0
+  const hasClosingSLR = typeof trade.closingShortLongRatio === 'number' && isFinite(trade.closingShortLongRatio)
+  const shortLongRatioChange = hasOpeningSLR && hasClosingSLR
+    ? trade.closingShortLongRatio! / trade.openingShortLongRatio
+    : undefined
+  const shortLongRatioChangePct = hasOpeningSLR && hasClosingSLR
+    ? ((trade.closingShortLongRatio! - trade.openingShortLongRatio) / trade.openingShortLongRatio) * 100
+    : undefined
+
   NORMALIZATION_BASES.forEach(currentBasis => {
     const denom = denominators[currentBasis]
     if (!denom || denom <= 0) {
@@ -178,6 +189,8 @@ export function calculateTradeExcursionMetrics(trade: Trade, tradeNumber: number
     movement: trade.movement,
     maxProfit: trade.maxProfit,
     maxLoss: trade.maxLoss,
+    shortLongRatioChange,
+    shortLongRatioChangePct,
   }
 
   // Calculate percentages if we have a denominator
