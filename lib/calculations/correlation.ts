@@ -1,6 +1,18 @@
 import { Trade } from "@/lib/models/trade";
 import { mean } from "mathjs";
 
+export type CorrelationMethod = "pearson" | "spearman" | "kendall";
+export type CorrelationAlignment = "shared" | "zero-pad";
+export type CorrelationNormalization = "raw" | "margin" | "notional";
+export type CorrelationDateBasis = "opened" | "closed";
+
+export interface CorrelationOptions {
+  method?: CorrelationMethod;
+  alignment?: CorrelationAlignment;
+  normalization?: CorrelationNormalization;
+  dateBasis?: CorrelationDateBasis;
+}
+
 export interface CorrelationMatrix {
   strategies: string[];
   correlationData: number[][];
@@ -24,10 +36,18 @@ export interface CorrelationAnalytics {
  */
 export function calculateCorrelationMatrix(
   trades: Trade[],
-  method: "pearson" | "spearman" | "kendall" = "pearson"
+  options: CorrelationOptions = {}
 ): CorrelationMatrix {
+  const {
+    method = "pearson",
+    alignment = "shared",
+    normalization = "raw",
+    dateBasis = "opened",
+  } = options;
+
   // Group trades by strategy and date
   const strategyDailyReturns: Record<string, Record<string, number>> = {};
+  const allDates = new Set<string>();
 
   for (const trade of trades) {
     // Skip trades without a strategy
@@ -36,14 +56,17 @@ export function calculateCorrelationMatrix(
     }
 
     const strategy = trade.strategy;
-    const dateKey = trade.dateOpened.toISOString().split("T")[0];
+    const dateKey = getTradeDateKey(trade, dateBasis);
 
     if (!strategyDailyReturns[strategy]) {
       strategyDailyReturns[strategy] = {};
     }
 
     strategyDailyReturns[strategy][dateKey] =
-      (strategyDailyReturns[strategy][dateKey] || 0) + trade.pl;
+      (strategyDailyReturns[strategy][dateKey] || 0) +
+      normalizeReturn(trade, normalization);
+
+    allDates.add(dateKey);
   }
 
   const strategies = Object.keys(strategyDailyReturns).sort();
@@ -56,33 +79,53 @@ export function calculateCorrelationMatrix(
     return { strategies, correlationData: identityMatrix };
   }
 
-  // Get all unique dates
-  const allDates = new Set<string>();
-  for (const strategyData of Object.values(strategyDailyReturns)) {
-    for (const date of Object.keys(strategyData)) {
-      allDates.add(date);
+  const correlationData: number[][] = [];
+
+  const sortedDates = alignment === "zero-pad"
+    ? Array.from(allDates).sort()
+    : [];
+
+  const zeroPaddedReturns: Record<string, number[]> = {};
+  if (alignment === "zero-pad") {
+    for (const strategy of strategies) {
+      zeroPaddedReturns[strategy] = sortedDates.map(
+        (date) => strategyDailyReturns[strategy][date] || 0
+      );
     }
   }
 
-  const sortedDates = Array.from(allDates).sort();
-
-  // Create aligned returns arrays for each strategy
-  const strategyReturnsArrays: Record<string, number[]> = {};
-  for (const strategy of strategies) {
-    strategyReturnsArrays[strategy] = sortedDates.map(
-      (date) => strategyDailyReturns[strategy][date] || 0
-    );
-  }
-
-  // Calculate correlation matrix
-  const correlationData: number[][] = [];
-
   for (const strategy1 of strategies) {
     const row: number[] = [];
-    const returns1 = strategyReturnsArrays[strategy1];
 
     for (const strategy2 of strategies) {
-      const returns2 = strategyReturnsArrays[strategy2];
+      if (strategy1 === strategy2) {
+        row.push(1.0);
+        continue;
+      }
+
+      let returns1: number[] = [];
+      let returns2: number[] = [];
+
+      if (alignment === "zero-pad") {
+        returns1 = zeroPaddedReturns[strategy1];
+        returns2 = zeroPaddedReturns[strategy2];
+      } else {
+        const strategy1Data = strategyDailyReturns[strategy1];
+        const strategy2Data = strategyDailyReturns[strategy2];
+
+        for (const date of Object.keys(strategy1Data)) {
+          if (date in strategy2Data) {
+            returns1.push(strategy1Data[date]);
+            returns2.push(strategy2Data[date]);
+          }
+        }
+      }
+
+      // Need at least 2 data points for correlation
+      if (returns1.length < 2 || returns2.length < 2) {
+        row.push(0.0);
+        continue;
+      }
 
       let correlation: number;
       if (method === "pearson") {
@@ -203,6 +246,43 @@ function getRanks(values: number[]): number[] {
   }
 
   return ranks;
+}
+
+function normalizeReturn(
+  trade: Trade,
+  mode: CorrelationNormalization
+): number {
+  switch (mode) {
+    case "margin": {
+      if (!trade.marginReq) {
+        return 0;
+      }
+      return trade.pl / trade.marginReq;
+    }
+    case "notional": {
+      const notional = Math.abs(trade.openingPrice || 0) *
+        Math.abs(trade.numContracts || 0);
+      if (!notional) {
+        return 0;
+      }
+      return trade.pl / notional;
+    }
+    default:
+      return trade.pl;
+  }
+}
+
+function getTradeDateKey(
+  trade: Trade,
+  basis: CorrelationDateBasis
+): string {
+  const date = basis === "closed" ? trade.dateClosed ?? trade.dateOpened : trade.dateOpened;
+
+  if (!date) {
+    throw new Error("Trade is missing required date information for correlation calculation");
+  }
+
+  return date.toISOString().split("T")[0];
 }
 
 /**

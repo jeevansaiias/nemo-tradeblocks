@@ -13,6 +13,9 @@ import {
 import {
   calculateCorrelationAnalytics,
   calculateCorrelationMatrix,
+  CorrelationAlignment,
+  CorrelationDateBasis,
+  CorrelationNormalization,
 } from "@/lib/calculations/correlation";
 import { getTradesByBlock } from "@/lib/db/trades-store";
 import { Trade } from "@/lib/models/trade";
@@ -33,6 +36,10 @@ export default function CorrelationMatrixPage() {
   const [method, setMethod] = useState<"pearson" | "spearman" | "kendall">(
     "pearson"
   );
+  const [alignment, setAlignment] = useState<CorrelationAlignment>("shared");
+  const [normalization, setNormalization] =
+    useState<CorrelationNormalization>("raw");
+  const [dateBasis, setDateBasis] = useState<CorrelationDateBasis>("opened");
 
   useEffect(() => {
     async function loadTrades() {
@@ -60,11 +67,16 @@ export default function CorrelationMatrixPage() {
       return { correlationMatrix: null, analytics: null };
     }
 
-    const matrix = calculateCorrelationMatrix(trades, method);
+    const matrix = calculateCorrelationMatrix(trades, {
+      method,
+      alignment,
+      normalization,
+      dateBasis,
+    });
     const stats = calculateCorrelationAnalytics(matrix);
 
     return { correlationMatrix: matrix, analytics: stats };
-  }, [trades, method]);
+  }, [trades, method, alignment, normalization, dateBasis]);
 
   const { plotData, layout } = useMemo(() => {
     if (!correlationMatrix) {
@@ -285,6 +297,36 @@ export default function CorrelationMatrixPage() {
                 </span>
               </div>
             </div>
+
+            {/* Current settings */}
+            <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+              <div className="rounded-lg border bg-card/30 p-3">
+                <div className="text-sm font-medium text-foreground">Alignment</div>
+                <p>
+                  {alignment === "shared"
+                    ? "Shared trading days only. Missing days are ignored to avoid synthetic P/L."
+                    : "Zero-fill missing days. Treats no-trade days as 0 P/L for comparison."}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-card/30 p-3">
+                <div className="text-sm font-medium text-foreground">Return basis</div>
+                <p>
+                  {normalization === "raw"
+                    ? "Raw P/L values"
+                    : normalization === "margin"
+                    ? "P/L divided by margin requirement"
+                    : "P/L divided by opening price × contracts (notional)"}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-card/30 p-3">
+                <div className="text-sm font-medium text-foreground">Date basis</div>
+                <p>
+                  {dateBasis === "opened"
+                    ? "Groups trades by opening date (entry timing)."
+                    : "Groups trades by closing date to reflect realized P/L."}
+                </p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -297,23 +339,80 @@ export default function CorrelationMatrixPage() {
         layout={layout}
         style={{ height: "600px" }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Method:</span>
-          <Select
-            value={method}
-            onValueChange={(value) =>
-              setMethod(value as "pearson" | "spearman" | "kendall")
-            }
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select method" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pearson">Pearson (Linear)</SelectItem>
-              <SelectItem value="spearman">Spearman (Rank)</SelectItem>
-              <SelectItem value="kendall">Kendall (Rank)</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Method:</span>
+            <Select
+              value={method}
+              onValueChange={(value) =>
+                setMethod(value as "pearson" | "spearman" | "kendall")
+              }
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pearson">Pearson (Linear)</SelectItem>
+                <SelectItem value="spearman">Spearman (Rank)</SelectItem>
+                <SelectItem value="kendall">Kendall (Rank)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Alignment:</span>
+            <Select
+              value={alignment}
+              onValueChange={(value) =>
+                setAlignment(value as CorrelationAlignment)
+              }
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Alignment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="shared">Shared days (default)</SelectItem>
+                <SelectItem value="zero-pad">Zero-fill missing days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Return basis:</span>
+            <Select
+              value={normalization}
+              onValueChange={(value) =>
+                setNormalization(value as CorrelationNormalization)
+              }
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Return basis" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="raw">Raw P/L</SelectItem>
+                <SelectItem value="margin">P/L ÷ Margin Req.</SelectItem>
+                <SelectItem value="notional">P/L ÷ (Price × Contracts)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Date basis:</span>
+            <Select
+              value={dateBasis}
+              onValueChange={(value) =>
+                setDateBasis(value as CorrelationDateBasis)
+              }
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Date basis" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="opened">Opened date</SelectItem>
+                <SelectItem value="closed">Closed date</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </ChartWrapper>
 
@@ -357,7 +456,15 @@ export default function CorrelationMatrixPage() {
                   {analytics.averageCorrelation.toFixed(2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {analytics.strategyCount} strategies analyzed
+                  {analytics.strategyCount} strategies · {alignment === "shared"
+                    ? "Shared days"
+                    : "Zero-filled"}
+                  , {normalization === "raw"
+                    ? "Raw P/L"
+                    : normalization === "margin"
+                    ? "Margin-normalized"
+                    : "Notional-normalized"}
+                  , {dateBasis === "opened" ? "Opened dates" : "Closed dates"}
                 </div>
               </div>
             </div>
