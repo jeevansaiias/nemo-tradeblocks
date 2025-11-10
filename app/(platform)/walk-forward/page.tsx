@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useMemo } from "react"
-import { Download, History, Loader2, TrendingUp, AlertTriangle } from "lucide-react"
+import { Download, History, Loader2, TrendingUp, AlertTriangle, Activity } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Progress } from "@/components/ui/progress"
+import { ChartWrapper } from "@/components/performance-charts/chart-wrapper"
 import { WalkForwardPeriodSelector } from "@/components/walk-forward/period-selector"
 import { WalkForwardAnalysisChart } from "@/components/walk-forward/analysis-chart"
 import { RobustnessMetrics } from "@/components/walk-forward/robustness-metrics"
@@ -14,6 +15,7 @@ import { useBlockStore } from "@/lib/stores/block-store"
 import { useWalkForwardStore } from "@/lib/stores/walk-forward-store"
 import { WalkForwardOptimizationTarget } from "@/lib/models/walk-forward"
 import { cn } from "@/lib/utils"
+import type { Data } from "plotly.js"
 
 const TARGET_LABELS: Record<WalkForwardOptimizationTarget, string> = {
   netPl: "Net Profit",
@@ -95,7 +97,48 @@ export default function WalkForwardPage() {
     ]
   }, [results, targetMetricLabel])
 
-  const periodRows = useMemo(() => {
+  const formatMetricValue = (value: number) => {
+    if (!Number.isFinite(value)) return "—"
+    const abs = Math.abs(value)
+    const fractionDigits = abs >= 1000 ? 0 : abs >= 100 ? 1 : 2
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    })
+  }
+
+  const getEfficiencyStatus = (pct: number) => {
+    if (pct >= 90) {
+      return {
+        label: "Robust retention",
+        chipClass: "bg-emerald-50 text-emerald-700",
+        icon: TrendingUp,
+        iconClass: "text-emerald-600",
+        action: "OOS almost mirrors IS. You can lean into this sizing with confidence.",
+        lineColor: "#10b981",
+      }
+    }
+    if (pct >= 70) {
+      return {
+        label: "Worth monitoring",
+        chipClass: "bg-amber-50 text-amber-700",
+        icon: Activity,
+        iconClass: "text-amber-600",
+        action: "Slight degradation — keep the parameters but monitor drawdowns closely.",
+        lineColor: "#f59e0b",
+      }
+    }
+    return {
+      label: "Needs attention",
+      chipClass: "bg-rose-50 text-rose-700",
+      icon: AlertTriangle,
+      iconClass: "text-rose-600",
+      action: "OOS fell off a cliff. Re-run optimization or throttle position sizes here.",
+      lineColor: "#f43f5e",
+    }
+  }
+
+  const periodSummaries = useMemo(() => {
     if (!results) return []
     return results.results.periods.map((period, index) => {
       const degradation =
@@ -103,17 +146,20 @@ export default function WalkForwardPage() {
           ? period.targetMetricOutOfSample / period.targetMetricInSample
           : 0
 
-      const parameterSummary = Object.entries(period.optimalParameters)
-        .map(([key, value]) => {
-          if (key.startsWith("strategy:")) {
-            return `${key.replace("strategy:", "Strategy ")}: ${(value * 100).toFixed(0)}%`
-          }
-          if (key.toLowerCase().includes("pct")) {
-            return `${key}: ${value.toFixed(2)}%`
-          }
-          return `${key}: ${value.toFixed(2)}`
-        })
-        .join(", ")
+      const efficiencyPct = Number.isFinite(degradation) ? degradation * 100 : 0
+      const status = getEfficiencyStatus(efficiencyPct)
+
+      const parameterSummary = Object.entries(period.optimalParameters).map(([key, value]) => {
+        if (key.startsWith("strategy:")) {
+          return `${key.replace("strategy:", "Strategy ")}: ${(value * 100).toFixed(0)}%`
+        }
+        if (key.toLowerCase().includes("pct")) {
+          return `${key}: ${value.toFixed(2)}%`
+        }
+        return `${key}: ${value.toFixed(2)}`
+      })
+      const parameterPreview = parameterSummary.slice(0, 4)
+      const parameterOverflow = Math.max(0, parameterSummary.length - parameterPreview.length)
 
       return {
         label: `Period ${index + 1}`,
@@ -121,12 +167,60 @@ export default function WalkForwardPage() {
         outSampleRange: `${formatDate(period.outOfSampleStart)} → ${formatDate(period.outOfSampleEnd)}`,
         inSampleMetric: period.targetMetricInSample,
         outSampleMetric: period.targetMetricOutOfSample,
-        degradation,
+        efficiencyPct,
+        status,
         oosDrawdown: period.outOfSampleMetrics.maxDrawdown,
-        parameters: parameterSummary,
+        oosTrades: period.outOfSampleMetrics.totalTrades,
+        parameterItems: parameterPreview,
+        parameterOverflow,
       }
     })
   }, [results])
+
+  const slopegraph = useMemo(() => {
+    if (!periodSummaries.length) return null
+
+    const traces: Data[] = periodSummaries.map((period) => ({
+      type: "scatter",
+      mode: "lines+markers",
+      name: period.label,
+      x: [period.inSampleMetric, period.outSampleMetric],
+      y: [period.label, period.label],
+      marker: {
+        size: 8,
+        color: ["#2563eb", "#f97316"],
+      },
+      text: ["In-Sample", "Out-of-Sample"],
+      line: { color: period.status.lineColor, width: 2 },
+      hovertemplate:
+        `<b>${period.label}</b><br>%{text}: %{x:.2f} ${targetMetricLabel}<extra></extra>`,
+      showlegend: false,
+    }))
+
+    const height = Math.max(220, periodSummaries.length * 60)
+
+    return {
+      data: traces,
+      layout: {
+        height,
+        xaxis: {
+          title: { text: targetMetricLabel },
+          zeroline: false,
+          gridcolor: "rgba(226,232,240,0.5)",
+          automargin: true,
+        },
+        yaxis: {
+          type: "category" as const,
+          autorange: "reversed" as const,
+          tickfont: { size: 12 },
+          automargin: true,
+        },
+        margin: { t: 20, r: 20, b: 40, l: 90 },
+        hovermode: "closest" as const,
+        showlegend: false,
+      },
+    }
+  }, [periodSummaries, targetMetricLabel])
 
   const handleExport = (format: "csv" | "json") => {
     const payload = format === "csv" ? exportResultsAsCsv() : exportResultsAsJson()
@@ -249,43 +343,153 @@ export default function WalkForwardPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            {results && results.results.periods.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead>IS Window</TableHead>
-                    <TableHead>OOS Window</TableHead>
-                    <TableHead>{`IS ${targetMetricLabel}`}</TableHead>
-                    <TableHead>{`OOS ${targetMetricLabel}`}</TableHead>
-                    <TableHead>Efficiency</TableHead>
-                    <TableHead>OOS Max DD</TableHead>
-                    <TableHead>Parameters</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {periodRows.map((row) => (
-                    <TableRow key={row.label}>
-                      <TableCell className="font-medium">{row.label}</TableCell>
-                      <TableCell>{row.inSampleRange}</TableCell>
-                      <TableCell>{row.outSampleRange}</TableCell>
-                      <TableCell>{row.inSampleMetric.toFixed(2)}</TableCell>
-                      <TableCell>{row.outSampleMetric.toFixed(2)}</TableCell>
-                      <TableCell className={row.degradation >= 0.8 ? "text-green-600" : ""}>
-                        {(row.degradation * 100).toFixed(1)}%
-                      </TableCell>
-                      <TableCell>{row.oosDrawdown?.toFixed(2) ?? "—"}%</TableCell>
-                      <TableCell className="max-w-[220px] text-xs text-muted-foreground">
-                        {row.parameters || "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          <CardContent className="space-y-6">
+            {periodSummaries.length > 0 ? (
+              <>
+                <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 p-4 text-sm text-muted-foreground">
+                  <p className="text-foreground text-sm font-medium">How to read these windows</p>
+                  <ul className="mt-3 space-y-2 text-xs">
+                    <li className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-blue-500" />
+                      In-sample ranges (blue) show what the optimizer saw. Orange ranges show how that setup behaved on unseen data.
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-orange-500" />
+                      OOS retention ≥ 80% generally signals a robust hand-off. Anything below ~60% deserves a parameter tweak.
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                      Action chips highlight what to do next (scale up, monitor, or re-optimize).
+                    </li>
+                  </ul>
+                </div>
+
+                {slopegraph && (
+                  <ChartWrapper
+                    title="IS vs OOS retention"
+                    description={`Each slope shows how ${targetMetricLabel} travelled from the training window to the test window.`}
+                    data={slopegraph.data}
+                    layout={slopegraph.layout}
+                    style={{ height: (slopegraph.layout.height as number | undefined) ?? 280 }}
+                  />
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {periodSummaries.map((period) => {
+                    const delta = period.outSampleMetric - period.inSampleMetric
+                    const deltaClass = delta >= 0 ? "text-emerald-600" : "text-rose-600"
+                    const StatusIcon = period.status.icon
+                    const progressValue = Math.max(0, Math.min(100, period.efficiencyPct))
+
+                    return (
+                      <div
+                        key={period.label}
+                        className="rounded-2xl border bg-card/40 p-4 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Window
+                            </p>
+                            <p className="text-lg font-semibold">{period.label}</p>
+                          </div>
+                          <span className={cn("rounded-full px-3 py-1 text-xs font-medium", period.status.chipClass)}>
+                            {period.status.label}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                            <span>{period.inSampleRange}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-orange-500" />
+                            <span>{period.outSampleRange}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-between text-sm font-medium">
+                            <span>{`IS ${targetMetricLabel}`}</span>
+                            <span>{formatMetricValue(period.inSampleMetric)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm font-medium">
+                            <span>{`OOS ${targetMetricLabel}`}</span>
+                            <span>{formatMetricValue(period.outSampleMetric)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Delta</span>
+                            <span className={deltaClass}>
+                              {delta >= 0 ? "+" : ""}
+                              {formatMetricValue(delta)} {targetMetricLabel}
+                            </span>
+                          </div>
+                          <Progress value={progressValue} />
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>OOS retained</span>
+                            <span className="font-semibold text-foreground">
+                              {period.efficiencyPct.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          <div>
+                            <p className="text-base font-semibold text-foreground">
+                              {period.oosTrades ?? "—"}
+                            </p>
+                            <p className="text-[11px] uppercase tracking-wide">OOS trades</p>
+                          </div>
+                          <div>
+                            <p className="text-base font-semibold text-foreground">
+                              {period.oosDrawdown != null
+                                ? `${Math.abs(period.oosDrawdown).toFixed(2)}%`
+                                : "—"}
+                            </p>
+                            <p className="text-[11px] uppercase tracking-wide">Max drawdown</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          <p className="text-xs font-semibold text-muted-foreground">
+                            Parameters that won this window
+                          </p>
+                          {period.parameterItems.length ? (
+                            <div className="flex flex-wrap gap-2">
+                              {period.parameterItems.map((item) => (
+                                <span
+                                  key={`${period.label}-${item}`}
+                                  className="rounded-full bg-muted px-2 py-1 text-xs"
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                              {period.parameterOverflow > 0 && (
+                                <span className="rounded-full border px-2 py-1 text-xs text-muted-foreground">
+                                  +{period.parameterOverflow} more
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              No parameter adjustments captured for this slice.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-4 flex items-start gap-2 rounded-lg bg-muted/40 p-3 text-sm">
+                          <StatusIcon className={cn("h-4 w-4 flex-shrink-0", period.status.iconClass)} />
+                          <p className="text-muted-foreground">{period.status.action}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             ) : (
               <div className="py-10 text-center text-sm text-muted-foreground">
-                Run the analysis to populate this table.
+                Run the analysis to populate this comparison.
               </div>
             )}
           </CardContent>
