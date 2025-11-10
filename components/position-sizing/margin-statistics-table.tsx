@@ -129,12 +129,12 @@ export function MarginStatisticsTable({
                 historically.
               </li>
               <li>
-                <strong>Projected Margin:</strong> Projected margin need at your Kelly
-                %. Example: 80% historical max with a 25% Kelly uses ~20% margin.
+                <strong>Projected Margin:</strong> Historical max × portfolio Kelly ×
+                strategy Kelly. Example: 80% × 50% × 50% ≈ 20%.
               </li>
               <li>
-                <strong>Allocated:</strong> How much capital this strategy gets based
-                on its calculated Kelly criterion and your Kelly % setting.
+                <strong>Allocated:</strong> Kelly edge × portfolio Kelly × strategy Kelly
+                (what fraction of capital you&apos;re actually sizing to this strategy).
               </li>
             </ul>
           </div>
@@ -189,10 +189,10 @@ export function MarginStatisticsTable({
                           </div>
                           <div className="px-4 pb-4 space-y-3">
                             <p className="text-sm font-medium text-foreground leading-relaxed">
-                              Your current Kelly fraction setting for this strategy.
+                              Strategy-level Kelly multiplier (portfolio slider applies globally on top of this).
                             </p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              This is the multiplier applied to the optimal Kelly percentage. For example, 25% means you&apos;re using a quarter Kelly fraction to reduce risk and volatility.
+                              This is the per-strategy knob on top of the portfolio Kelly fraction. Example: 25% here with a 50% portfolio Kelly means the strategy ultimately runs at 12.5% of full Kelly.
                             </p>
                           </div>
                         </div>
@@ -243,10 +243,10 @@ export function MarginStatisticsTable({
                           </div>
                           <div className="px-4 pb-4 space-y-3">
                             <p className="text-sm font-medium text-foreground leading-relaxed">
-                              Capital allocated to this strategy after Kelly adjustment.
+                              Capital allocated to this strategy after portfolio + strategy Kelly multipliers.
                             </p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              Calculated as Optimal Kelly × (Kelly % / 100). This is the percentage of your starting capital that should be dedicated to this strategy based on the Kelly criterion and your risk tolerance settings.
+                              Calculated as Optimal Kelly × (Portfolio Kelly % / 100) × (Strategy Kelly % / 100). That final percentage is how much of starting capital is earmarked for the strategy at your current risk settings.
                             </p>
                           </div>
                         </div>
