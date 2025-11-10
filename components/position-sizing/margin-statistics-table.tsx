@@ -60,7 +60,10 @@ export function MarginStatisticsTable({
   // Strategy rows
   for (const analysis of strategyAnalysis) {
     if (analysis.maxMarginPct > 0 && analysis.inputPct > 0) {
-      const projectedMargin = analysis.maxMarginPct * (analysis.inputPct / 100);
+      const projectedMargin =
+        analysis.maxMarginPct *
+        (portfolioKellyPct / 100) *
+        (analysis.inputPct / 100);
       statistics.push({
         name: analysis.name,
         historicalMax: analysis.maxMarginPct,
@@ -216,7 +219,7 @@ export function MarginStatisticsTable({
                               Expected margin requirement at your Kelly fraction.
                             </p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              Calculated as Historical Max × (Kelly % / 100). For example, if historical max was 80% and you&apos;re using 25% Kelly, projected margin is ~20%. This estimates how much margin you&apos;ll need if you trade at your chosen Kelly fraction.
+                              Calculated as Historical Max × (Portfolio Kelly % / 100) × (Strategy Kelly % / 100). Example: 80% historical max × 50% portfolio × 50% strategy ≈ 20%. This estimates how much margin you&apos;ll need once both multipliers are applied.
                             </p>
                           </div>
                         </div>
