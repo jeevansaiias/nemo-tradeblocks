@@ -110,9 +110,14 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const { getTradesByBlock, getDailyLogsByBlock } = await import('@/lib/db')
+      const { getTradesByBlockWithOptions, getDailyLogsByBlock, getBlock } = await import('@/lib/db')
+
+      // Fetch block to get analysis config
+      const block = await getBlock(blockId)
+      const combineLegGroups = block?.analysisConfig?.combineLegGroups ?? false
+
       const [trades, dailyLogs] = await Promise.all([
-        getTradesByBlock(blockId),
+        getTradesByBlockWithOptions(blockId, { combineLegGroups }),
         getDailyLogsByBlock(blockId)
       ])
 

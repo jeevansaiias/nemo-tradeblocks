@@ -349,5 +349,6 @@ export {
   deleteTradesByBlock,
   getTradeCountByBlock,
   getTradesByBlock,
+  getTradesByBlockWithOptions,
   updateTradesForBlock,
 } from "./trades-store";
