@@ -25,7 +25,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn, truncateStrategyName } from "@/lib/utils";
 
 /**
  * Animation types and configurations
@@ -821,23 +827,24 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
             >
               {selectedValues.length > 0 ? (
                 <div className="flex justify-between items-center w-full">
-                  <div
-                    className={cn(
-                      "flex items-center gap-1",
-                      singleLine
-                        ? "overflow-x-auto multiselect-singleline-scroll"
-                        : "flex-wrap",
-                      responsiveSettings.compactMode && "gap-0.5"
-                    )}
-                    style={
-                      singleLine
-                        ? {
-                            paddingBottom: "4px",
-                          }
-                        : {}
-                    }
-                  >
-                    {selectedValues
+                  <TooltipProvider delayDuration={300}>
+                    <div
+                      className={cn(
+                        "flex items-center gap-1",
+                        singleLine
+                          ? "overflow-x-auto multiselect-singleline-scroll"
+                          : "flex-wrap",
+                        responsiveSettings.compactMode && "gap-0.5"
+                      )}
+                      style={
+                        singleLine
+                          ? {
+                              paddingBottom: "4px",
+                            }
+                          : {}
+                      }
+                    >
+                      {selectedValues
                       .slice(0, responsiveSettings.maxCount)
                       .map((value) => {
                         const option = getOptionByValue(value);
@@ -856,9 +863,15 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                             color: "white",
                           }),
                         };
-                        return (
+                        const truncatedLabel = truncateStrategyName(
+                          option.label,
+                          40
+                        );
+                        const shouldShowTooltip =
+                          option.label.length > 40;
+
+                        const badgeElement = (
                           <Badge
-                            key={value}
                             className={cn(
                               getBadgeAnimationClass(),
                               multiSelectVariants({ variant }),
@@ -897,7 +910,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                                 screenSize === "mobile" && "truncate"
                               )}
                             >
-                              {option.label}
+                              {truncatedLabel}
                             </span>
                             <div
                               role="button"
@@ -929,42 +942,58 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                             </div>
                           </Badge>
                         );
+
+                        return shouldShowTooltip ? (
+                          <Tooltip key={value}>
+                            <TooltipTrigger asChild>
+                              {badgeElement}
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{option.label}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <React.Fragment key={value}>
+                            {badgeElement}
+                          </React.Fragment>
+                        );
                       })
                       .filter(Boolean)}
-                    {selectedValues.length > responsiveSettings.maxCount && (
-                      <Badge
-                        className={cn(
-                          "bg-transparent text-foreground border-foreground/1 hover:bg-transparent",
-                          getBadgeAnimationClass(),
-                          multiSelectVariants({ variant }),
-                          responsiveSettings.compactMode &&
-                            "text-xs px-1.5 py-0.5",
-                          singleLine && "flex-shrink-0 whitespace-nowrap",
-                          "[&>svg]:pointer-events-auto"
-                        )}
-                        style={{
-                          animationDuration: `${
-                            animationConfig?.duration || animation
-                          }s`,
-                          animationDelay: `${animationConfig?.delay || 0}s`,
-                        }}
-                      >
-                        {`+ ${
-                          selectedValues.length - responsiveSettings.maxCount
-                        } more`}
-                        <XCircle
+                      {selectedValues.length > responsiveSettings.maxCount && (
+                        <Badge
                           className={cn(
-                            "ml-2 h-4 w-4 cursor-pointer",
-                            responsiveSettings.compactMode && "ml-1 h-3 w-3"
+                            "bg-transparent text-foreground border-foreground/1 hover:bg-transparent",
+                            getBadgeAnimationClass(),
+                            multiSelectVariants({ variant }),
+                            responsiveSettings.compactMode &&
+                              "text-xs px-1.5 py-0.5",
+                            singleLine && "flex-shrink-0 whitespace-nowrap",
+                            "[&>svg]:pointer-events-auto"
                           )}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            clearExtraOptions();
+                          style={{
+                            animationDuration: `${
+                              animationConfig?.duration || animation
+                            }s`,
+                            animationDelay: `${animationConfig?.delay || 0}s`,
                           }}
-                        />
-                      </Badge>
-                    )}
-                  </div>
+                        >
+                          {`+ ${
+                            selectedValues.length - responsiveSettings.maxCount
+                          } more`}
+                          <XCircle
+                            className={cn(
+                              "ml-2 h-4 w-4 cursor-pointer",
+                              responsiveSettings.compactMode && "ml-1 h-3 w-3"
+                            )}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              clearExtraOptions();
+                            }}
+                          />
+                        </Badge>
+                      )}
+                    </div>
+                  </TooltipProvider>
                   <div className="flex items-center justify-between">
                     <div
                       role="button"
@@ -1132,7 +1161,16 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                                 aria-hidden="true"
                               />
                             )}
-                            <span>{option.label}</span>
+                            <span
+                              className="truncate max-w-[300px]"
+                              title={
+                                option.label.length > 40
+                                  ? option.label
+                                  : undefined
+                              }
+                            >
+                              {option.label}
+                            </span>
                           </CommandItem>
                         );
                       })}
@@ -1175,7 +1213,16 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
                               aria-hidden="true"
                             />
                           )}
-                          <span>{option.label}</span>
+                          <span
+                            className="truncate max-w-[300px]"
+                            title={
+                              option.label.length > 40
+                                ? option.label
+                                : undefined
+                            }
+                          >
+                            {option.label}
+                          </span>
                         </CommandItem>
                       );
                     })}

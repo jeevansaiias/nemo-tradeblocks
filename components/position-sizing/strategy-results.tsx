@@ -142,7 +142,10 @@ export function StrategyResults({
               <div className="space-y-4">
                 {/* Strategy name and badges */}
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                  <h3 className="font-semibold leading-snug min-h-[3rem] flex items-center">
+                  <h3
+                    className="font-semibold leading-snug min-h-[3rem] flex items-center truncate"
+                    title={strategy.name}
+                  >
                     {strategy.name}
                   </h3>
                   <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">

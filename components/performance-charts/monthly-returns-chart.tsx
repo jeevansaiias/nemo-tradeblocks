@@ -1,8 +1,9 @@
 "use client"
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ChartWrapper, createBarChartLayout } from './chart-wrapper'
 import { usePerformanceStore } from '@/lib/stores/performance-store'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { Layout, PlotData } from 'plotly.js'
 
 interface MonthlyReturnsChartProps {
@@ -11,32 +12,46 @@ interface MonthlyReturnsChartProps {
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+type ViewMode = 'dollars' | 'percent'
+
 export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
   const { data } = usePerformanceStore()
+  const [viewMode, setViewMode] = useState<ViewMode>('dollars')
 
   const { plotData, layout } = useMemo(() => {
     if (!data?.monthlyReturns) {
       return { plotData: [], layout: {} }
     }
 
-    const { monthlyReturns } = data
+    const { monthlyReturns, monthlyReturnsPercent } = data
+    const sourceData = viewMode === 'dollars' ? monthlyReturns : monthlyReturnsPercent
+
+    if (!sourceData) {
+      return { plotData: [], layout: {} }
+    }
 
     // Flatten the data for chronological bar chart (matching legacy)
     const allMonths: string[] = []
     const allValues: number[] = []
     const allLabels: string[] = []
 
-    const years = Object.keys(monthlyReturns).map(Number).sort()
+    const years = Object.keys(sourceData).map(Number).sort()
 
     for (const year of years) {
-      const yearData = monthlyReturns[year]
+      const yearData = sourceData[year]
       for (let monthIdx = 1; monthIdx <= 12; monthIdx++) {
         // Only include months with non-zero values (matching legacy line 670)
         if (monthIdx in yearData && yearData[monthIdx] !== 0) {
           const value = yearData[monthIdx]
           allMonths.push(`${MONTH_NAMES[monthIdx - 1]} ${year}`)
           allValues.push(value)
-          allLabels.push(`$${value >= 0 ? '+' : ''}${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`)
+
+          // Format label based on view mode
+          if (viewMode === 'dollars') {
+            allLabels.push(`$${value >= 0 ? '+' : ''}${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`)
+          } else {
+            allLabels.push(`${value >= 0 ? '+' : ''}${value.toFixed(1)}%`)
+          }
         }
       }
     }
@@ -62,15 +77,17 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
       hovertemplate: '<b>%{x}</b><br>Return: %{text}<extra></extra>'
     }
 
+    const yAxisTitle = viewMode === 'dollars' ? 'Monthly Return ($)' : 'Monthly Return (%)'
+
     const chartLayout: Partial<Layout> = {
-      ...createBarChartLayout('', 'Month', 'Monthly Return ($)'),
+      ...createBarChartLayout('', 'Month', yAxisTitle),
       xaxis: {
         title: { text: 'Month' },
         showgrid: false,
         tickangle: 45, // Angle labels for readability
       },
       yaxis: {
-        title: { text: 'Monthly Return ($)' },
+        title: { text: yAxisTitle },
         showgrid: true,
         zeroline: true,
         zerolinewidth: 1,
@@ -85,12 +102,31 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
     }
 
     return { plotData: [barTrace], layout: chartLayout }
-  }, [data])
+  }, [data, viewMode])
 
   const tooltip = {
     flavor: "Your trading foundation year by year - which months added strong blocks and which needed rebuilding.",
     detailed: "Monthly performance patterns can reveal seasonal effects, consistency issues, and how your strategy performs across different market environments. Some strategies work better in certain market conditions that tend to cluster around calendar periods. This helps identify when to be more or less aggressive."
   }
+
+  const toggleControls = (
+    <ToggleGroup
+      type="single"
+      value={viewMode}
+      onValueChange={(value) => {
+        if (value) setViewMode(value as ViewMode)
+      }}
+      variant="outline"
+      size="sm"
+    >
+      <ToggleGroupItem value="dollars" aria-label="View in dollars">
+        Dollars
+      </ToggleGroupItem>
+      <ToggleGroupItem value="percent" aria-label="View in percent">
+        Percent
+      </ToggleGroupItem>
+    </ToggleGroup>
+  )
 
   if (!data || !data.monthlyReturns || Object.keys(data.monthlyReturns).length === 0) {
     return (
@@ -102,6 +138,7 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
         layout={{}}
         style={{ height: '300px' }}
         tooltip={tooltip}
+        actions={toggleControls}
       />
     )
   }
@@ -115,6 +152,7 @@ export function MonthlyReturnsChart({ className }: MonthlyReturnsChartProps) {
       layout={layout}
       style={{ height: '350px' }}
       tooltip={tooltip}
+      actions={toggleControls}
     />
   )
 }

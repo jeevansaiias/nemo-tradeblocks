@@ -2,15 +2,21 @@ import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
 import { PortfolioStatsCalculator } from '@/lib/calculations/portfolio-stats'
-import { calculatePremiumEfficiencyPercent, computeTotalPremium } from '@/lib/metrics/trade-efficiency'
-import { 
-  calculateMFEMAEData, 
-  calculateMFEMAEStats, 
+import {
+  calculatePremiumEfficiencyPercent,
+  computeTotalPremium,
+  EfficiencyBasis
+} from '@/lib/metrics/trade-efficiency'
+import {
+  calculateMFEMAEData,
+  calculateMFEMAEStats,
   createExcursionDistribution,
   type MFEMAEDataPoint,
   type MFEMAEStats,
+  type DistributionBucket,
   type NormalizationBasis
 } from '@/lib/calculations/mfe-mae'
+import { normalizeTradesToOneLot } from '@/lib/utils/trade-normalization'
 
 export interface SnapshotDateRange {
   from?: Date
@@ -27,12 +33,13 @@ interface SnapshotOptions {
   dailyLogs?: DailyLogEntry[]
   filters?: SnapshotFilters
   riskFreeRate?: number
+  normalizeTo1Lot?: boolean
 }
 
 export interface SnapshotChartData {
   equityCurve: Array<{ date: string; equity: number; highWaterMark: number; tradeNumber: number }>
   drawdownData: Array<{ date: string; drawdownPct: number }>
-  dayOfWeekData: Array<{ day: string; count: number; avgPl: number }>
+  dayOfWeekData: Array<{ day: string; count: number; avgPl: number; avgPlPercent: number }>
   returnDistribution: number[]
   streakData: {
     winDistribution: Record<number, number>
@@ -45,7 +52,8 @@ export interface SnapshotChartData {
     }
   }
   monthlyReturns: Record<number, Record<number, number>>
-  tradeSequence: Array<{ tradeNumber: number; pl: number; date: string }>
+  monthlyReturnsPercent: Record<number, Record<number, number>>
+  tradeSequence: Array<{ tradeNumber: number; pl: number; rom: number; date: string }>
   romTimeline: Array<{ date: string; rom: number }>
   rollingMetrics: Array<{ date: string; winRate: number; sharpeRatio: number; profitFactor: number; volatility: number }>
   volatilityRegimes: Array<{ date: string; openingVix?: number; closingVix?: number; pl: number; rom?: number }>
@@ -60,7 +68,7 @@ export interface SnapshotChartData {
     totalCommissions?: number
     efficiencyPct?: number
     efficiencyDenominator?: number
-    efficiencyBasis?: string
+    efficiencyBasis?: EfficiencyBasis
     totalPremium?: number
   }>
   marginUtilization: Array<{ date: string; marginReq: number; fundsAtClose: number; numContracts: number; pl: number }>
@@ -68,7 +76,7 @@ export interface SnapshotChartData {
   holdingPeriods: Array<{ tradeNumber: number; dateOpened: string; dateClosed?: string; durationHours: number; pl: number; strategy: string }>
   mfeMaeData: MFEMAEDataPoint[]
   mfeMaeStats: Partial<Record<NormalizationBasis, MFEMAEStats>>
-  mfeMaeDistribution: Array<{ bucket: string; mfeCount: number; maeCount: number; range: [number, number] }>
+  mfeMaeDistribution: DistributionBucket[]
 }
 
 export interface PerformanceSnapshot {
@@ -79,12 +87,21 @@ export interface PerformanceSnapshot {
 }
 
 export async function buildPerformanceSnapshot(options: SnapshotOptions): Promise<PerformanceSnapshot> {
+  const normalizeTo1Lot = Boolean(options.normalizeTo1Lot)
   const riskFreeRate = typeof options.riskFreeRate === 'number' ? options.riskFreeRate : 2.0
   const strategies = options.filters?.strategies?.length ? options.filters?.strategies : undefined
   const dateRange = options.filters?.dateRange
 
-  let filteredTrades = [...options.trades]
-  let filteredDailyLogs = options.dailyLogs ? [...options.dailyLogs] : undefined
+  const sourceTrades = normalizeTo1Lot
+    ? normalizeTradesToOneLot(options.trades)
+    : options.trades
+
+  let filteredTrades = [...sourceTrades]
+  let filteredDailyLogs = normalizeTo1Lot
+    ? undefined
+    : options.dailyLogs
+      ? [...options.dailyLogs]
+      : undefined
 
   if (dateRange?.from || dateRange?.to) {
     filteredTrades = filteredTrades.filter(trade => {
@@ -144,10 +161,12 @@ export async function processChartData(
   const streakData = calculateStreakData(trades)
 
   const monthlyReturns = calculateMonthlyReturns(trades)
+  const monthlyReturnsPercent = calculateMonthlyReturnsPercent(trades, dailyLogs)
 
   const tradeSequence = trades.map((trade, index) => ({
     tradeNumber: index + 1,
     pl: trade.pl,
+    rom: trade.marginReq && trade.marginReq > 0 ? (trade.pl / trade.marginReq) * 100 : 0,
     date: new Date(trade.dateOpened).toISOString()
   }))
 
@@ -167,32 +186,9 @@ export async function processChartData(
   const holdingPeriods = calculateHoldingPeriods(trades)
 
   // MFE/MAE excursion analysis
-  let mfeMaeData: MFEMAEDataPoint[] = []
-  let mfeMaeStats: Partial<Record<NormalizationBasis, MFEMAEStats>> = {}
-  let mfeMaeDistribution: Array<{ bucket: string; mfeCount: number; maeCount: number; range: [number, number] }> = []
-
-  try {
-    mfeMaeData = calculateMFEMAEData(trades)
-    if (mfeMaeData.length > 0) {
-      mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
-      mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
-    } else {
-      // Create synthetic MFE/MAE data if no real excursion data is available
-      mfeMaeData = createSyntheticMFEMAEData(trades)
-      if (mfeMaeData.length > 0) {
-        mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
-        mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to calculate MFE/MAE data:', error)
-    // Fallback to synthetic data
-    mfeMaeData = createSyntheticMFEMAEData(trades)
-    if (mfeMaeData.length > 0) {
-      mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
-      mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
-    }
-  }
+  const mfeMaeData = calculateMFEMAEData(trades)
+  const mfeMaeStats = calculateMFEMAEStats(mfeMaeData)
+  const mfeMaeDistribution = createExcursionDistribution(mfeMaeData, 10)
 
   return {
     equityCurve,
@@ -201,6 +197,7 @@ export async function processChartData(
     returnDistribution,
     streakData,
     monthlyReturns,
+    monthlyReturnsPercent,
     tradeSequence,
     romTimeline,
     rollingMetrics,
@@ -420,7 +417,12 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
 
 function calculateDayOfWeekData(trades: Trade[]) {
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const dayData: Record<string, { count: number; totalPl: number }> = {}
+  const dayData: Record<string, {
+    count: number
+    totalPl: number
+    totalPlPercent: number
+    percentSampleCount: number
+  }> = {}
 
   trades.forEach(trade => {
     const tradeDate = trade.dateOpened instanceof Date ? trade.dateOpened : new Date(trade.dateOpened)
@@ -430,16 +432,23 @@ function calculateDayOfWeekData(trades: Trade[]) {
     const day = dayNames[pythonWeekday]
 
     if (!dayData[day]) {
-      dayData[day] = { count: 0, totalPl: 0 }
+      dayData[day] = { count: 0, totalPl: 0, totalPlPercent: 0, percentSampleCount: 0 }
     }
     dayData[day].count++
     dayData[day].totalPl += trade.pl
+
+    // Calculate percentage return (ROM) if margin is available
+    if (trade.marginReq && trade.marginReq > 0) {
+      dayData[day].totalPlPercent += (trade.pl / trade.marginReq) * 100
+      dayData[day].percentSampleCount++
+    }
   })
 
   return Object.entries(dayData).map(([day, data]) => ({
     day,
     count: data.count,
-    avgPl: data.count > 0 ? data.totalPl / data.count : 0
+    avgPl: data.count > 0 ? data.totalPl / data.count : 0,
+    avgPlPercent: data.percentSampleCount > 0 ? data.totalPlPercent / data.percentSampleCount : 0
   }))
 }
 
@@ -533,6 +542,192 @@ function calculateMonthlyReturns(trades: Trade[]) {
   return monthlyReturns
 }
 
+function calculateMonthlyReturnsPercent(
+  trades: Trade[],
+  dailyLogs?: DailyLogEntry[]
+): Record<number, Record<number, number>> {
+  // If daily logs are available, use them for accurate balance tracking
+  if (dailyLogs && dailyLogs.length > 0) {
+    return calculateMonthlyReturnsPercentFromDailyLogs(trades, dailyLogs)
+  }
+
+  // Fallback to trade-based calculation
+  return calculateMonthlyReturnsPercentFromTrades(trades)
+}
+
+function calculateMonthlyReturnsPercentFromDailyLogs(
+  trades: Trade[],
+  dailyLogs: DailyLogEntry[]
+): Record<number, Record<number, number>> {
+  const sortedLogs = [...dailyLogs].sort((a, b) =>
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+
+  if (sortedLogs.length === 0) {
+    return {}
+  }
+
+  // Pre-compute trade-based percents for fallback months without balance data
+  const tradeBasedPercents = calculateMonthlyReturnsPercentFromTrades(trades)
+
+  // Group trades by month to get P&L per month
+  const monthlyPL: Record<string, number> = {}
+  trades.forEach(trade => {
+    const date = new Date(trade.dateOpened)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
+    monthlyPL[monthKey] = (monthlyPL[monthKey] || 0) + trade.pl
+  })
+
+  // Get starting balance for each month from daily logs
+  const monthlyBalances: Record<string, { startBalance: number; endBalance: number }> = {}
+
+  sortedLogs.forEach(log => {
+    const date = new Date(log.date)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
+
+    const balance = getEquityValueFromDailyLog(log)
+
+    if (!monthlyBalances[monthKey]) {
+      monthlyBalances[monthKey] = { startBalance: balance, endBalance: balance }
+    } else {
+      monthlyBalances[monthKey].endBalance = balance
+    }
+  })
+
+  // Calculate percentage returns
+  const monthlyReturnsPercent: Record<number, Record<number, number>> = {}
+  const years = new Set<number>()
+
+  Object.keys(monthlyPL).forEach(monthKey => {
+    const [yearStr, monthStr] = monthKey.split('-')
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
+    years.add(year)
+
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+
+    const pl = monthlyPL[monthKey] || 0
+    const balanceData = monthlyBalances[monthKey]
+
+    if (balanceData && balanceData.startBalance > 0) {
+      // Calculate percentage: (monthPL / startingBalance) * 100
+      monthlyReturnsPercent[year][month] = (pl / balanceData.startBalance) * 100
+    } else {
+      const fallbackPercent = tradeBasedPercents[year]?.[month]
+      monthlyReturnsPercent[year][month] = typeof fallbackPercent === 'number' ? fallbackPercent : 0
+    }
+  })
+
+  // Fill in zeros for months without data
+  Array.from(years).sort().forEach(year => {
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+    for (let month = 1; month <= 12; month++) {
+      if (monthlyReturnsPercent[year][month] === undefined) {
+        monthlyReturnsPercent[year][month] = 0
+      }
+    }
+  })
+
+  return monthlyReturnsPercent
+}
+
+function calculateMonthlyReturnsPercentFromTrades(
+  trades: Trade[]
+): Record<number, Record<number, number>> {
+  if (trades.length === 0) {
+    return {}
+  }
+
+  // Sort trades by date
+  const sortedTrades = [...trades].sort((a, b) =>
+    new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+  )
+
+  // Calculate initial capital
+  let runningCapital = PortfolioStatsCalculator.calculateInitialCapital(sortedTrades)
+  if (!isFinite(runningCapital) || runningCapital <= 0) {
+    runningCapital = 100000
+  }
+
+  // Group trades by month
+  const monthlyData: Record<string, { pl: number; startingCapital: number }> = {}
+  const years = new Set<number>()
+
+  sortedTrades.forEach(trade => {
+    const date = new Date(trade.dateOpened)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`
+
+    years.add(year)
+
+    if (!monthlyData[monthKey]) {
+      monthlyData[monthKey] = {
+        pl: 0,
+        startingCapital: runningCapital
+      }
+    }
+
+    monthlyData[monthKey].pl += trade.pl
+  })
+
+  // Calculate percentage returns and update running capital
+  const monthlyReturnsPercent: Record<number, Record<number, number>> = {}
+  const sortedMonthKeys = Object.keys(monthlyData).sort()
+
+  sortedMonthKeys.forEach(monthKey => {
+    const [yearStr, monthStr] = monthKey.split('-')
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
+
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+
+    const { pl, startingCapital } = monthlyData[monthKey]
+
+    if (startingCapital > 0) {
+      monthlyReturnsPercent[year][month] = (pl / startingCapital) * 100
+    } else {
+      monthlyReturnsPercent[year][month] = 0
+    }
+
+    // Update capital for next month (compounding)
+    runningCapital = startingCapital + pl
+
+    // Update startingCapital for any remaining trades in future months
+    const currentMonthIndex = sortedMonthKeys.indexOf(monthKey)
+    if (currentMonthIndex < sortedMonthKeys.length - 1) {
+      const nextMonthKey = sortedMonthKeys[currentMonthIndex + 1]
+      if (monthlyData[nextMonthKey]) {
+        monthlyData[nextMonthKey].startingCapital = runningCapital
+      }
+    }
+  })
+
+  // Fill in zeros for months without data
+  Array.from(years).sort().forEach(year => {
+    if (!monthlyReturnsPercent[year]) {
+      monthlyReturnsPercent[year] = {}
+    }
+    for (let month = 1; month <= 12; month++) {
+      if (monthlyReturnsPercent[year][month] === undefined) {
+        monthlyReturnsPercent[year][month] = 0
+      }
+    }
+  })
+
+  return monthlyReturnsPercent
+}
+
 function calculateRollingMetrics(trades: Trade[]) {
   const windowSize = 30
   const metrics: SnapshotChartData['rollingMetrics'] = []
@@ -566,61 +761,93 @@ function calculateRollingMetrics(trades: Trade[]) {
 }
 
 function getFiniteNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && isFinite(value)) {
-    return value
-  }
-  return undefined
+  return typeof value === 'number' && isFinite(value) ? value : undefined
 }
 
 function calculateVolatilityRegimes(trades: Trade[]) {
-  return trades.map(trade => {
-    const rom = trade.marginReq && trade.marginReq > 0 ? (trade.pl / trade.marginReq) * 100 : undefined
-    return {
+  const regimes: SnapshotChartData['volatilityRegimes'] = []
+
+  trades.forEach(trade => {
+    const openingVix = getFiniteNumber(trade.openingVix)
+    const closingVix = getFiniteNumber(trade.closingVix)
+
+    if (openingVix === undefined && closingVix === undefined) {
+      return
+    }
+
+    const rom = trade.marginReq && trade.marginReq !== 0 ? (trade.pl / trade.marginReq) * 100 : undefined
+
+    regimes.push({
       date: new Date(trade.dateOpened).toISOString(),
-      openingVix: getFiniteNumber(trade.openingVix),
-      closingVix: getFiniteNumber(trade.closingVix),
+      openingVix,
+      closingVix,
       pl: trade.pl,
       rom
-    }
+    })
   })
+
+  return regimes
 }
 
 function calculatePremiumEfficiency(trades: Trade[]) {
-  return trades.map((trade, index) => {
-    const totalCommissions = 
-      (getFiniteNumber(trade.openingCommissionsFees) ?? 0) + 
-      (getFiniteNumber(trade.closingCommissionsFees) ?? 0)
+  const efficiency: SnapshotChartData['premiumEfficiency'] = []
+
+  trades.forEach((trade, index) => {
+    const premium = getFiniteNumber(trade.premium)
+    const avgClosingCost = getFiniteNumber(trade.avgClosingCost)
+    const maxProfit = getFiniteNumber(trade.maxProfit)
+    const maxLoss = getFiniteNumber(trade.maxLoss)
+
+    const totalCommissions =
+      getFiniteNumber(trade.openingCommissionsFees) !== undefined &&
+      getFiniteNumber(trade.closingCommissionsFees) !== undefined
+        ? (trade.openingCommissionsFees ?? 0) + (trade.closingCommissionsFees ?? 0)
+        : undefined
 
     const efficiencyResult = calculatePremiumEfficiencyPercent(trade)
     const totalPremium = computeTotalPremium(trade)
 
-    return {
+    efficiency.push({
       tradeNumber: index + 1,
       date: new Date(trade.dateOpened).toISOString(),
       pl: trade.pl,
-      premium: getFiniteNumber(trade.premium),
-      avgClosingCost: getFiniteNumber(trade.avgClosingCost),
-      maxProfit: getFiniteNumber(trade.maxProfit),
-      maxLoss: getFiniteNumber(trade.maxLoss),
-      totalCommissions: totalCommissions,
+      premium,
+      avgClosingCost,
+      maxProfit,
+      maxLoss,
+      totalCommissions,
       efficiencyPct: efficiencyResult.percentage,
       efficiencyDenominator: efficiencyResult.denominator,
       efficiencyBasis: efficiencyResult.basis,
-      totalPremium: totalPremium
-    }
+      totalPremium
+    })
   })
+
+  return efficiency
 }
 
 function calculateMarginUtilization(trades: Trade[]) {
-  return trades
-    .filter(trade => trade.marginReq && trade.marginReq > 0)
-    .map(trade => ({
+  const utilization: SnapshotChartData['marginUtilization'] = []
+
+  trades.forEach(trade => {
+    const marginReq = getFiniteNumber(trade.marginReq) ?? 0
+    const fundsAtClose = getFiniteNumber(trade.fundsAtClose) ?? 0
+    const numContracts = getFiniteNumber(trade.numContracts) ?? 0
+
+    if (marginReq === 0 && fundsAtClose === 0 && numContracts === 0) {
+      return
+    }
+
+    utilization.push({
       date: new Date(trade.dateOpened).toISOString(),
-      marginReq: trade.marginReq!,
-      fundsAtClose: 0, // Would need daily log data
-      numContracts: trade.numContracts ?? 1,
+      marginReq,
+      fundsAtClose,
+      numContracts,
       pl: trade.pl
-    }))
+    })
+  })
+
+  return utilization
 }
 
 function calculateExitReasonBreakdown(trades: Trade[]) {
@@ -643,129 +870,34 @@ function calculateExitReasonBreakdown(trades: Trade[]) {
 }
 
 function calculateHoldingPeriods(trades: Trade[]) {
-  return trades.map((trade, index) => {
-    const openDate = new Date(trade.dateOpened)
-    const closeDate = trade.dateClosed ? new Date(trade.dateClosed) : openDate
-    const durationHours = (closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60)
-
-    return {
-      tradeNumber: index + 1,
-      dateOpened: openDate.toISOString(),
-      dateClosed: trade.dateClosed ? closeDate.toISOString() : undefined,
-      durationHours: Math.max(0, durationHours),
-      pl: trade.pl,
-      strategy: trade.strategy || 'Unknown'
-    }
-  })
-}
-
-function createSyntheticMFEMAEData(trades: Trade[]): MFEMAEDataPoint[] {
-  const syntheticData: MFEMAEDataPoint[] = []
+  const periods: SnapshotChartData['holdingPeriods'] = []
 
   trades.forEach((trade, index) => {
-    // Skip if we don't have minimum required data
-    if (!trade.pl && trade.pl !== 0) return
-
-    // Create synthetic MFE/MAE based on P/L and reasonable assumptions
-    const pl = trade.pl
-    const premium = getFiniteNumber(trade.premium) || 0
-    const marginReq = getFiniteNumber(trade.marginReq) || 0
-    
-    // If we have actual MFE/MAE data, use it
-    let mfe = getFiniteNumber(trade.maxProfit)
-    let mae = getFiniteNumber(trade.maxLoss)
-
-    // If we don't have MFE/MAE data, create synthetic estimates
-    if (!mfe && !mae) {
-      if (pl > 0) {
-        // Winner: assume MFE is 1.2x the final P/L, MAE is modest
-        mfe = Math.abs(pl) * 1.2
-        mae = Math.abs(pl) * 0.3
-      } else if (pl < 0) {
-        // Loser: assume MAE is 1.1x the loss, MFE shows some unrealized gain
-        mae = Math.abs(pl) * 1.1
-        mfe = Math.abs(pl) * 0.4
-      } else {
-        // Breakeven: small excursions
-        mfe = premium * 0.2 || 50
-        mae = premium * 0.2 || 50
-      }
-    } else if (!mfe) {
-      mfe = Math.max(Math.abs(pl), mae || 0) * 1.1
-    } else if (!mae) {
-      mae = Math.max(Math.abs(pl), mfe * 0.3)
+    if (!trade.dateOpened) {
+      return
     }
 
-    // Ensure we have valid numbers
-    if (!mfe || !mae || mfe <= 0 || mae <= 0) return
+    const openDate = new Date(trade.dateOpened)
+    const closeDate = trade.dateClosed ? new Date(trade.dateClosed) : undefined
 
-    // Determine denominator for normalization
-    let denominator = premium
-    let basis: 'premium' | 'margin' | 'unknown' = 'premium'
-
-    if (!denominator || denominator <= 0) {
-      denominator = marginReq
-      basis = 'margin'
+    if (isNaN(openDate.getTime())) {
+      return
     }
 
-    if (!denominator || denominator <= 0) {
-      denominator = Math.max(mfe, mae, Math.abs(pl))
-      basis = 'unknown'
+    let durationHours = 0
+    if (closeDate && !isNaN(closeDate.getTime())) {
+      durationHours = (closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60)
     }
 
-    if (denominator <= 0) return // Skip if we can't normalize
-
-    // Create the data point
-    const dataPoint: MFEMAEDataPoint = {
+    periods.push({
       tradeNumber: index + 1,
-      date: new Date(trade.dateOpened),
-      strategy: trade.strategy || 'Unknown',
-      mfe: mfe,
-      mae: mae,
-      pl: pl,
-      mfePercent: (mfe / denominator) * 100,
-      maePercent: (mae / denominator) * 100,
-      plPercent: (pl / denominator) * 100,
-      profitCapturePercent: mfe > 0 ? (pl / mfe) * 100 : undefined,
-      excursionRatio: mae > 0 ? mfe / mae : undefined,
-      denominator: denominator,
-      basis: basis,
-      isWinner: pl > 0,
-      marginReq: marginReq,
-      premium: premium || undefined,
-      normalizedBy: {
-        premium: premium > 0 ? {
-          denominator: premium,
-          mfePercent: (mfe / premium) * 100,
-          maePercent: (mae / premium) * 100,
-          plPercent: (pl / premium) * 100
-        } : undefined,
-        margin: marginReq > 0 ? {
-          denominator: marginReq,
-          mfePercent: (mfe / marginReq) * 100,
-          maePercent: (mae / marginReq) * 100,
-          plPercent: (pl / marginReq) * 100
-        } : undefined
-      },
-      openingPrice: trade.openingPrice,
-      closingPrice: trade.closingPrice,
-      numContracts: trade.numContracts || 1,
-      avgClosingCost: trade.avgClosingCost,
-      fundsAtClose: trade.fundsAtClose || 0,
-      openingCommissionsFees: trade.openingCommissionsFees || 0,
-      closingCommissionsFees: trade.closingCommissionsFees || 0,
-      openingShortLongRatio: trade.openingShortLongRatio || 0,
-      closingShortLongRatio: trade.closingShortLongRatio,
-      openingVix: trade.openingVix,
-      closingVix: trade.closingVix,
-      gap: trade.gap,
-      movement: trade.movement,
-      maxProfit: trade.maxProfit,
-      maxLoss: trade.maxLoss
-    }
-
-    syntheticData.push(dataPoint)
+      dateOpened: openDate.toISOString(),
+      dateClosed: closeDate ? closeDate.toISOString() : undefined,
+      durationHours,
+      pl: trade.pl,
+      strategy: trade.strategy || 'Unknown'
+    })
   })
 
-  return syntheticData
+  return periods
 }

@@ -37,7 +37,7 @@ This document explains how NemoBlocks is structured and how to work effectively 
   - `/performance-blocks` – strategy filters, equity curve charts, and performance tables.
   - `/position-sizing` – Kelly calculations and sizing guidance.
   - `/risk-simulator` – Monte Carlo simulator (see audit in `RISK_SIMULATOR_AUDIT.md`).
-  - `/correlation-matrix` – cross-strategy correlation heatmap.
+  - `/correlation-matrix` – cross-strategy correlation heatmap with configurable method, alignment (shared days vs zero-fill), return normalization (raw, margin, notional), and date basis (opened vs closed trades).
 
 ### State & Persistence
 - **Zustand stores**

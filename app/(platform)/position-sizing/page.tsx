@@ -5,28 +5,36 @@ import { MarginStatisticsTable } from "@/components/position-sizing/margin-stati
 import { PortfolioSummary } from "@/components/position-sizing/portfolio-summary";
 import { StrategyKellyTable } from "@/components/position-sizing/strategy-kelly-table";
 import {
-    StrategyAnalysis,
-    StrategyResults,
+  StrategyAnalysis,
+  StrategyResults,
 } from "@/components/position-sizing/strategy-results";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import {
-    calculateKellyMetrics,
-    calculateStrategyKellyMetrics,
+  calculateKellyMetrics,
+  calculateStrategyKellyMetrics,
 } from "@/lib/calculations/kelly";
 import {
-    buildMarginTimeline,
-    calculateMaxMarginPct,
-    type MarginMode,
+  buildMarginTimeline,
+  calculateMaxMarginPct,
+  type MarginMode,
 } from "@/lib/calculations/margin-timeline";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";
@@ -34,8 +42,29 @@ import { getTradesByBlock } from "@/lib/db/trades-store";
 import { DailyLogEntry } from "@/lib/models/daily-log";
 import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
-import { HelpCircle, Play } from "lucide-react";
+import { AlertCircle, HelpCircle, Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
+interface RunConfig {
+  startingCapital: number;
+  portfolioKellyPct: number;
+  marginMode: MarginMode;
+  kellyValues: Record<string, number>;
+}
+
+type StrategySortOption =
+  | "name-asc"
+  | "winrate-desc"
+  | "kelly-desc"
+  | "applied-desc"
+  | "capital-desc"
+  | "trades-desc";
+
+const normalizeKellyValue = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  const clamped = Math.min(200, Math.max(0, value));
+  return Math.round(clamped);
+};
 
 export default function PositionSizingPage() {
   const { activeBlockId } = useBlockStore();
@@ -45,13 +74,16 @@ export default function PositionSizingPage() {
   const [dailyLog, setDailyLog] = useState<DailyLogEntry[]>([]);
   const [startingCapital, setStartingCapital] = useState(100000);
   const [portfolioKellyPct, setPortfolioKellyPct] = useState(100);
+  const [portfolioKellyInput, setPortfolioKellyInput] = useState("100");
   const [marginMode, setMarginMode] = useState<MarginMode>("fixed");
   const [kellyValues, setKellyValues] = useState<Record<string, number>>({});
   const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(
     new Set()
   );
-  const [hasRun, setHasRun] = useState(false);
+  const [lastRunConfig, setLastRunConfig] = useState<RunConfig | null>(null);
   const [allStrategiesKellyPct, setAllStrategiesKellyPct] = useState(100);
+  const [strategySort, setStrategySort] =
+    useState<StrategySortOption>("name-asc");
 
   // Load trades and daily log when active block changes
   useEffect(() => {
@@ -64,10 +96,11 @@ export default function PositionSizingPage() {
         setDailyLog(loadedDailyLog);
 
         // Auto-detect starting capital (prefer daily log when available)
-        const calculatedCapital = PortfolioStatsCalculator.calculateInitialCapital(
-          loadedTrades,
-          loadedDailyLog.length > 0 ? loadedDailyLog : undefined
-        );
+        const calculatedCapital =
+          PortfolioStatsCalculator.calculateInitialCapital(
+            loadedTrades,
+            loadedDailyLog.length > 0 ? loadedDailyLog : undefined
+          );
         setStartingCapital(calculatedCapital > 0 ? calculatedCapital : 100000);
 
         // Initialize all strategies as selected with 100%
@@ -81,12 +114,18 @@ export default function PositionSizingPage() {
           initialValues[s] = 100;
         });
         setKellyValues(initialValues);
+        setPortfolioKellyPct(100);
+        setPortfolioKellyInput("100");
+        setLastRunConfig(null);
       });
     } else {
       setTrades([]);
       setDailyLog([]);
       setSelectedStrategies(new Set());
       setKellyValues({});
+      setPortfolioKellyPct(100);
+      setPortfolioKellyInput("100");
+      setLastRunConfig(null);
     }
   }, [activeBlockId]);
 
@@ -108,18 +147,42 @@ export default function PositionSizingPage() {
 
   // Calculate results when user clicks "Run Allocation"
   const runAllocation = () => {
-    setHasRun(true);
+    commitPortfolioKellyInput();
+    const snapshotKellyValues: Record<string, number> = {};
+    strategyData.forEach((strategy) => {
+      const value = kellyValues[strategy.name];
+      snapshotKellyValues[strategy.name] = normalizeKellyValue(
+        typeof value === "number" ? value : 100
+      );
+    });
+
+    setLastRunConfig({
+      startingCapital,
+      portfolioKellyPct,
+      marginMode,
+      kellyValues: snapshotKellyValues,
+    });
   };
 
-  // Results calculations (only when hasRun is true)
+  // Results calculations using the last run configuration
   const results = useMemo(() => {
-    if (!hasRun || trades.length === 0) return null;
+    if (!lastRunConfig || trades.length === 0) return null;
+
+    const {
+      startingCapital: runStartingCapital,
+      portfolioKellyPct: runPortfolioKellyPct,
+      marginMode: runMarginMode,
+      kellyValues: runKellyValues,
+    } = lastRunConfig;
 
     // Calculate portfolio-level Kelly metrics with starting capital for validation
-    const portfolioMetrics = calculateKellyMetrics(trades, startingCapital);
+    const portfolioMetrics = calculateKellyMetrics(trades, runStartingCapital);
 
     // Calculate per-strategy Kelly metrics with starting capital for validation
-    const strategyMetricsMap = calculateStrategyKellyMetrics(trades, startingCapital);
+    const strategyMetricsMap = calculateStrategyKellyMetrics(
+      trades,
+      runStartingCapital
+    );
 
     // Get strategy names sorted by trade count
     const strategyNames = strategyData.map((s) => s.name);
@@ -128,8 +191,8 @@ export default function PositionSizingPage() {
     const marginTimeline = buildMarginTimeline(
       trades,
       strategyNames,
-      startingCapital,
-      marginMode,
+      runStartingCapital,
+      runMarginMode,
       dailyLog.length > 0 ? dailyLog : undefined
     );
 
@@ -146,18 +209,18 @@ export default function PositionSizingPage() {
 
     for (const strategy of strategyData) {
       const metrics = strategyMetricsMap.get(strategy.name)!;
-      const inputPct = kellyValues[strategy.name] ?? 100;
+      const inputPct = runKellyValues[strategy.name] ?? 100;
 
       // Use normalized Kelly when available (more accurate for position sizing)
       const effectiveKellyPct = metrics.normalizedKellyPct ?? metrics.percent;
 
       // Apply BOTH Portfolio Kelly and Strategy Kelly multipliers
       const appliedPct =
-        effectiveKellyPct * (portfolioKellyPct / 100) * (inputPct / 100);
+        effectiveKellyPct * (runPortfolioKellyPct / 100) * (inputPct / 100);
       const maxMarginPct = calculateMaxMarginPct(marginTimeline, strategy.name);
       const allocationPct =
-        maxMarginPct * (portfolioKellyPct / 100) * (inputPct / 100);
-      const allocationDollars = (startingCapital * allocationPct) / 100;
+        maxMarginPct * (runPortfolioKellyPct / 100) * (inputPct / 100);
+      const allocationDollars = (runStartingCapital * allocationPct) / 100;
 
       strategyAnalysis.push({
         name: strategy.name,
@@ -177,7 +240,7 @@ export default function PositionSizingPage() {
 
     const weightedAppliedPct =
       totalTrades > 0 ? totalAppliedWeight / totalTrades : 0;
-    const appliedCapital = (startingCapital * weightedAppliedPct) / 100;
+    const appliedCapital = (runStartingCapital * weightedAppliedPct) / 100;
 
     return {
       portfolioMetrics,
@@ -187,21 +250,102 @@ export default function PositionSizingPage() {
       weightedAppliedPct,
       appliedCapital,
       portfolioMaxMarginPct,
+      config: {
+        startingCapital: runStartingCapital,
+        portfolioKellyPct: runPortfolioKellyPct,
+      },
     };
+  }, [lastRunConfig, trades, dailyLog, strategyData]);
+
+  const hasPendingChanges = useMemo(() => {
+    if (!lastRunConfig) {
+      return false;
+    }
+
+    if (lastRunConfig.startingCapital !== startingCapital) {
+      return true;
+    }
+
+    if (lastRunConfig.portfolioKellyPct !== portfolioKellyPct) {
+      return true;
+    }
+
+    if (lastRunConfig.marginMode !== marginMode) {
+      return true;
+    }
+
+    const allKeys = new Set([
+      ...Object.keys(lastRunConfig.kellyValues),
+      ...Object.keys(kellyValues),
+    ]);
+
+    for (const key of allKeys) {
+      const lastValue = lastRunConfig.kellyValues[key] ?? 100;
+      const currentValue = kellyValues[key] ?? 100;
+      if (lastValue !== currentValue) {
+        return true;
+      }
+    }
+
+    return false;
   }, [
-    hasRun,
-    trades,
-    dailyLog,
-    strategyData,
-    kellyValues,
+    lastRunConfig,
     startingCapital,
-    marginMode,
     portfolioKellyPct,
+    marginMode,
+    kellyValues,
   ]);
+
+  const sortedStrategies = useMemo(() => {
+    if (!results) {
+      return [];
+    }
+
+    const strategies = [...results.strategyAnalysis];
+
+    const compareByName = (a: StrategyAnalysis, b: StrategyAnalysis) =>
+      a.name.localeCompare(b.name);
+
+    strategies.sort((a, b) => {
+      switch (strategySort) {
+        case "winrate-desc": {
+          const diff =
+            (b.kellyMetrics.winRate ?? 0) - (a.kellyMetrics.winRate ?? 0);
+          return diff !== 0 ? diff : compareByName(a, b);
+        }
+        case "kelly-desc": {
+          const aKelly =
+            a.kellyMetrics.normalizedKellyPct ?? a.kellyMetrics.percent ?? 0;
+          const bKelly =
+            b.kellyMetrics.normalizedKellyPct ?? b.kellyMetrics.percent ?? 0;
+          const diff = bKelly - aKelly;
+          return diff !== 0 ? diff : compareByName(a, b);
+        }
+        case "applied-desc": {
+          const diff = b.appliedPct - a.appliedPct;
+          return diff !== 0 ? diff : compareByName(a, b);
+        }
+        case "capital-desc": {
+          const diff = b.allocationDollars - a.allocationDollars;
+          return diff !== 0 ? diff : compareByName(a, b);
+        }
+        case "trades-desc": {
+          const diff = b.tradeCount - a.tradeCount;
+          return diff !== 0 ? diff : compareByName(a, b);
+        }
+        case "name-asc":
+        default:
+          return compareByName(a, b);
+      }
+    });
+
+    return strategies;
+  }, [results, strategySort]);
 
   // Handlers
   const handleKellyChange = (strategy: string, value: number) => {
-    setKellyValues((prev) => ({ ...prev, [strategy]: value }));
+    const normalized = normalizeKellyValue(value);
+    setKellyValues((prev) => ({ ...prev, [strategy]: normalized }));
   };
 
   const handleSelectionChange = (strategy: string, selected: boolean) => {
@@ -222,6 +366,32 @@ export default function PositionSizingPage() {
     } else {
       setSelectedStrategies(new Set());
     }
+  };
+
+  const handlePortfolioKellyInputChange = (value: string) => {
+    // Allow users to clear the field while editing
+    setPortfolioKellyInput(value);
+
+    const numericValue = Number(value);
+    if (value === "" || Number.isNaN(numericValue)) {
+      return;
+    }
+
+    // Update numeric state eagerly so pending-change detection stays responsive
+    const normalized = normalizeKellyValue(numericValue);
+    if (normalized !== portfolioKellyPct) {
+      setPortfolioKellyPct(normalized);
+    }
+  };
+
+  const commitPortfolioKellyInput = () => {
+    const numericValue = Number(portfolioKellyInput);
+    const normalized = Number.isNaN(numericValue)
+      ? portfolioKellyPct
+      : normalizeKellyValue(numericValue);
+
+    setPortfolioKellyPct(normalized);
+    setPortfolioKellyInput(normalized.toString());
   };
 
   // Empty state
@@ -396,18 +566,64 @@ export default function PositionSizingPage() {
               <Input
                 id="portfolio-kelly"
                 type="number"
-                value={portfolioKellyPct}
+                value={portfolioKellyInput}
                 onChange={(e) =>
-                  setPortfolioKellyPct(parseInt(e.target.value) || 100)
+                  handlePortfolioKellyInputChange(e.target.value)
                 }
+                onBlur={commitPortfolioKellyInput}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    commitPortfolioKellyInput();
+                  }
+                }}
                 min={0}
                 max={200}
-                step={2.5}
+                step={1}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Margin Calculation Mode</Label>
+              <div className="flex items-center gap-2">
+                <Label>Margin Calculation Mode</Label>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 p-0 overflow-hidden">
+                    <div className="space-y-3">
+                      <div className="bg-primary/5 border-b px-4 py-3">
+                        <h4 className="text-sm font-semibold text-primary">
+                          Margin Calculation Mode
+                        </h4>
+                      </div>
+                      <div className="px-4 pb-4 space-y-3 text-xs text-muted-foreground leading-relaxed">
+                        <p className="text-sm text-foreground">
+                          Choose how the simulator scales capital requirements
+                          when trades stack.
+                        </p>
+                        <ul className="list-disc list-inside space-y-1">
+                          <li>
+                            <span className="font-medium text-foreground">
+                              Fixed Capital:
+                            </span>{" "}
+                            Uses your starting balance as a constant baseline.
+                            Pick this when you size positions with a flat dollar
+                            amount per trade.
+                          </li>
+                          <li>
+                            <span className="font-medium text-foreground">
+                              Compounding:
+                            </span>{" "}
+                            Recalculates margin against current equity so
+                            requirements grow or shrink with account
+                            performance.
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
               <RadioGroup
                 value={marginMode}
                 onValueChange={(value) => setMarginMode(value as MarginMode)}
@@ -462,11 +678,11 @@ export default function PositionSizingPage() {
                   <Slider
                     value={[allStrategiesKellyPct]}
                     onValueChange={(values) =>
-                      setAllStrategiesKellyPct(values[0])
+                      setAllStrategiesKellyPct(normalizeKellyValue(values[0]))
                     }
                     min={0}
                     max={200}
-                    step={2.5}
+                    step={1}
                     className="flex-1"
                   />
                   <Button
@@ -474,7 +690,9 @@ export default function PositionSizingPage() {
                     onClick={() => {
                       const newValues: Record<string, number> = {};
                       selectedStrategies.forEach((strategy) => {
-                        newValues[strategy] = allStrategiesKellyPct;
+                        newValues[strategy] = normalizeKellyValue(
+                          allStrategiesKellyPct
+                        );
                       });
                       setKellyValues((prev) => ({ ...prev, ...newValues }));
                     }}
@@ -485,7 +703,9 @@ export default function PositionSizingPage() {
                 <div className="flex gap-2 text-xs text-muted-foreground">
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(25)}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(25))
+                    }
                     className="hover:text-foreground"
                   >
                     25%
@@ -493,7 +713,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(50)}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(50))
+                    }
                     className="hover:text-foreground"
                   >
                     50%
@@ -501,7 +723,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(75)}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(75))
+                    }
                     className="hover:text-foreground"
                   >
                     75%
@@ -509,7 +733,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(100)}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(100))
+                    }
                     className="hover:text-foreground"
                   >
                     100%
@@ -517,7 +743,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(125)}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(125))
+                    }
                     className="hover:text-foreground"
                   >
                     125%
@@ -525,7 +753,9 @@ export default function PositionSizingPage() {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => setAllStrategiesKellyPct(150)}
+                    onClick={() =>
+                      setAllStrategiesKellyPct(normalizeKellyValue(150))
+                    }
                     className="hover:text-foreground"
                   >
                     150%
@@ -561,18 +791,72 @@ export default function PositionSizingPage() {
       {/* Results */}
       {results && (
         <>
+          {hasPendingChanges && (
+            <Alert
+              variant="default"
+              className="gap-2 border-dashed border-primary/40 bg-primary/5"
+            >
+              <AlertCircle
+                className="h-4 w-4 text-primary"
+                aria-hidden={true}
+              />
+              <AlertTitle className="text-sm font-semibold">
+                Pending changes
+              </AlertTitle>
+              <AlertDescription className="text-xs text-muted-foreground">
+                Current results reflect the last run with $
+                {results.config.startingCapital.toLocaleString()} starting
+                capital at {results.config.portfolioKellyPct}% portfolio Kelly.
+                Click Run Allocation to refresh with your latest settings.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <PortfolioSummary
             portfolioMetrics={results.portfolioMetrics}
             weightedAppliedPct={results.weightedAppliedPct}
-            startingCapital={startingCapital}
+            startingCapital={results.config.startingCapital}
             appliedCapital={results.appliedCapital}
           />
 
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Strategy Analysis</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-lg font-semibold">Strategy Analysis</h2>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                <span className="uppercase tracking-wide">Sort</span>
+                <Select
+                  value={strategySort}
+                  onValueChange={(value) =>
+                    setStrategySort(value as StrategySortOption)
+                  }
+                >
+                  <SelectTrigger size="sm" className="w-[190px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name (A → Z)</SelectItem>
+                    <SelectItem value="winrate-desc">
+                      Win Rate (High → Low)
+                    </SelectItem>
+                    <SelectItem value="kelly-desc">
+                      Kelly % (High → Low)
+                    </SelectItem>
+                    <SelectItem value="applied-desc">
+                      Applied % (High → Low)
+                    </SelectItem>
+                    <SelectItem value="capital-desc">
+                      Allocation $ (High → Low)
+                    </SelectItem>
+                    <SelectItem value="trades-desc">
+                      Trades (High → Low)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <StrategyResults
-              strategies={results.strategyAnalysis}
-              startingCapital={startingCapital}
+              strategies={sortedStrategies}
+              startingCapital={results.config.startingCapital}
             />
           </div>
 
@@ -583,7 +867,7 @@ export default function PositionSizingPage() {
 
           <MarginStatisticsTable
             portfolioMaxMarginPct={results.portfolioMaxMarginPct}
-            portfolioKellyPct={portfolioKellyPct}
+            portfolioKellyPct={results.config.portfolioKellyPct}
             weightedAppliedPct={results.weightedAppliedPct}
             strategyAnalysis={results.strategyAnalysis}
           />

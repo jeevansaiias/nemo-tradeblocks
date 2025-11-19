@@ -4,6 +4,7 @@ import { processChartData, buildPerformanceSnapshot } from '../../lib/services/p
 import { calculateInitialCapital } from '../../lib/processing/capital-calculator'
 import { mockTrades } from '../data/mock-trades'
 import { mockDailyLogs } from '../data/mock-daily-logs'
+import { Trade } from '@/lib/models/trade'
 
 describe('performance-store chart data', () => {
   it('uses daily logs to drive drawdown when available', async () => {
@@ -79,5 +80,47 @@ describe('performance-store chart data', () => {
 
     expect(snapshot.filteredTrades.every(trade => (trade.strategy || 'Unknown') === 'Long Call')).toBe(true)
     expect(snapshot.portfolioStats.totalTrades).toBeLessThan(unfiltered.portfolioStats.totalTrades)
+  })
+
+  it('normalizes trades to one lot when requested', async () => {
+    const trades: Trade[] = [
+      {
+        dateOpened: new Date('2024-02-01'),
+        timeOpened: '09:30:00',
+        openingPrice: 100,
+        legs: 'Test 1',
+        premium: 10,
+        pl: 500,
+        numContracts: 5,
+        fundsAtClose: 105000,
+        marginReq: 20000,
+        strategy: 'Scaled',
+        openingCommissionsFees: 50,
+        closingCommissionsFees: 25,
+        openingShortLongRatio: 0.5,
+      },
+      {
+        dateOpened: new Date('2024-02-05'),
+        timeOpened: '10:00:00',
+        openingPrice: 120,
+        legs: 'Test 2',
+        premium: 12,
+        pl: -300,
+        numContracts: 3,
+        fundsAtClose: 101000,
+        marginReq: 15000,
+        strategy: 'Scaled',
+        openingCommissionsFees: 30,
+        closingCommissionsFees: 15,
+        openingShortLongRatio: 0.4,
+      },
+    ]
+
+    const snapshot = await buildPerformanceSnapshot({ trades, normalizeTo1Lot: true })
+
+    expect(snapshot.filteredTrades.every(trade => trade.numContracts === 1)).toBe(true)
+    // 500/5 + (-300/3) = 100 - 100 = 0
+    expect(snapshot.portfolioStats.totalPl).toBeCloseTo(0)
+    expect(snapshot.portfolioStats.initialCapital).toBeCloseTo((105000 - 500) / 5)
   })
 })

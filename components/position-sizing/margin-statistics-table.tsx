@@ -60,7 +60,10 @@ export function MarginStatisticsTable({
   // Strategy rows
   for (const analysis of strategyAnalysis) {
     if (analysis.maxMarginPct > 0 && analysis.inputPct > 0) {
-      const projectedMargin = analysis.maxMarginPct * (analysis.inputPct / 100);
+      const projectedMargin =
+        analysis.maxMarginPct *
+        (portfolioKellyPct / 100) *
+        (analysis.inputPct / 100);
       statistics.push({
         name: analysis.name,
         historicalMax: analysis.maxMarginPct,
@@ -126,12 +129,12 @@ export function MarginStatisticsTable({
                 historically.
               </li>
               <li>
-                <strong>Projected Margin:</strong> Projected margin need at your Kelly
-                %. Example: 80% historical max with a 25% Kelly uses ~20% margin.
+                <strong>Projected Margin:</strong> Historical max × portfolio Kelly ×
+                strategy Kelly. Example: 80% × 50% × 50% ≈ 20%.
               </li>
               <li>
-                <strong>Allocated:</strong> How much capital this strategy gets based
-                on its calculated Kelly criterion and your Kelly % setting.
+                <strong>Allocated:</strong> Kelly edge × portfolio Kelly × strategy Kelly
+                (what fraction of capital you&apos;re actually sizing to this strategy).
               </li>
             </ul>
           </div>
@@ -186,10 +189,10 @@ export function MarginStatisticsTable({
                           </div>
                           <div className="px-4 pb-4 space-y-3">
                             <p className="text-sm font-medium text-foreground leading-relaxed">
-                              Your current Kelly fraction setting for this strategy.
+                              Strategy-level Kelly multiplier (portfolio slider applies globally on top of this).
                             </p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              This is the multiplier applied to the optimal Kelly percentage. For example, 25% means you&apos;re using a quarter Kelly fraction to reduce risk and volatility.
+                              This is the per-strategy knob on top of the portfolio Kelly fraction. Example: 25% here with a 50% portfolio Kelly means the strategy ultimately runs at 12.5% of full Kelly.
                             </p>
                           </div>
                         </div>
@@ -216,7 +219,7 @@ export function MarginStatisticsTable({
                               Expected margin requirement at your Kelly fraction.
                             </p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              Calculated as Historical Max × (Kelly % / 100). For example, if historical max was 80% and you&apos;re using 25% Kelly, projected margin is ~20%. This estimates how much margin you&apos;ll need if you trade at your chosen Kelly fraction.
+                              Calculated as Historical Max × (Portfolio Kelly % / 100) × (Strategy Kelly % / 100). Example: 80% historical max × 50% portfolio × 50% strategy ≈ 20%. This estimates how much margin you&apos;ll need once both multipliers are applied.
                             </p>
                           </div>
                         </div>
@@ -240,10 +243,10 @@ export function MarginStatisticsTable({
                           </div>
                           <div className="px-4 pb-4 space-y-3">
                             <p className="text-sm font-medium text-foreground leading-relaxed">
-                              Capital allocated to this strategy after Kelly adjustment.
+                              Capital allocated to this strategy after portfolio + strategy Kelly multipliers.
                             </p>
                             <p className="text-xs text-muted-foreground leading-relaxed">
-                              Calculated as Optimal Kelly × (Kelly % / 100). This is the percentage of your starting capital that should be dedicated to this strategy based on the Kelly criterion and your risk tolerance settings.
+                              Calculated as Optimal Kelly × (Portfolio Kelly % / 100) × (Strategy Kelly % / 100). That final percentage is how much of starting capital is earmarked for the strategy at your current risk settings.
                             </p>
                           </div>
                         </div>
@@ -257,7 +260,11 @@ export function MarginStatisticsTable({
               {/* Portfolio row */}
               {portfolioStats.map((stat) => (
                 <TableRow key={stat.name} className="font-semibold">
-                  <TableCell>{stat.name}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <div className="truncate" title={stat.name}>
+                      {stat.name}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     {stat.historicalMax.toFixed(1)}%
                   </TableCell>
@@ -282,7 +289,11 @@ export function MarginStatisticsTable({
               {/* Strategy rows */}
               {strategyStats.map((stat) => (
                 <TableRow key={stat.name}>
-                  <TableCell className="text-sm">{stat.name}</TableCell>
+                  <TableCell className="text-sm max-w-[200px]">
+                    <div className="truncate" title={stat.name}>
+                      {stat.name}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right text-sm">
                     {stat.historicalMax.toFixed(1)}%
                   </TableCell>

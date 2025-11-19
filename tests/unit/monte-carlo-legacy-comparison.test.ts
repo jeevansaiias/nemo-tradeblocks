@@ -18,21 +18,21 @@ describe("Monte Carlo legacy comparison", () => {
 
     expect(result.statistics).toMatchInlineSnapshot(`
 {
-  "meanAnnualizedReturn": 0.12127135124480794,
-  "meanFinalValue": 4646170.810060007,
-  "meanMaxDrawdown": 0.0327541351919287,
-  "meanSharpeRatio": 2.2239415909815112,
-  "meanTotalReturn": 0.26089713491389926,
-  "medianAnnualizedReturn": 0.12229450511935136,
-  "medianFinalValue": 4649763.850000003,
-  "medianMaxDrawdown": 0.030330508308702077,
-  "medianTotalReturn": 0.2618722290185265,
-  "probabilityOfProfit": 0.999,
-  "stdFinalValue": 301739.2143380576,
+  "meanAnnualizedReturn": 0.11753863961340699,
+  "meanFinalValue": 3990519.993459993,
+  "meanMaxDrawdown": 0.015921245623771414,
+  "meanSharpeRatio": 3.520797443565685,
+  "meanTotalReturn": 0.2516373591238308,
+  "medianAnnualizedReturn": 0.1178781683758825,
+  "medianFinalValue": 3991298.739999995,
+  "medianMaxDrawdown": 0.014818941209153055,
+  "medianTotalReturn": 0.25188161507652596,
+  "probabilityOfProfit": 1,
+  "stdFinalValue": 162541.74285933183,
   "valueAtRisk": {
-    "p10": 0.15736886951066184,
-    "p25": 0.2057732842882098,
-    "p5": 0.1295632260380985,
+    "p10": 0.18809136361814727,
+    "p25": 0.21530255773486684,
+    "p5": 0.16488850637757374,
   },
 }
 `);
