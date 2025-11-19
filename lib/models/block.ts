@@ -87,6 +87,14 @@ export interface Block {
     rowCount: number
     fileSize: number
   }
+  /**
+   * Optional reporting log metadata (added to support upstream reporting features)
+   */
+  reportingLog?: {
+    rowCount: number
+    fileName?: string
+    generatedAt?: Date
+  }
   stats: {
     totalPnL: number
     winRate: number
