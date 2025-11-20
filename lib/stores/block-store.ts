@@ -10,6 +10,7 @@ import {
     updateBlockStats,
 } from "../db";
 import { ProcessedBlock } from "../models/block";
+import type { StrategyAlignment } from "../models/strategy-alignment";
 
 export interface Block {
   id: string
@@ -42,7 +43,11 @@ export interface Block {
     avgLoss: number
   }
   strategyAlignment?: {
-    mappings: StrategyAlignment[]
+    mappings: Array<{
+      reportingStrategies: string[]
+      liveStrategies: string[]
+      note?: string
+    }>
     updatedAt: Date
   }
 }
