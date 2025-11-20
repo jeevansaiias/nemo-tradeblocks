@@ -1,0 +1,11 @@
+# Preserve my custom TP Optimizer (MAE/MFE) implementation
+components/tp-optimizer-mfe/** merge=ours
+components/tp-optimizer/** merge=ours
+# Preserve TP optimizer pages under app/(platform) if present
+app/(platform)/tp-optimizer*/** merge=ours
+# Preserve Block Stats & Analytics (custom)
+app/(platform)/block-stats/** merge=ours
+# Preserve P/L Calendar (custom)
+app/(platform)/calendar/** merge=ours
+components/pl-calendar/** merge=ours
+lib/processing/pl-calendar.ts merge=ours
