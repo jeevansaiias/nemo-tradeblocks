@@ -32,8 +32,9 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  getBlock,
   getReportingTradesByBlock,
-  getTradesByBlock,
+  getTradesByBlockWithOptions,
   updateBlock as updateProcessedBlock,
 } from "@/lib/db";
 import { StrategyAlignment } from "@/lib/models/strategy-alignment";
@@ -173,8 +174,12 @@ export default function ComparisonBlocksPage() {
     const load = async () => {
       try {
         const blockId = activeBlock.id;
+        const processedBlock = await getBlock(blockId);
+        const combineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+
         const [trades, reportingTrades] = await Promise.all([
-          getTradesByBlock(blockId),
+          getTradesByBlockWithOptions(blockId, { combineLegGroups }),
           getReportingTradesByBlock(blockId),
         ]);
 

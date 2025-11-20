@@ -265,8 +265,36 @@ export class TransactionError extends DatabaseError {
 }
 
 // Re-export functions from individual stores
-export { createBlock, deleteBlock, getActiveBlock, getAllBlocks, getBlock, updateBlock, updateBlockStats } from './blocks-store'
-export { addDailyLogEntries, deleteDailyLogsByBlock, getDailyLogCountByBlock, getDailyLogsByBlock } from './daily-logs-store'
-export { addReportingTrades, deleteReportingTradesByBlock, getReportingStrategiesByBlock, getReportingTradeCountByBlock, getReportingTradesByBlock, updateReportingTradesForBlock } from './reporting-logs-store'
-export { addTrades, deleteTradesByBlock, getTradeCountByBlock, getTradesByBlock } from './trades-store'
+export {
+    createBlock,
+    deleteBlock,
+    getActiveBlock,
+    getAllBlocks,
+    getBlock,
+    updateBlock,
+    updateBlockStats
+} from "./blocks-store"
+export {
+    addDailyLogEntries,
+    deleteDailyLogsByBlock,
+    getDailyLogCountByBlock,
+    getDailyLogsByBlock,
+    updateDailyLogsForBlock
+} from "./daily-logs-store"
+export {
+    addReportingTrades,
+    deleteReportingTradesByBlock,
+    getReportingStrategiesByBlock,
+    getReportingTradeCountByBlock,
+    getReportingTradesByBlock,
+    updateReportingTradesForBlock
+} from "./reporting-logs-store"
+export {
+    addTrades,
+    deleteTradesByBlock,
+    getTradeCountByBlock,
+    getTradesByBlock,
+    getTradesByBlockWithOptions,
+    updateTradesForBlock
+} from "./trades-store"
 

@@ -1,7 +1,15 @@
-import { create } from 'zustand'
-import { PortfolioStatsCalculator } from '../calculations/portfolio-stats'
-import { deleteBlock as dbDeleteBlock, updateBlock as dbUpdateBlock, getAllBlocks, getBlock, getDailyLogsByBlock, getTradesByBlock, updateBlockStats } from '../db'
-import { ProcessedBlock } from '../models/block'
+import { create } from "zustand";
+import { PortfolioStatsCalculator } from "../calculations/portfolio-stats";
+import {
+    deleteBlock as dbDeleteBlock,
+    updateBlock as dbUpdateBlock,
+    getAllBlocks,
+    getBlock,
+    getDailyLogsByBlock,
+    getReportingTradesByBlock,
+    updateBlockStats,
+} from "../db";
+import { ProcessedBlock } from "../models/block";
 
 export interface Block {
   id: string
@@ -119,11 +127,20 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       const processedBlocks = await getAllBlocks()
       const blocks: Block[] = []
 
+      // Import getTradesByBlockWithOptions
+      const { getTradesByBlockWithOptions } = await import("../db");
+
       // Convert each ProcessedBlock to Block with trade/daily log counts
       for (const processedBlock of processedBlocks) {
         try {
-          const trades = await getTradesByBlock(processedBlock.id)
-          const dailyLogs = await getDailyLogsByBlock(processedBlock.id)
+          // Use combineLegGroups setting from block config
+          const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
+
+          const [trades, dailyLogs, reportingTrades] = await Promise.all([
+            getTradesByBlockWithOptions(processedBlock.id, { combineLegGroups }),
+            getDailyLogsByBlock(processedBlock.id),
+            getReportingTradesByBlock(processedBlock.id),
+          ]);
 
           // Calculate stats from trades
           const stats = trades.length > 0 ? {
@@ -308,8 +325,15 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       const processedBlock = await getBlock(id)
       if (!processedBlock) return
 
-      const trades = await getTradesByBlock(id)
-      const dailyLogs = await getDailyLogsByBlock(id)
+      // Use combineLegGroups setting from block config
+      const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
+      const { getTradesByBlockWithOptions } = await import("../db");
+
+      const [trades, dailyLogs, reportingTrades] = await Promise.all([
+        getTradesByBlockWithOptions(id, { combineLegGroups }),
+        getDailyLogsByBlock(id),
+        getReportingTradesByBlock(id),
+      ]);
 
       // Calculate fresh stats
       const stats = trades.length > 0 ? {
@@ -355,10 +379,15 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         throw new Error('Block not found')
       }
 
-      const [trades, dailyLogs] = await Promise.all([
-        getTradesByBlock(id),
-        getDailyLogsByBlock(id)
-      ])
+      // Use combineLegGroups setting from block config
+      const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
+      const { getTradesByBlockWithOptions } = await import("../db");
+
+      const [trades, dailyLogs, reportingTrades] = await Promise.all([
+        getTradesByBlockWithOptions(id, { combineLegGroups }),
+        getDailyLogsByBlock(id),
+        getReportingTradesByBlock(id),
+      ]);
 
       console.log(`Recalculating stats for ${trades.length} trades and ${dailyLogs.length} daily logs`)
 

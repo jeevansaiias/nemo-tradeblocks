@@ -37,8 +37,11 @@ import {
     type MonteCarloResult,
 } from "@/lib/calculations/monte-carlo";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
-import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";
-import { getTradesByBlock } from "@/lib/db/trades-store";
+import {
+  getBlock,
+  getDailyLogsByBlock,
+  getTradesByBlockWithOptions,
+} from "@/lib/db";
 import { DailyLogEntry } from "@/lib/models/daily-log";
 import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
@@ -157,18 +160,44 @@ export default function RiskSimulatorPage() {
 
   // Load trades and daily logs when active block changes
   useEffect(() => {
-    if (activeBlockId) {
-      Promise.all([
-        getTradesByBlock(activeBlockId),
-        getDailyLogsByBlock(activeBlockId),
-      ]).then(([loadedTrades, loadedDailyLogs]) => {
-        setTrades(loadedTrades);
-        setDailyLogs(loadedDailyLogs);
-      });
-    } else {
-      setTrades([]);
-      setDailyLogs([]);
-    }
+    let cancelled = false;
+
+    const loadData = async () => {
+      if (!activeBlockId) {
+        if (!cancelled) {
+          setTrades([]);
+          setDailyLogs([]);
+        }
+        return;
+      }
+
+      try {
+        const processedBlock = await getBlock(activeBlockId);
+        const combineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+
+        const [loadedTrades, loadedDailyLogs] = await Promise.all([
+          getTradesByBlockWithOptions(activeBlockId, { combineLegGroups }),
+          getDailyLogsByBlock(activeBlockId),
+        ]);
+
+        if (!cancelled) {
+          setTrades(loadedTrades);
+          setDailyLogs(loadedDailyLogs);
+        }
+      } catch (error) {
+        console.error("Failed to load block data:", error);
+        if (!cancelled) {
+          setTrades([]);
+          setDailyLogs([]);
+        }
+      }
+    };
+
+    loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [activeBlockId]);
 
   // Update tradesPerYear and initialCapital when calculated values change
