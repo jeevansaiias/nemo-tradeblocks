@@ -112,10 +112,13 @@ dependencies:
     version: 14.9.1
   next:
     specifier: 15.5.4
-    version: 15.5.4(@babel/core@7.28.4)(react-dom@19.1.0)(react@19.1.0)
+    version: 15.5.4(@babel/core@7.28.4)(@playwright/test@1.56.1)(react-dom@19.1.0)(react@19.1.0)
   next-themes:
     specifier: ^0.4.6
     version: 0.4.6(react-dom@19.1.0)(react@19.1.0)
+  papaparse:
+    specifier: ^5.5.3
+    version: 5.5.3
   plotly.js:
     specifier: ^3.1.0
     version: 3.1.2(mapbox-gl@1.13.3)
@@ -157,6 +160,9 @@ devDependencies:
   '@jest/globals':
     specifier: ^30.2.0
     version: 30.2.0
+  '@playwright/test':
+    specifier: ^1.56.1
+    version: 1.56.1
   '@tailwindcss/postcss':
     specifier: ^4
     version: 4.1.14
@@ -172,6 +178,9 @@ devDependencies:
   '@types/node':
     specifier: ^20
     version: 20.19.22
+  '@types/papaparse':
+    specifier: ^5.5.0
+    version: 5.5.0
   '@types/react':
     specifier: ^19
     version: 19.2.2
@@ -199,6 +208,9 @@ devDependencies:
   jest-environment-jsdom:
     specifier: ^29.7.0
     version: 29.7.0
+  playwright:
+    specifier: ^1.56.1
+    version: 1.56.1
   tailwindcss:
     specifier: ^4
     version: 4.1.14
@@ -1502,6 +1514,13 @@ packages:
     resolution: {integrity: sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     dev: true
+
+  /@playwright/test@1.56.1:
+    resolution: {integrity: sha512-vSMYtL/zOcFpvJCW71Q/OEGQb7KYBPAdKh35WNSkaZA75JlAO8ED8UN6GUNTm3drWomcbcqRPFqQbLae8yBTdg==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dependencies:
+      playwright: 1.56.1
 
   /@plotly/d3-sankey-circular@0.33.1:
     resolution: {integrity: sha512-FgBV1HEvCr3DV7RHhDsPXyryknucxtfnLwPtCKKxdolKyTFYoLX/ibEfX39iFYIL7DYbVeRtP43dbFcrHNE+KQ==}
@@ -3108,6 +3127,12 @@ packages:
     resolution: {integrity: sha512-hRnu+5qggKDSyWHlnmThnUqg62l29Aj/6vcYgUaSFL9oc7DVjeWEQN3PRgdSc6F8d9QRMWkf36CLMch1Do/+RQ==}
     dependencies:
       undici-types: 6.21.0
+    dev: true
+
+  /@types/papaparse@5.5.0:
+    resolution: {integrity: sha512-GVs5iMQmUr54BAZYYkByv8zPofFxmyxUpISPb2oh8sayR3+1zbxasrOvoKiHJ/nnoq/uULuPsu1Lze1EkagVFg==}
+    dependencies:
+      '@types/node': 20.19.22
     dev: true
 
   /@types/pbf@3.0.5:
@@ -5358,6 +5383,13 @@ packages:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
     dev: true
 
+  /fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+    requiresBuild: true
+    optional: true
+
   /fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -7286,7 +7318,7 @@ packages:
     resolution: {integrity: sha512-CXdUiJembsNjuToQvxayPZF9Vqht7hewsvy2sOWafLvi2awflj9mOC6bHIg50orX8IJvWKY9wYQ/zB2kogPslQ==}
     dev: false
 
-  /next@15.5.4(@babel/core@7.28.4)(react-dom@19.1.0)(react@19.1.0):
+  /next@15.5.4(@babel/core@7.28.4)(@playwright/test@1.56.1)(react-dom@19.1.0)(react@19.1.0):
     resolution: {integrity: sha512-xH4Yjhb82sFYQfY3vbkJfgSDgXvBB6a8xPs9i35k6oZJRoQRihZH+4s9Yo2qsWpzBmZ3lPXaJ2KPXLfkvW4LnA==}
     engines: {node: ^18.18.0 || ^19.8.0 || >= 20.0.0}
     hasBin: true
@@ -7308,6 +7340,7 @@ packages:
         optional: true
     dependencies:
       '@next/env': 15.5.4
+      '@playwright/test': 1.56.1
       '@swc/helpers': 0.5.15
       caniuse-lite: 1.0.30001751
       postcss: 8.4.31
@@ -7510,6 +7543,10 @@ packages:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
     dev: true
 
+  /papaparse@5.5.3:
+    resolution: {integrity: sha512-5QvjGxYVjxO59MGU2lHVYpRWBBtKHnlIAcSe1uNFCkkptUh63NFRj0FJQm7nR67puEruUci/ZkjmEFrjCAyP4A==}
+    dev: false
+
   /parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
@@ -7617,6 +7654,20 @@ packages:
     dependencies:
       find-up: 4.1.0
     dev: true
+
+  /playwright-core@1.56.1:
+    resolution: {integrity: sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  /playwright@1.56.1:
+    resolution: {integrity: sha512-aFi5B0WovBHTEvpM3DzXTUaeN6eN0qWnTkKx4NQaH4Wvcmc153PdaY2UBdSYKaGYw+UyWXSVyxDUg5DoPEttjw==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dependencies:
+      playwright-core: 1.56.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   /plotly.js@3.1.2(mapbox-gl@1.13.3):
     resolution: {integrity: sha512-Yk1KQ1QHzZH1t/XYdub3b631Gc4t4kZYHdnf4G7DqnNg4CP3nJ9FP4hsNh3pNVO9LcpchE7NrmjPKJlaGzBJNg==}
