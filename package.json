@@ -14,6 +14,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "papaparse": "^5.5.3",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
@@ -64,6 +65,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.5.0",
     "@eslint/eslintrc": "^3",
     "@jest/globals": "^30.2.0",
     "@tailwindcss/postcss": "^4",

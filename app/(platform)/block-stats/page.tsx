@@ -12,7 +12,7 @@ import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import {
   getBlock,
   getDailyLogsByBlock,
-  getTradesByBlockWithOptions,
+  getTradesByBlock,
 } from "@/lib/db";
 import {
   calculatePremiumEfficiencyPercent,
@@ -110,11 +110,11 @@ export default function BlockStatsPage() {
 
       try {
         const processedBlock = await getBlock(activeBlock.id);
-        const combineLegGroups =
-          processedBlock?.analysisConfig?.combineLegGroups ?? false;
-
+        // Upstream now uses a simpler getTradesByBlock API; combineLegGroups
+        // option was removed from the DB helper. Use getTradesByBlock and
+        // avoid passing options here.
         const [blockTrades, blockDailyLogs] = await Promise.all([
-          getTradesByBlockWithOptions(activeBlock.id, { combineLegGroups }),
+          getTradesByBlock(activeBlock.id),
           getDailyLogsByBlock(activeBlock.id),
         ]);
 
