@@ -1,5 +1,5 @@
 /**
- * IndexedDB Database Service for TradeBlocks
+ * IndexedDB Database Service for NemoBlocks
  *
  * Manages the client-side database for storing blocks, trades, and daily logs.
  * Uses a versioned schema with migration support.
@@ -349,5 +349,6 @@ export {
   deleteTradesByBlock,
   getTradeCountByBlock,
   getTradesByBlock,
+  getTradesByBlockWithOptions,
   updateTradesForBlock,
 } from "./trades-store";

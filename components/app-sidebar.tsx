@@ -105,13 +105,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-2"
             >
-              <Link href="/block-stats" className="flex items-center gap-3">
+                <Link href="/block-stats" className="flex items-center gap-3">
                 <div className="flex-shrink-0">
                   <Blocks className="h-8 w-8 text-primary" />
                 </div>
                 <span className="flex flex-col">
                   <span className="text-sm font-semibold leading-tight">
-                    TradeBlocks
+                    NemoBlocks
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Analytics Platform

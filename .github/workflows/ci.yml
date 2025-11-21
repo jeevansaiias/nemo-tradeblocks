@@ -1,4 +1,4 @@
-name: TradeBlocks CI
+name: NemoBlocks CI
 
 on:
   push:
