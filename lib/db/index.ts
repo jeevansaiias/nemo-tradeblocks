@@ -355,3 +355,4 @@ export {
 
 // Migration helpers
 export { migrateDatabaseName } from "./migration";
+export type { MigrationResult } from "./migration";
