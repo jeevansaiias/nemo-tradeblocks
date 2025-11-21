@@ -31,6 +31,16 @@ import {
 const navData = {
   navMain: [
     {
+      title: "TP Optimizer (MAE/MFE)",
+      href: "/tp-optimizer-mae-mfe",
+      icon: IconReportAnalytics,
+    },
+    {
+      title: "P/L Calendar",
+      href: "/calendar",
+      icon: IconChartHistogram,
+    },
+    {
       title: "Block Management",
       href: "/blocks",
       icon: IconStack2,
