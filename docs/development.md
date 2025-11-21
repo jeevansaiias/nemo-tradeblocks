@@ -1,6 +1,6 @@
-# TradeBlocks Developer Guide
+# NemoBlocks Developer Guide
 
-This document explains how TradeBlocks is structured and how to work effectively inside the codebase. Pair it with the top-level `README.md` for quick-start instructions.
+This document explains how NemoBlocks is structured and how to work effectively inside the codebase. Pair it with the top-level `README.md` for quick-start instructions.
 
 ## Environment & Tooling
 - **Runtime:** Node.js 20 LTS (Next.js 15 requires >=18.18, but we develop against 20 for parity with Vercel).
@@ -16,7 +16,7 @@ This document explains how TradeBlocks is structured and how to work effectively
 3. Visit `http://localhost:3000` → you will be redirected to `/blocks`.
 4. Create your first block and upload a trade CSV (sample: `IC_Trades.csv`).
 
-> Resetting locally stored data: open your browser dev tools → **Application** tab → clear IndexedDB storage and `localStorage` key `tradeblocks-active-block-id`.
+> Resetting locally stored data: open your browser dev tools → **Application** tab → clear IndexedDB storage and the `localStorage` key `tradeblocks-active-block-id` (internal key name unchanged).
 
 ## Application Architecture
 
@@ -90,7 +90,7 @@ This document explains how TradeBlocks is structured and how to work effectively
 - Use the `plans/` directory for task breakdowns if you want structured TODOs (optional).
 - Tailwind CSS configuration lives in `tailwind.config.ts` produced via `@tailwindcss/postcss` (Tailwind v4). Check `app/globals.css` for design tokens.
 - Components expect the `@/*` alias (configured in `tsconfig.json`)—prefer it over relative paths.
-- When debugging IndexedDB, the store names mirror file names (e.g., `tradeblocks-trades`); inspect them via browser dev tools.
+- When debugging IndexedDB, the store names mirror file names (e.g., `tradeblocks-trades`); inspect them via browser dev tools. Note: internal store/key names remain unchanged to preserve backward compatibility.
 - `npm run build` uses Turbopack; large third-party imports (Plotly/Recharts) can impact bundle size, so keep an eye on analytics when adding dependencies.
 
 ## Useful Links
