@@ -76,6 +76,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-plotly.js": "^2.6.3",
+  "@types/plotly.js": "^3.0.8",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "fake-indexeddb": "^6.2.2",
