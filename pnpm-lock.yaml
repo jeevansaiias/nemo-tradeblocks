@@ -116,6 +116,9 @@ dependencies:
   next-themes:
     specifier: ^0.4.6
     version: 0.4.6(react-dom@19.1.0)(react@19.1.0)
+  papaparse:
+    specifier: ^5.5.3
+    version: 5.5.3
   plotly.js:
     specifier: ^3.1.0
     version: 3.1.2(mapbox-gl@1.13.3)
@@ -172,6 +175,9 @@ devDependencies:
   '@types/node':
     specifier: ^20
     version: 20.19.22
+  '@types/papaparse':
+    specifier: ^5.5.0
+    version: 5.5.0
   '@types/react':
     specifier: ^19
     version: 19.2.2
@@ -3108,6 +3114,12 @@ packages:
     resolution: {integrity: sha512-hRnu+5qggKDSyWHlnmThnUqg62l29Aj/6vcYgUaSFL9oc7DVjeWEQN3PRgdSc6F8d9QRMWkf36CLMch1Do/+RQ==}
     dependencies:
       undici-types: 6.21.0
+    dev: true
+
+  /@types/papaparse@5.5.0:
+    resolution: {integrity: sha512-GVs5iMQmUr54BAZYYkByv8zPofFxmyxUpISPb2oh8sayR3+1zbxasrOvoKiHJ/nnoq/uULuPsu1Lze1EkagVFg==}
+    dependencies:
+      '@types/node': 20.19.22
     dev: true
 
   /@types/pbf@3.0.5:
@@ -7509,6 +7521,10 @@ packages:
   /package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
     dev: true
+
+  /papaparse@5.5.3:
+    resolution: {integrity: sha512-5QvjGxYVjxO59MGU2lHVYpRWBBtKHnlIAcSe1uNFCkkptUh63NFRj0FJQm7nR67puEruUci/ZkjmEFrjCAyP4A==}
+    dev: false
 
   /parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
