@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SizingModeToggle } from "@/components/sizing-mode-toggle";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
-import { getDailyLogsByBlock, getTradesByBlock } from "@/lib/db";
+import {
+  getBlock,
+  getDailyLogsByBlock,
+  getTradesByBlockWithOptions,
+} from "@/lib/db";
 import {
   calculatePremiumEfficiencyPercent,
   computeTotalPremium,
@@ -105,8 +109,12 @@ export default function BlockStatsPage() {
       setDataError(null);
 
       try {
+        const processedBlock = await getBlock(activeBlock.id);
+        const combineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+
         const [blockTrades, blockDailyLogs] = await Promise.all([
-          getTradesByBlock(activeBlock.id),
+          getTradesByBlockWithOptions(activeBlock.id, { combineLegGroups }),
           getDailyLogsByBlock(activeBlock.id),
         ]);
 
