@@ -9,6 +9,9 @@ import { useTPOptimizerStore } from "@/lib/stores/tp-optimizer-store";
 import Papa from "papaparse";
 import { TradeRecord } from "@/lib/stores/tp-optimizer-store";
 import { pct } from "@/lib/processing/auto-tp";
+import { addTrades, createBlock } from "@/lib/db";
+import { useBlockStore } from "@/lib/stores/block-store";
+import type { Trade } from "@/lib/models/trade";
 
 interface TPFileUploadProps {
   onDataLoaded?: () => void;
@@ -83,6 +86,57 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
     return trades;
   }, []);
 
+  // Try to map a raw CSV row (header normalized) to full Trade model when possible
+  const tryMapRawRowsToTrades = useCallback((rows: Record<string, string | number>[]): Trade[] => {
+    const mapped: Trade[] = [];
+    const parseNumber = (v: unknown): number => {
+      if (v === null || v === undefined || v === "") return 0;
+      const s = String(v).replace(/[$,%]/g, "").replace(/,/g, "").trim();
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    for (const row of rows) {
+      try {
+        const dateOpenedRaw = (row["Date Opened"] ?? row["Entry Date"] ?? row["Date"] ?? "") as string;
+        const dateClosedRaw = (row["Date Closed"] ?? row["Exit Date"] ?? "") as string;
+
+        const dateOpened = dateOpenedRaw ? new Date(String(dateOpenedRaw)) : new Date();
+        const dateClosed = dateClosedRaw ? new Date(String(dateClosedRaw)) : undefined;
+
+        const trade: Trade = {
+          dateOpened,
+          timeOpened: String(row["Time Opened"] ?? row["Time"] ?? "00:00:00"),
+          openingPrice: parseNumber(row["Opening Price"] ?? 0),
+          legs: String(row["Legs"] ?? ""),
+          premium: parseNumber(row["Premium"] ?? 0),
+          premiumPrecision: undefined,
+          closingPrice: parseNumber(row["Closing Price"] ?? 0) || undefined,
+          dateClosed: dateClosed,
+          timeClosed: String(row["Time Closed"] ?? ""),
+          avgClosingCost: parseNumber(row["Avg. Closing Cost"] ?? 0) || undefined,
+          reasonForClose: String(row["Reason For Close"] ?? row["Reason"] ?? ""),
+          pl: parseNumber(row["P/L"] ?? row["Result"] ?? row["PnL"] ?? 0),
+          numContracts: parseNumber(row["No. of Contracts"] ?? row["Contracts"] ?? 1),
+          fundsAtClose: parseNumber(row["Funds at Close"] ?? 100000),
+          marginReq: parseNumber(row["Margin Req."] ?? row["Margin Req"] ?? 0),
+          strategy: String(row["Strategy"] ?? row["strategy"] ?? "Unknown"),
+          openingCommissionsFees: parseNumber(row["Opening Commissions + Fees"] ?? row["Opening comms & fees"] ?? 0),
+          closingCommissionsFees: parseNumber(row["Closing Commissions + Fees"] ?? 0),
+          openingShortLongRatio: parseNumber(row["Opening Short/Long Ratio"] ?? 0),
+          closingShortLongRatio: parseNumber(row["Closing Short/Long Ratio"] ?? 0) || undefined,
+        } as Trade;
+
+        mapped.push(trade);
+      } catch {
+        // Skip invalid rows
+        continue;
+      }
+    }
+
+    return mapped;
+  }, []);
+
   const parseDate = (dateStr: string): Date => {
     if (!dateStr) throw new Error("Date is required");
     
@@ -116,6 +170,90 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
     reader.onload = (e) => {
       try {
         const csvText = e.target?.result as string;
+
+        // Parse raw CSV first so we can detect whether it's a full trade log
+        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, transformHeader: (h: string) => h.trim() });
+        const rows = parsed.data as Record<string, string | number>[];
+
+        // If CSV looks like a full trade log (has Date Opened or P/L), try mapping to full Trade model and persist
+        const headerSet = new Set((parsed.meta.fields || []).map((f: string) => f.trim()));
+        const looksLikeTradeLog = headerSet.has("Date Opened") || headerSet.has("P/L") || headerSet.has("No. of Contracts");
+
+        if (looksLikeTradeLog) {
+          const mappedTrades = tryMapRawRowsToTrades(rows);
+
+          if (mappedTrades.length === 0) {
+            throw new Error("No valid trade rows found for persistence. Falling back to TP optimizer format.");
+          }
+
+          // Persist into active block or create a new block
+          (async () => {
+            try {
+              const activeBlockId = useBlockStore.getState().activeBlockId;
+
+              let targetBlockId = activeBlockId;
+
+              if (!targetBlockId) {
+                // Create a new block in DB and set it active in store
+                const newBlock = await createBlock({
+                  name: file.name.replace(/\.csv$/i, ""),
+                  description: "Imported via CSV upload",
+                  isActive: true,
+                  tradeLog: {
+                    fileName: file.name,
+                    fileSize: file.size,
+                    originalRowCount: rows.length,
+                    processedRowCount: mappedTrades.length,
+                    uploadedAt: new Date(),
+                  },
+                  processingStatus: 'completed',
+                  dataReferences: { tradesStorageKey: '' },
+                  analysisConfig: {
+                    riskFreeRate: 2.0,
+                    useBusinessDaysOnly: true,
+                    annualizationFactor: 252,
+                    confidenceLevel: 95,
+                    combineLegGroups: false,
+                  },
+                });
+                targetBlockId = newBlock.id;
+                // Refresh block list and set active
+                await useBlockStore.getState().loadBlocks();
+                useBlockStore.getState().setActiveBlock(targetBlockId);
+              }
+
+              if (targetBlockId) {
+                await addTrades(targetBlockId, mappedTrades);
+                // Refresh the block's cached stats
+                await useBlockStore.getState().refreshBlock(targetBlockId);
+              }
+            } catch (err) {
+              console.error("Failed to persist trades to block:", err);
+            }
+          })();
+
+          // Also set TP optimizer store so the optimizer UI has data (convert to TradeRecord if possible)
+          try {
+            const tpRecords: TradeRecord[] = rows.map((r) => ({
+              strategy: String(r["Strategy"] ?? r["strategy"] ?? "Unknown"),
+              entryDate: String(r["Date Opened"] ?? r["Entry Date"] ?? r["Date"] ?? new Date().toISOString()),
+              exitDate: String(r["Date Closed"] ?? r["Exit Date"] ?? new Date().toISOString()),
+              maxProfitPct: pct(r["Max Profit"] ?? r["Max Profit %"] ?? r["Max Profit %"] ?? 0),
+              maxLossPct: pct(r["Max Loss"] ?? r["Max Loss %"] ?? 0),
+              resultPct: pct(r["P/L"] ?? r["Result %"] ?? r["Result"] ?? 0),
+            }));
+
+            setData(tpRecords.filter(tr => !isNaN(tr.maxProfitPct)));
+          } catch {
+            // ignore
+          }
+
+          setIsProcessing(false);
+          onDataLoaded?.();
+          return;
+        }
+
+        // Fallback to TP optimizer format parsing
         const trades = parseCSVData(csvText);
         setData(trades);
         setIsProcessing(false);
@@ -132,7 +270,7 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
     };
 
     reader.readAsText(file);
-  }, [parseCSVData, setData, onDataLoaded]);
+  }, [parseCSVData, setData, onDataLoaded, tryMapRawRowsToTrades]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
