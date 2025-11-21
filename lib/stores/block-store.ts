@@ -12,6 +12,11 @@ import {
 } from "../db";
 import { ProcessedBlock } from "../models/block";
 import { StrategyAlignment } from "../models/strategy-alignment";
+import {
+  migrateLocalStorageKeys,
+  readActiveBlockIdFromStorage,
+  writeActiveBlockIdToStorage,
+} from "@/lib/utils/storage-migration";
 
 export interface Block {
   id: string;
@@ -140,10 +145,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // Restore active block ID from localStorage
-      const savedActiveBlockId = localStorage.getItem(
-        "tradeblocks-active-block-id"
-      );
+      // Run safe migration of localStorage keys (legacy -> nemoblocks)
+      migrateLocalStorageKeys();
+
+      // Restore active block ID from storage (prefer new nemoblocks key)
+      const savedActiveBlockId = readActiveBlockIdFromStorage();
 
       const processedBlocks = await getAllBlocks();
       const blocks: Block[] = [];
@@ -229,8 +235,8 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
 
   // Actions
   setActiveBlock: (blockId: string) => {
-    // Save to localStorage for persistence
-    localStorage.setItem("tradeblocks-active-block-id", blockId);
+    // Save to storage (update both legacy and new keys for compatibility)
+    writeActiveBlockIdToStorage(blockId);
 
     set((state) => ({
       blocks: state.blocks.map((block) => ({
@@ -242,8 +248,8 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
   },
 
   clearActiveBlock: () => {
-    // Remove from localStorage
-    localStorage.removeItem("tradeblocks-active-block-id");
+    // Clear active block in storage (keep legacy key present but empty)
+    writeActiveBlockIdToStorage(null);
 
     set((state) => ({
       blocks: state.blocks.map((block) => ({

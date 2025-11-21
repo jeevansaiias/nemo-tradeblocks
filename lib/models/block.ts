@@ -72,6 +72,8 @@ export interface ProcessedBlock {
     useBusinessDaysOnly: boolean
     annualizationFactor: number
     confidenceLevel: number
+    // Whether to combine leg groups when performing excursion/TP analysis
+    combineLegGroups?: boolean
   }
 }
 

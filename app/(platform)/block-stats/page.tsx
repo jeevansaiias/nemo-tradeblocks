@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { SizingModeToggle } from "@/components/sizing-mode-toggle";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import {
-  getBlock,
   getDailyLogsByBlock,
   getTradesByBlock,
 } from "@/lib/db";
@@ -109,10 +108,7 @@ export default function BlockStatsPage() {
       setDataError(null);
 
       try {
-        const processedBlock = await getBlock(activeBlock.id);
-        // Upstream now uses a simpler getTradesByBlock API; combineLegGroups
-        // option was removed from the DB helper. Use getTradesByBlock and
-        // avoid passing options here.
+        // Fetch trades and daily logs for the active block
         const [blockTrades, blockDailyLogs] = await Promise.all([
           getTradesByBlock(activeBlock.id),
           getDailyLogsByBlock(activeBlock.id),

@@ -101,7 +101,7 @@ export function StrategyExitHeatmap({ data }: StrategyExitHeatmapProps) {
   const uniqueStrategies = [...new Set(sortedData.map((d) => d.strategy))];
   const uniqueReasons = [...new Set(sortedData.map((d) => d.exit_reason))];
 
-  const chartData = sortedData.map((item, idx) => ({
+  const chartData = sortedData.map((item) => ({
     ...item,
     x: uniqueReasons.indexOf(item.exit_reason),
     y: uniqueStrategies.indexOf(item.strategy),

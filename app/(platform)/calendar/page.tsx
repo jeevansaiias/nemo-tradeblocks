@@ -1,25 +1,18 @@
 "use client"
 
-import { format } from "date-fns"
+// date-fns formatting used inside MonthlyPLCalendar and Monthly drawer component
 import { useEffect, useState } from "react"
 
 import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
 import { YearlyPLTable } from "@/components/pl-calendar/YearlyPLTable"
-import { Badge } from "@/components/ui/badge"
+// MonthlyPLCalendar provides its own drawer. Page-level dialog and badge imports removed.
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
 import {
     Tabs,
     TabsContent,
@@ -29,11 +22,10 @@ import {
 import { getTradesByBlock } from "@/lib/db"
 import type { StoredTrade } from "@/lib/db/trades-store"
 import {
-    aggregateDailyPL,
-    calculateCalendarStats,
-    formatPL,
-    getTradesForDate,
-    type DailyPLData,
+  aggregateDailyPL,
+  calculateCalendarStats,
+  formatPL,
+  type DailyPLData,
 } from "@/lib/processing/pl-calendar"
 import { useBlockStore } from "@/lib/stores/block-store"
 import { Calendar, Target, TrendingDown, TrendingUp } from "lucide-react"
@@ -48,8 +40,6 @@ export default function CalendarPage() {
 
   const [trades, setTrades] = useState<StoredTrade[]>([])
   const [dailyPL, setDailyPL] = useState<DailyPLData[]>([])
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [selectedTrades, setSelectedTrades] = useState<StoredTrade[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -85,14 +75,7 @@ export default function CalendarPage() {
     loadTrades()
   }, [activeBlock?.id])
 
-  const handleDateClick = (value: { date: string; value?: number; count?: number } | null) => {
-    if (!value?.date) return
-    
-    const dateString = value.date
-    const dayTrades = getTradesForDate(trades, dateString)
-    setSelectedTrades(dayTrades)
-    setSelectedDate(dateString)
-  }
+  // Date click handler removed — MonthlyPLCalendar currently uses onDateChange prop
 
   const handleMonthClick = (year: number, month: number) => {
     // Create a date for the selected month and year
@@ -241,78 +224,7 @@ export default function CalendarPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Trade Details Modal */}
-      <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Trades on {selectedDate ? format(new Date(selectedDate), "MMMM d, yyyy") : "Unknown Date"}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedTrades.length} trade{selectedTrades.length !== 1 ? "s" : ""} executed on this day
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="max-h-96 overflow-y-auto">
-            {selectedTrades.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6">
-                No trades found for this date.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {selectedTrades.map((trade, index) => (
-                  <Card key={index} className="border-l-4" style={{
-                    borderLeftColor: trade.pl >= 0 ? '#FF8A3D' : '#ef4444'
-                  }}>
-                    <CardContent className="pt-4">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <div className="font-medium text-foreground">
-                            {trade.legs}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Strategy: {trade.strategy}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Contracts: {trade.numContracts} • Premium: {formatPL(trade.premium)}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className={`text-lg font-bold ${
-                            trade.pl >= 0 ? 'text-primary' : 'text-destructive'
-                          }`}>
-                            {formatPL(trade.pl)}
-                          </div>
-                          <Badge variant={trade.pl >= 0 ? "default" : "destructive"}>
-                            {trade.pl >= 0 ? "Profit" : "Loss"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                
-                {/* Daily Summary */}
-                <Card className="border-dashed">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center justify-between font-semibold">
-                      <span>Daily Total</span>
-                      <span className={
-                        selectedTrades.reduce((sum, t) => sum + t.pl, 0) >= 0 
-                          ? 'text-primary' 
-                          : 'text-destructive'
-                      }>
-                        {formatPL(selectedTrades.reduce((sum, t) => sum + t.pl, 0))}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Monthly calendar uses its own drawer for trade details */}
     </div>
   )
 }

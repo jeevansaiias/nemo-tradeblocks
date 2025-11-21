@@ -352,3 +352,6 @@ export {
   getTradesByBlockWithOptions,
   updateTradesForBlock,
 } from "./trades-store";
+
+// Migration helpers
+export { migrateDatabaseName } from "./migration";
