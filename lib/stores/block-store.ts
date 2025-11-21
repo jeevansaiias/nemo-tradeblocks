@@ -43,11 +43,7 @@ export interface Block {
     avgLoss: number
   }
   strategyAlignment?: {
-    mappings: Array<{
-      reportingStrategies: string[]
-      liveStrategies: string[]
-      note?: string
-    }>
+    mappings: StrategyAlignment[]
     updatedAt: Date
   }
 }
