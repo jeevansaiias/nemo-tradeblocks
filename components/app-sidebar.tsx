@@ -31,19 +31,14 @@ import {
 const navData = {
   navMain: [
     {
-      title: "TP Optimizer (MAE/MFE)",
-      href: "/tp-optimizer-mae-mfe",
-      icon: IconReportAnalytics,
-    },
-    {
-      title: "P/L Calendar",
-      href: "/calendar",
-      icon: IconChartHistogram,
-    },
-    {
       title: "Block Management",
       href: "/blocks",
       icon: IconStack2,
+    },
+    {
+      title: "TP Optimizer (MAE/MFE)",
+      href: "/tp-optimizer-mae-mfe",
+      icon: IconReportAnalytics,
     },
     {
       title: "Block Stats",
@@ -55,7 +50,17 @@ const navData = {
       href: "/performance-blocks",
       icon: IconReportAnalytics,
     },
-
+    {
+      title: "Comparison Blocks",
+      href: "/comparison-blocks",
+      icon: IconLink,
+      badge: "Beta",
+    },
+    {
+      title: "P/L Calendar",
+      href: "/calendar",
+      icon: IconChartHistogram,
+    },
     {
       title: "Position Sizing",
       href: "/position-sizing",
@@ -70,12 +75,6 @@ const navData = {
       title: "Correlation Matrix",
       href: "/correlation-matrix",
       icon: IconChartHistogram,
-    },
-    {
-      title: "Comparison Blocks",
-      href: "/comparison-blocks",
-      icon: IconLink,
-      badge: "Beta",
     },
   ],
 };
