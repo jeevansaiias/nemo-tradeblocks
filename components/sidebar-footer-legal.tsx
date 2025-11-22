@@ -125,7 +125,7 @@ export function SidebarFooterLegal() {
         </Link>
         <span className="text-muted-foreground/50">•</span>
         <Link
-          href="https://github.com/davidromeo/tradeblocks"
+          href="https://github.com/jeevansaiias/nemo-tradeblocks"
           target="_blank"
           className="inline-flex items-center gap-1 transition hover:text-foreground"
         >
