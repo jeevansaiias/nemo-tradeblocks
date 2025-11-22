@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import { useTPOptimizerStore } from "@/lib/stores/tp-optimizer-store";
 import Papa from "papaparse";
 import { TradeRecord } from "@/lib/stores/tp-optimizer-store";
 import { pct } from "@/lib/processing/auto-tp";
-import { addTrades, createBlock } from "@/lib/db";
+import { addTrades, createBlock, updateTradesForBlock } from "@/lib/db";
 import { useBlockStore } from "@/lib/stores/block-store";
 import type { Trade } from "@/lib/models/trade";
 
@@ -19,6 +20,7 @@ interface TPFileUploadProps {
 
 export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
   const { setData, data, setActiveTab } = useTPOptimizerStore();
+  const [replaceMode, setReplaceMode] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,12 +225,23 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
               }
 
               if (targetBlockId) {
-                await addTrades(targetBlockId, mappedTrades);
+                if (replaceMode) {
+                  await updateTradesForBlock(targetBlockId, mappedTrades);
+                } else {
+                  await addTrades(targetBlockId, mappedTrades);
+                }
                 // Refresh the block's cached stats
                 await useBlockStore.getState().refreshBlock(targetBlockId);
+                // Notify user
+                toast.success(
+                  replaceMode
+                    ? `Replaced ${mappedTrades.length} trades in block.`
+                    : `Added ${mappedTrades.length} trades to block.`
+                );
               }
             } catch (err) {
               console.error("Failed to persist trades to block:", err);
+              toast.error(err instanceof Error ? err.message : "Failed to persist trades to block");
             }
           })();
 
@@ -270,7 +283,7 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
     };
 
     reader.readAsText(file);
-  }, [parseCSVData, setData, onDataLoaded, tryMapRawRowsToTrades]);
+  }, [parseCSVData, setData, onDataLoaded, tryMapRawRowsToTrades, replaceMode]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -403,6 +416,18 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
               </span>
             </Button>
           </label>
+          {/* Replace vs Append toggle */}
+          <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={replaceMode}
+                onChange={(e) => setReplaceMode(e.target.checked)}
+                className="rounded"
+              />
+              <span>Replace existing trades for target block (overwrite)</span>
+            </label>
+          </div>
         </div>
       </div>
 
