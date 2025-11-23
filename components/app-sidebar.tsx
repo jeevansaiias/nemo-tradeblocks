@@ -106,17 +106,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-2"
             >
                 <Link href="/block-stats" className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Image
-                    src="/logo-nemo.png"
-                    alt="NemoBlocks logo"
-                    width={28}
-                    height={28}
-                    className="rounded-md"
-                    priority
-                  />
+                <div className="flex items-center gap-2 px-4 py-2">
+                  <div className="relative h-8 w-8 flex-shrink-0 rounded-md bg-transparent">
+                    <Image
+                      src="/logo-nemo.png"
+                      alt="NemoBlocks logo"
+                      fill
+                      className="object-contain"
+                      priority={true}
+                    />
+                  </div>
                   <div className="flex flex-col leading-tight">
-                    <span className="font-semibold text-sm">NemoBlocks</span>
+                    <span className="text-base font-semibold text-foreground">NemoBlocks</span>
                     <span className="text-xs text-muted-foreground">Analytics Platform</span>
                   </div>
                 </div>
