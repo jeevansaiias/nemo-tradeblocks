@@ -11,7 +11,7 @@ export default function AppleIcon() {
     (
       <div
         style={{
-          background: "#2563eb",
+          background: "transparent",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -20,20 +20,13 @@ export default function AppleIcon() {
           borderRadius: "24px",
         }}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="100"
-          height="100"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="white"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2" />
-          <rect x="14" y="2" width="8" height="8" rx="1" />
-        </svg>
+        <img
+          src={new URL("/logo-nemo.png", "http://localhost:3000").toString()}
+          alt="NemoBlocks"
+          width={144}
+          height={144}
+          style={{ width: "80%", height: "80%", objectFit: "contain", borderRadius: "18px" }}
+        />
       </div>
     ),
     {
