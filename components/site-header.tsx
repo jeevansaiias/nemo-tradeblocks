@@ -2,6 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
+import Image from "next/image";
+import Link from "next/link";
 
 import { ModeToggle } from "@/components/mode-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +63,18 @@ export function SiteHeader() {
     <header className="flex h-(--header-height) shrink-0 items-center border-b bg-background/70 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
       <div className="flex w-full items-center gap-3">
         <SidebarTrigger className="-ml-1" />
+        <Link href="/" className="flex items-center space-x-2">
+          <Image
+            src="/logo-nemo.png"
+            alt="NemoBlocks"
+            width={36}
+            height={36}
+            className="mr-1"
+          />
+          <span className="font-semibold text-xl tracking-wide hidden sm:inline">
+            NemoBlocks
+          </span>
+        </Link>
         <Separator orientation="vertical" className="h-6" />
         <div className="flex flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">
