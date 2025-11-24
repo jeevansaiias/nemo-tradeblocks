@@ -92,9 +92,9 @@ export async function buildPerformanceSnapshot(options: SnapshotOptions): Promis
   const strategies = options.filters?.strategies?.length ? options.filters?.strategies : undefined
   const dateRange = options.filters?.dateRange
 
-  // If the user is filtering by strategy or normalizing, the per-trade `fundsAtClose`
-  // values represent the whole account and would leak performance from excluded data.
-  // In those cases we rebuild equity using cumulative P&L instead of absolute funds.
+  // When filtering by strategy or normalizing, the `fundsAtClose` values from individual trades
+  // represent the entire account balance and include performance from trades outside the current filter.
+  // To avoid this data leakage, we rebuild the equity curve using cumulative P&L calculations instead of the absolute `fundsAtClose` values.
   const useFundsAtClose = !normalizeTo1Lot && !strategies
 
   const sourceTrades = normalizeTo1Lot
