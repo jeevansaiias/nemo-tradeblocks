@@ -73,7 +73,6 @@ describe('trade normalization helpers', () => {
 
     const firstCapital = (trades[0].fundsAtClose - trades[0].pl) / trades[0].numContracts
     expect(normalized[0].fundsAtClose).toBeCloseTo(firstCapital - 200)
-    expect(normalized[0].fundsAtClose).toBeCloseTo(firstCapital - 200)
     expect(normalized[1].fundsAtClose).toBeCloseTo(firstCapital - 200 + 200)
   })
 
