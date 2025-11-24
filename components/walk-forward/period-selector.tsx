@@ -19,6 +19,7 @@ import { WALK_FORWARD_PRESETS, useWalkForwardStore } from "@/lib/stores/walk-for
 
 interface PeriodSelectorProps {
   blockId?: string | null
+  addon?: React.ReactNode
 }
 
 const TARGET_OPTIONS: Array<{ value: WalkForwardOptimizationTarget; label: string }> = [
@@ -74,7 +75,7 @@ const PARAMETER_METADATA: Record<
   },
 }
 
-export function WalkForwardPeriodSelector({ blockId }: PeriodSelectorProps) {
+export function WalkForwardPeriodSelector({ blockId, addon }: PeriodSelectorProps) {
   const config = useWalkForwardStore((state) => state.config)
   const presets = useWalkForwardStore((state) => state.presets)
   const updateConfig = useWalkForwardStore((state) => state.updateConfig)
@@ -147,46 +148,47 @@ export function WalkForwardPeriodSelector({ blockId }: PeriodSelectorProps) {
               <Label className="text-xs">Min</Label>
               <Input
                 type="number"
-                value={minValue}
+                defaultValue={minValue}
                 step={stepValue}
-                onChange={(event) =>
-                  setParameterRange(key, [
-                    Number(event.target.value),
-                    maxValue,
-                    stepValue,
-                  ])
-                }
+                onBlur={(event) => {
+                  const next = Number.parseFloat(event.target.value)
+                  if (Number.isFinite(next)) {
+                    setParameterRange(key, [next, maxValue, stepValue])
+                  } else {
+                    event.target.value = String(minValue)
+                  }
+                }}
               />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Max</Label>
               <Input
                 type="number"
-                value={maxValue}
+                defaultValue={maxValue}
                 step={stepValue}
-                onChange={(event) =>
-                  setParameterRange(key, [
-                    minValue,
-                    Number(event.target.value),
-                    stepValue,
-                  ])
-                }
+                onBlur={(event) => {
+                  const next = Number.parseFloat(event.target.value)
+                  if (Number.isFinite(next)) {
+                    setParameterRange(key, [minValue, next, stepValue])
+                  } else {
+                    event.target.value = String(maxValue)
+                  }
+                }}
               />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Step</Label>
               <Input
                 type="number"
-                value={stepValue}
+                defaultValue={stepValue}
                 step={metadata.step}
                 min={metadata.step}
-                onChange={(event) =>
-                  setParameterRange(key, [
-                    minValue,
-                    maxValue,
-                    Math.max(Number(event.target.value), metadata.step),
-                  ])
-                }
+                onBlur={(event) => {
+                  const parsed = Number.parseFloat(event.target.value)
+                  const next = Number.isFinite(parsed) ? Math.max(parsed, metadata.step) : stepValue
+                  setParameterRange(key, [minValue, maxValue, next])
+                  event.target.value = String(next)
+                }}
               />
             </div>
           </div>
@@ -208,11 +210,16 @@ export function WalkForwardPeriodSelector({ blockId }: PeriodSelectorProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Configuration</CardTitle>
-        <CardDescription>
-          Define in-sample / out-of-sample cadence, optimization target, and risk sweeps. Use
-          presets for quick-start configurations.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Configuration</CardTitle>
+            <CardDescription>
+              Define in-sample / out-of-sample cadence, optimization target, and risk sweeps. Use
+              presets for quick-start configurations.
+            </CardDescription>
+          </div>
+          {addon}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {error && (

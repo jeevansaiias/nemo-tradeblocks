@@ -20,6 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -342,46 +350,6 @@ export default function WalkForwardPage() {
 
   return (
     <div className="space-y-6">
-      {/* How to Use This Page */}
-      <Card className="p-6">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">How to Use This Page</h2>
-          <p className="text-sm text-muted-foreground">
-            Walk-forward analysis validates your strategy&apos;s performance by
-            repeatedly optimizing on historical data (in-sample) and testing on
-            unseen future data (out-of-sample).
-          </p>
-          <ul className="space-y-2 text-sm text-muted-foreground list-disc list-inside">
-            <li>
-              Configure your in-sample and out-of-sample windows to match your
-              trading timeframe and available data.
-            </li>
-            <li>
-              Choose an optimization target (e.g., Sharpe Ratio, Net Profit)
-              that aligns with your risk tolerance and goals.
-            </li>
-            <li>
-              Define parameter ranges for position sizing and risk controls to
-              sweep through different combinations.
-            </li>
-            <li>
-              Run the analysis to see how optimal parameters change across
-              different market regimes and whether performance degrades
-              out-of-sample.
-            </li>
-            <li>
-              Review the efficiency metrics and consistency scores to assess if
-              your strategy is robust or overfit to specific market conditions.
-            </li>
-          </ul>
-          <p className="text-xs text-muted-foreground italic">
-            A robust strategy should maintain reasonable performance (60-80%
-            efficiency) in out-of-sample periods. High degradation suggests
-            overfitting to historical data.
-          </p>
-        </div>
-      </Card>
-
       <RunSwitcher
         history={history}
         currentId={results?.id ?? null}
@@ -389,7 +357,39 @@ export default function WalkForwardPage() {
         onDelete={deleteAnalysis}
       />
 
-      <WalkForwardPeriodSelector blockId={activeBlockId} />
+      <WalkForwardPeriodSelector
+        blockId={activeBlockId}
+        addon={
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">How it works</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>How to Use This Page</DialogTitle>
+                <DialogDescription asChild>
+                  <div className="space-y-3 text-sm text-muted-foreground">
+                    <p>
+                      Walk-forward analysis validates your strategy by repeatedly optimizing on historical data (in-sample)
+                      and testing on unseen future data (out-of-sample).
+                    </p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Pick in-sample / out-of-sample windows that match your timeframe and data depth.</li>
+                      <li>Select an optimization target (Sharpe, Net Profit, etc.) that matches your risk goals.</li>
+                      <li>Set parameter ranges for sizing and risk controls to sweep combinations.</li>
+                      <li>Run to see how optimal parameters shift across regimes and how OOS performance holds up.</li>
+                      <li>Use efficiency and consistency scores to judge robustness vs. overfitting.</li>
+                    </ul>
+                    <p className="text-xs italic text-muted-foreground">
+                      A robust strategy usually retains ~60–80% of in-sample performance out-of-sample; large drop-offs can signal overfitting.
+                    </p>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <RobustnessMetrics
         results={results?.results ?? null}
