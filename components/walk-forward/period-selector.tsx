@@ -148,14 +148,12 @@ export function WalkForwardPeriodSelector({ blockId, addon }: PeriodSelectorProp
               <Label className="text-xs">Min</Label>
               <Input
                 type="number"
-                defaultValue={minValue}
+                value={minValue}
                 step={stepValue}
-                onBlur={(event) => {
+                onChange={(event) => {
                   const next = Number.parseFloat(event.target.value)
                   if (Number.isFinite(next)) {
                     setParameterRange(key, [next, maxValue, stepValue])
-                  } else {
-                    event.target.value = String(minValue)
                   }
                 }}
               />
@@ -164,14 +162,12 @@ export function WalkForwardPeriodSelector({ blockId, addon }: PeriodSelectorProp
               <Label className="text-xs">Max</Label>
               <Input
                 type="number"
-                defaultValue={maxValue}
+                value={maxValue}
                 step={stepValue}
-                onBlur={(event) => {
+                onChange={(event) => {
                   const next = Number.parseFloat(event.target.value)
                   if (Number.isFinite(next)) {
                     setParameterRange(key, [minValue, next, stepValue])
-                  } else {
-                    event.target.value = String(maxValue)
                   }
                 }}
               />
@@ -180,14 +176,15 @@ export function WalkForwardPeriodSelector({ blockId, addon }: PeriodSelectorProp
               <Label className="text-xs">Step</Label>
               <Input
                 type="number"
-                defaultValue={stepValue}
+                value={stepValue}
                 step={metadata.step}
                 min={metadata.step}
-                onBlur={(event) => {
+                onChange={(event) => {
                   const parsed = Number.parseFloat(event.target.value)
-                  const next = Number.isFinite(parsed) ? Math.max(parsed, metadata.step) : stepValue
-                  setParameterRange(key, [minValue, maxValue, next])
-                  event.target.value = String(next)
+                  if (Number.isFinite(parsed) && parsed > 0) {
+                    const next = Math.max(parsed, metadata.step)
+                    setParameterRange(key, [minValue, maxValue, next])
+                  }
                 }}
               />
             </div>

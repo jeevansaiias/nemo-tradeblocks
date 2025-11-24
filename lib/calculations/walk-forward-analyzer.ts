@@ -23,6 +23,10 @@ const YIELD_EVERY = 250
 
 interface AnalyzeOptions {
   trades: Trade[]
+  /**
+   * Daily portfolio logs. Reserved for future use to enable more accurate
+   * equity curve calculations during walk-forward periods. Currently unused.
+   */
   dailyLogs?: DailyLogEntry[]
   config: WalkForwardConfig
   signal?: AbortSignal
@@ -241,7 +245,8 @@ export class WalkForwardAnalyzer {
 
   private filterTrades(trades: Trade[], start: Date, end: Date): Trade[] {
     const startMs = start.getTime()
-    const endMs = end.getTime()
+    // Add full day to end date to include all trades on that day regardless of time
+    const endMs = end.getTime() + DAY_MS - 1
     return trades.filter((trade) => {
       const tradeDate = new Date(trade.dateOpened).getTime()
       return tradeDate >= startMs && tradeDate <= endMs
@@ -404,10 +409,6 @@ export class WalkForwardAnalyzer {
     if (typeof params.fixedContracts === 'number' && params.fixedContracts > 0) {
       const baseContracts = baseline.avgContracts > 0 ? baseline.avgContracts : 1
       multiplier *= params.fixedContracts / baseContracts
-    }
-
-    if (baseline.baseKellyFraction > 0 && multiplier === 1 && typeof params.kellyMultiplier === 'number') {
-      multiplier *= params.kellyMultiplier
     }
 
     return Math.max(multiplier, 0)
