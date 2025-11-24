@@ -1,33 +1,33 @@
 "use client";
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import type { AlignedTradeSet } from "@/lib/stores/comparison-store";
+import { Switch } from "@/components/ui/switch";
 import type { TradePair } from "@/lib/models/strategy-alignment";
 import type { NormalizedTrade } from "@/lib/services/trade-reconciliation";
+import type { AlignedTradeSet } from "@/lib/stores/comparison-store";
 import { cn } from "@/lib/utils";
-import { useEffect, useState, useRef } from "react";
-import { Unlock, Link2, RotateCcw, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Link2, RotateCcw, Unlock } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface MatchReviewDialogProps {
   alignment: AlignedTradeSet | null;
@@ -99,9 +99,11 @@ export function MatchReviewDialog({
   onNormalizeTo1LotChange,
 }: MatchReviewDialogProps) {
   const [confirmedPairs, setConfirmedPairs] = useState<TradePair[]>([]);
+  const [loadedPairs, setLoadedPairs] = useState<TradePair[]>([]); // Track originally loaded pairs
   const [selectedBacktested, setSelectedBacktested] = useState<string | null>(null);
   const [selectedReported, setSelectedReported] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false); // Confirm before going back with unsaved changes
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [sessionFilter, setSessionFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<'all' | 'last7' | 'last30' | 'last90'>('all');
@@ -133,6 +135,7 @@ export function MatchReviewDialog({
       });
 
       setConfirmedPairs(loadedPairs);
+      setLoadedPairs(loadedPairs); // Track what was originally loaded
       setSelectedBacktested(null);
       setSelectedReported(null);
 
@@ -253,6 +256,7 @@ export function MatchReviewDialog({
 
   const handleSave = () => {
     onSave(confirmedPairs);
+    setLoadedPairs(confirmedPairs); // Update loaded pairs after save
   };
 
   const handleClose = (nextOpen: boolean) => {
@@ -578,6 +582,30 @@ export function MatchReviewDialog({
 
   const canCreatePair = selectedBacktested && selectedReported;
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = JSON.stringify(confirmedPairs.sort((a, b) => 
+    `${a.backtestedId}-${a.reportedId}`.localeCompare(`${b.backtestedId}-${b.reportedId}`))
+  ) !== JSON.stringify(loadedPairs.sort((a, b) => 
+    `${a.backtestedId}-${a.reportedId}`.localeCompare(`${b.backtestedId}-${b.reportedId}`))
+  );
+
+  const handleBackToSessions = () => {
+    if (hasUnsavedChanges) {
+      setShowBackConfirm(true);
+    } else {
+      setSelectedSession(null);
+    }
+  };
+
+  const confirmBackToSessions = () => {
+    setShowBackConfirm(false);
+    setSelectedSession(null);
+    // Reset to loaded state
+    setConfirmedPairs(loadedPairs);
+    setSelectedBacktested(null);
+    setSelectedReported(null);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="h-[90vh] w-[calc(100vw-4rem)] !max-w-[calc(100vw-4rem)] flex flex-col">
@@ -587,7 +615,7 @@ export function MatchReviewDialog({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedSession(null)}
+              onClick={handleBackToSessions}
               className="h-8 w-8 p-0"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -816,7 +844,7 @@ export function MatchReviewDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setSelectedSession(null)}
+              onClick={handleBackToSessions}
             >
               Back to Sessions
             </Button>
@@ -844,6 +872,25 @@ export function MatchReviewDialog({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmResetToAuto}>
               Reset to Auto
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showBackConfirm} onOpenChange={setShowBackConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to your trade matches. If you go back now, your changes will be lost.
+              <br /><br />
+              <strong>Do you want to discard your changes?</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBackToSessions} className="bg-destructive hover:bg-destructive/90">
+              Discard Changes
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
