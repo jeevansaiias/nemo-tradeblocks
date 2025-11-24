@@ -256,6 +256,7 @@ export default function PerformanceBlocksPage() {
             onValueChange={setSelectedStrategies}
             placeholder="All strategies"
             maxCount={3}
+            hideSelectAll
             className="w-full"
           />
         </div>

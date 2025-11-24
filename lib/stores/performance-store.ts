@@ -88,6 +88,19 @@ function buildSnapshotFilters(dateRange: DateRange, strategies: string[]): Snaps
   return filters
 }
 
+// Selecting every available strategy should behave the same as selecting none.
+// This prevents "(Select All)" in the UI from acting like a restrictive filter
+// and keeps the output aligned with the default "All Strategies" view.
+function normalizeStrategyFilter(selected: string[], trades?: Trade[]): string[] {
+  if (!trades || selected.length === 0) return selected
+
+  const uniqueStrategies = new Set(trades.map(trade => trade.strategy || 'Unknown'))
+
+  // If the user picked every strategy we know about, drop the filter so the
+  // snapshot uses the full data set (identical to the default state).
+  return selected.length === uniqueStrategies.size ? [] : selected
+}
+
 export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   isLoading: false,
   error: null,
@@ -140,7 +153,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       const dailyLogs = await getDailyLogsByBlock(blockId)
 
       const state = get()
-      const filters = buildSnapshotFilters(state.dateRange, state.selectedStrategies)
+      const normalizedStrategies = normalizeStrategyFilter(state.selectedStrategies, trades)
+      const filters = buildSnapshotFilters(state.dateRange, normalizedStrategies)
       const snapshot = await buildPerformanceSnapshot({
         trades,
         dailyLogs,
@@ -177,7 +191,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     const { data, dateRange, selectedStrategies, normalizeTo1Lot } = get()
     if (!data) return
 
-    const filters = buildSnapshotFilters(dateRange, selectedStrategies)
+    const normalizedStrategies = normalizeStrategyFilter(selectedStrategies, data.allTrades)
+    const filters = buildSnapshotFilters(dateRange, normalizedStrategies)
 
     const snapshot = await buildPerformanceSnapshot({
       trades: data.allTrades,
