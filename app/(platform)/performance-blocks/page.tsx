@@ -24,6 +24,7 @@ import { HoldingDurationChart } from "@/components/performance-charts/holding-du
 import { MarginUtilizationChart } from "@/components/performance-charts/margin-utilization-chart";
 import { MFEMAEScatterChart } from "@/components/performance-charts/mfe-mae-scatter-chart";
 import { MonthlyReturnsChart } from "@/components/performance-charts/monthly-returns-chart";
+import { GroupedLegOutcomesChart } from "@/components/performance-charts/paired-leg-outcomes-chart";
 import { PremiumEfficiencyChart } from "@/components/performance-charts/premium-efficiency-chart";
 import { ReturnDistributionChart } from "@/components/performance-charts/return-distribution-chart";
 import { RiskEvolutionChart } from "@/components/performance-charts/risk-evolution-chart";
@@ -317,6 +318,7 @@ export default function PerformanceBlocksPage() {
         {/* Tab 3: Risk & Margin */}
         <TabsContent value="risk" className="space-y-6">
           <ROMTimelineChart />
+          <GroupedLegOutcomesChart />
           <MarginUtilizationChart />
           <RiskEvolutionChart />
           <HoldingDurationChart />

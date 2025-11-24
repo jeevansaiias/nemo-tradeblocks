@@ -38,6 +38,7 @@ import {
   addReportingTrades,
   addTrades,
   createBlock,
+  getBlock,
   deleteReportingTradesByBlock,
   updateDailyLogsForBlock,
   updateBlock as updateProcessedBlock,
@@ -71,12 +72,12 @@ import {
 } from "@/lib/processing/trade-processor";
 import { useBlockStore } from "@/lib/stores/block-store";
 import { useComparisonStore } from "@/lib/stores/comparison-store";
+import { cn } from "@/lib/utils";
 import {
   findMissingHeaders,
   normalizeHeaders,
   parseCsvLine,
 } from "@/lib/utils/csv-headers";
-import { cn } from "@/lib/utils";
 import {
   Activity,
   AlertCircle,
@@ -177,6 +178,7 @@ export function BlockDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [setAsActive, setSetAsActive] = useState(true);
+  const [combineLegGroups, setCombineLegGroups] = useState(false);
   const [tradeLog, setTradeLog] = useState<FileUploadState>({
     file: null,
     status: "empty",
@@ -200,7 +202,9 @@ export function BlockDialog({
   };
 
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
-  const [processedFileName, setProcessedFileName] = useState<string | null>(null);
+  const [processedFileName, setProcessedFileName] = useState<string | null>(
+    null
+  );
   const [processingErrors, setProcessingErrors] = useState<string[]>([]);
   const [missingStrategyCount, setMissingStrategyCount] = useState(0);
   const [strategyOverride, setStrategyOverride] = useState("");
@@ -227,6 +231,7 @@ export function BlockDialog({
       setName("");
       setDescription("");
       setSetAsActive(true);
+      setCombineLegGroups(false);
       setTradeLog({ file: null, status: "empty" });
       setDailyLog({ file: null, status: "empty" });
       setReportingLog({ file: null, status: "empty" });
@@ -246,6 +251,17 @@ export function BlockDialog({
       setName(block.name);
       setDescription(block.description || "");
       setSetAsActive(block.isActive);
+
+      // Load combineLegGroups setting from ProcessedBlock
+      (async () => {
+        const { getBlock } = await import("@/lib/db");
+        const processedBlock = await getBlock(block.id);
+        if (processedBlock?.analysisConfig) {
+          setCombineLegGroups(
+            processedBlock.analysisConfig.combineLegGroups ?? false
+          );
+        }
+      })();
 
       setTradeLog({
         file: null,
@@ -898,7 +914,8 @@ export function BlockDialog({
       let processedPreview = previewData;
       let missingStrategies = missingStrategyCount;
       // Check if we need to process: either no preview exists OR the file changed
-      const needsProcessing = tradeLog.file &&
+      const needsProcessing =
+        tradeLog.file &&
         (!processedPreview?.trades || processedFileName !== tradeLog.file.name);
 
       if (mode === "new" && tradeLog.file) {
@@ -984,6 +1001,7 @@ export function BlockDialog({
             annualizationFactor: 252,
             confidenceLevel: 0.95,
             drawdownThreshold: 0.05,
+            combineLegGroups,
           },
         };
 
@@ -1184,6 +1202,21 @@ export function BlockDialog({
         const metadataUpdates: Record<string, unknown> = {
           lastModified: new Date(),
         };
+
+        // Get current block to check if combineLegGroups changed
+        const processedBlock = await getBlock(block.id);
+        const currentCombineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+
+        // Update analysisConfig if combineLegGroups changed
+        if (combineLegGroups !== currentCombineLegGroups) {
+          metadataUpdates.analysisConfig = {
+            ...processedBlock?.analysisConfig,
+            combineLegGroups,
+          };
+          // Clear cache since combining affects calculations
+          calculationOrchestrator.clearCache(block.id);
+        }
 
         // Track if we need to clear caches/comparison data
         let filesChanged = false;
@@ -1466,7 +1499,9 @@ export function BlockDialog({
 
         <div
           className={`
-            relative border-2 border-dashed rounded-lg ${mode === "new" ? "p-3 sm:p-4" : "p-4 sm:p-5"} transition-all cursor-pointer
+            relative border-2 border-dashed rounded-lg ${
+              mode === "new" ? "p-3 sm:p-4" : "p-4 sm:p-5"
+            } transition-all cursor-pointer
             ${
               fileState.status === "dragover"
                 ? "border-primary bg-primary/5"
@@ -1649,8 +1684,18 @@ export function BlockDialog({
             </div>
           ) : (
             <div className="text-center">
-              <div className={`${mode === "new" ? "p-2" : "p-3"} bg-muted rounded-full w-fit mx-auto ${mode === "new" ? "mb-2" : "mb-4"}`}>
-                <Icon className={`${mode === "new" ? "w-5 h-5" : "w-6 h-6"} text-muted-foreground`} />
+              <div
+                className={`${
+                  mode === "new" ? "p-2" : "p-3"
+                } bg-muted rounded-full w-fit mx-auto ${
+                  mode === "new" ? "mb-2" : "mb-4"
+                }`}
+              >
+                <Icon
+                  className={`${
+                    mode === "new" ? "w-5 h-5" : "w-6 h-6"
+                  } text-muted-foreground`}
+                />
               </div>
               <p className={`font-medium ${mode === "new" ? "text-sm" : ""}`}>
                 {mode === "edit" && fileState.existingFileName
@@ -1659,7 +1704,11 @@ export function BlockDialog({
                   ? `Add ${label}`
                   : `Upload ${label}`}
               </p>
-              <p className={`text-sm text-muted-foreground ${mode === "new" ? "mt-0.5" : "mt-1"}`}>
+              <p
+                className={`text-sm text-muted-foreground ${
+                  mode === "new" ? "mt-0.5" : "mt-1"
+                }`}
+              >
                 Drag & drop your CSV file here or click to browse
               </p>
             </div>
@@ -1729,13 +1778,21 @@ export function BlockDialog({
           }
         }}
       >
-        <DialogContent className={cn(
-          "max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto",
-          mode === "new" && "p-5 gap-3"
-        )}>
+        <DialogContent
+          className={cn(
+            "max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto",
+            mode === "new" && "p-5 gap-3"
+          )}
+        >
           <DialogHeader className={mode === "new" ? "gap-1.5" : undefined}>
-            <DialogTitle className={mode === "new" ? "text-base" : undefined}>{getDialogTitle()}</DialogTitle>
-            <DialogDescription className={mode === "new" ? "text-xs" : undefined}>{getDialogDescription()}</DialogDescription>
+            <DialogTitle className={mode === "new" ? "text-base" : undefined}>
+              {getDialogTitle()}
+            </DialogTitle>
+            <DialogDescription
+              className={mode === "new" ? "text-xs" : undefined}
+            >
+              {getDialogDescription()}
+            </DialogDescription>
           </DialogHeader>
 
           <div className={mode === "new" ? "space-y-3" : "space-y-6"}>
@@ -1825,20 +1882,45 @@ export function BlockDialog({
             )}
 
             {/* Options */}
-            {mode === "new" && (
-              <div className="flex items-center space-x-2">
+            <div className="space-y-3">
+              {mode === "new" && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="set-active"
+                    checked={setAsActive}
+                    onCheckedChange={(checked) =>
+                      setSetAsActive(checked === true)
+                    }
+                  />
+                  <Label htmlFor="set-active">
+                    Set as active block after creation
+                  </Label>
+                </div>
+              )}
+
+              {/* Combine Leg Groups toggle */}
+              <div className="flex items-start space-x-2">
                 <Checkbox
-                  id="set-active"
-                  checked={setAsActive}
+                  id="combine-leg-groups"
+                  checked={combineLegGroups}
                   onCheckedChange={(checked) =>
-                    setSetAsActive(checked === true)
+                    setCombineLegGroups(checked === true)
                   }
                 />
-                <Label htmlFor="set-active">
-                  Set as active block after creation
-                </Label>
+                <div className="flex flex-col space-y-1">
+                  <Label
+                    htmlFor="combine-leg-groups"
+                    className="cursor-pointer"
+                  >
+                    Combine leg groups
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Merge trades/strategies with the same entry timestamp into
+                    single records.
+                  </p>
+                </div>
               </div>
-            )}
+            </div>
           </div>
 
           {mode === "edit" && <Separator />}
