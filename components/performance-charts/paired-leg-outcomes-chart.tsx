@@ -1,29 +1,30 @@
 "use client"
 
-import { useMemo } from 'react'
+import { usePerformanceStore } from '@/lib/stores/performance-store'
 import { format } from 'date-fns'
 import type { Layout, PlotData } from 'plotly.js'
+import { useMemo } from 'react'
 import { ChartWrapper } from './chart-wrapper'
-import { usePerformanceStore } from '@/lib/stores/performance-store'
 
 interface GroupedLegOutcomesChartProps {
   className?: string
 }
 
-const MAX_POINTS = 40
+// Increased max points since scatter plots can handle more density
+const MAX_POINTS = 200
 
 const OUTCOME_LABELS: Record<string, string> = {
   all_losses: 'All Legs Lost',
   all_wins: 'All Legs Won',
   mixed: 'Mixed Outcome',
-  single_direction: 'Same Direction'
+  neutral: 'Partial / Neutral'
 }
 
 const OUTCOME_COLORS: Record<string, string> = {
   all_losses: '#f87171',
   all_wins: '#4ade80',
   mixed: '#facc15',
-  single_direction: '#93c5fd'
+  neutral: '#93c5fd'
 }
 
 export function GroupedLegOutcomesChart({ className }: GroupedLegOutcomesChartProps) {
@@ -35,64 +36,96 @@ export function GroupedLegOutcomesChart({ className }: GroupedLegOutcomesChartPr
     }
 
     const entries = data.groupedLegOutcomes.entries
-    const recentEntries =
-      entries.length > MAX_POINTS ? entries.slice(-MAX_POINTS) : entries
-
-    const labelFormatter = (iso: string, time?: string) => {
-      const dateLabel = format(new Date(iso), "MMM d")
-      return time ? `${dateLabel} ${time}` : dateLabel
-    }
-
-    const labels = recentEntries.map(entry =>
-      labelFormatter(entry.dateOpened, entry.timeOpened)
+    // Sort chronologically for the scatter plot line (if we wanted lines, but markers are better here)
+    // The store already sorts them, but let's be safe for the axis.
+    const sortedEntries = [...entries].sort((a, b) => 
+      new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
     )
 
-    const combinedValues = recentEntries.map(entry => entry.combinedPl)
-    const colors = recentEntries.map(entry => OUTCOME_COLORS[entry.outcome] ?? '#cbd5f5')
-    const custom = recentEntries.map(entry => [
-      OUTCOME_LABELS[entry.outcome] ?? entry.outcome,
-      entry.legCount,
-      entry.positiveLegs,
-      entry.negativeLegs
-    ])
+    const recentEntries =
+      sortedEntries.length > MAX_POINTS ? sortedEntries.slice(-MAX_POINTS) : sortedEntries
 
-    const combinedTrace: Partial<PlotData> = {
-      x: labels,
-      y: combinedValues,
-      type: 'bar',
+    // X-Axis: Actual Date/Time
+    const xValues = recentEntries.map(entry => {
+        // Combine date and time if available for precise plotting
+        if (entry.timeOpened) {
+            return `${entry.dateOpened.split('T')[0]}T${entry.timeOpened}`
+        }
+        return entry.dateOpened
+    })
+    
+    const yValues = recentEntries.map(entry => entry.combinedPl)
+    const colors = recentEntries.map(entry => OUTCOME_COLORS[entry.outcome] ?? '#cbd5f5')
+    
+    // Prepare detailed custom data for tooltip
+    const custom = recentEntries.map(entry => {
+      const dateLabel = format(new Date(entry.dateOpened), "MMM d, yyyy")
+      const timeLabel = entry.timeOpened ? ` at ${entry.timeOpened}` : ''
+      return [
+        OUTCOME_LABELS[entry.outcome] ?? entry.outcome, // 0: Outcome Label
+        entry.legCount,                                 // 1: Leg Count
+        entry.positiveLegs,                             // 2: Positive Legs
+        entry.negativeLegs,                             // 3: Negative Legs
+        `${dateLabel}${timeLabel}`,                     // 4: Full Date/Time
+        entry.strategy                                  // 5: Strategy
+      ]
+    })
+
+    const scatterTrace: Partial<PlotData> = {
+      x: xValues,
+      y: yValues,
+      type: 'scatter',
+      mode: 'markers',
       name: 'Combined P/L',
-      marker: { color: colors },
+      marker: { 
+        color: colors,
+        size: 10,
+        line: {
+            color: 'white',
+            width: 1
+        },
+        opacity: 0.8
+      },
       customdata: custom,
       hovertemplate:
-        '<b>%{x}</b><br><b>Outcome:</b> %{customdata[0]}<br><b>Combined:</b> $%{y:.2f}<br><b>Legs:</b> %{customdata[1]} (↑%{customdata[2]} / ↓%{customdata[3]})<extra></extra>'
+        '<b>%{customdata[4]}</b><br>' +
+        'Strategy: %{customdata[5]}<br>' +
+        'Outcome: <b>%{customdata[0]}</b><br>' +
+        'Combined P/L: <b>$%{y:.2f}</b><br>' +
+        'Legs: %{customdata[1]} (Win: %{customdata[2]}, Loss: %{customdata[3]})<extra></extra>'
     }
 
     const layout: Partial<Layout> = {
-      barmode: 'relative',
       xaxis: {
-        title: { text: 'Entries (chronological)' },
-        tickangle: -45
+        title: { text: 'Date' },
+        type: 'date',
+        tickformat: '%b %d', // e.g. "Jan 01"
+        gridcolor: '#f1f5f9',
+        zeroline: false
       },
       yaxis: {
         title: { text: 'P/L ($)' },
         zeroline: true,
-        zerolinecolor: '#94a3b8'
+        zerolinecolor: '#94a3b8',
+        gridcolor: '#f1f5f9'
       },
-      legend: { orientation: 'h', y: -0.25 }
+      showlegend: false, // Legend is redundant with color coding and tooltip
+      hovermode: 'closest',
+      margin: { t: 20, r: 20, b: 40, l: 60 }
     }
 
     return {
-      plotData: [combinedTrace],
+      plotData: [scatterTrace],
       layout,
-      hasData: labels.length > 0,
+      hasData: xValues.length > 0,
       summary: data.groupedLegOutcomes.summary
     }
   }, [data])
 
   const tooltip = {
-    flavor: "Outcome map for every grouped entry.",
+    flavor: "Scatter plot of grouped entry outcomes over time.",
     detailed:
-      "Whether you pair calls vs. puts or two overlapping spreads, this shows how each grouped entry resolved—double wins, mixed results, or full wipeouts—so you can spot which sessions snowball."
+      "Each dot represents a grouped entry. The position shows the P/L and the date/time. Colors indicate the outcome type (Win/Loss/Mixed). This view helps identify clusters of activity and performance trends over time."
   }
 
   const summaryFooter = summary ? (
@@ -112,7 +145,7 @@ export function GroupedLegOutcomesChart({ className }: GroupedLegOutcomesChartPr
     return (
       <ChartWrapper
         title="🧲 Grouped Leg Outcomes"
-        description="Outcome-based view for simultaneous entries"
+        description="Timeline of grouped trade performance"
         className={className}
         data={[]}
         layout={{}}
@@ -128,7 +161,7 @@ export function GroupedLegOutcomesChart({ className }: GroupedLegOutcomesChartPr
   return (
     <ChartWrapper
       title="🧲 Grouped Leg Outcomes"
-      description="Outcome-based performance for grouped entries"
+      description="Timeline of grouped trade performance"
       className={className}
       data={hasData ? plotData : []}
       layout={layout}

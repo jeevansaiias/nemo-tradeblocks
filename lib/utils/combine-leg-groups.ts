@@ -82,15 +82,6 @@ export function combineLegGroup(trades: Trade[]): CombinedTrade {
     throw new Error('Cannot combine empty trade group')
   }
 
-  if (trades.length === 1) {
-    // Single trade, just return it as a combined trade
-    return {
-      ...trades[0],
-      originalTradeCount: 1,
-      combinedLegs: [trades[0].legs],
-    }
-  }
-
   // Sort trades by closing time (or use original order if not closed)
   const sortedTrades = [...trades].sort((a, b) => {
     if (!a.dateClosed && !b.dateClosed) return 0
@@ -113,10 +104,19 @@ export function combineLegGroup(trades: Trade[]): CombinedTrade {
   // Aggregate numeric values
   const totalPremium = trades.reduce((sum, t) => sum + t.premium, 0)
   const totalPL = trades.reduce((sum, t) => sum + t.pl, 0)
-  const totalContracts = trades.reduce((sum, t) => sum + t.numContracts, 0)
+  // Use the contract size of the first leg to represent the "Strategy Unit Size"
+  // e.g. A 10-lot Iron Condor has 4 legs of 10 contracts.
+  // We want the combined trade to say "10 contracts" (10 ICs), not 40.
+  const totalContracts = firstTrade.numContracts
   const totalOpeningCommissions = trades.reduce((sum, t) => sum + t.openingCommissionsFees, 0)
   const totalClosingCommissions = trades.reduce((sum, t) => sum + t.closingCommissionsFees, 0)
-  const maxMargin = Math.max(...trades.map(t => t.marginReq))
+  
+  // For margin:
+  // - Debit trades (totalPremium < 0): Sum margin (e.g. Straddle = Call + Put cost)
+  // - Credit trades (totalPremium >= 0): Max margin (e.g. Iron Condor = Max(Call side, Put side))
+  const maxMargin = totalPremium < 0
+    ? trades.reduce((sum, t) => sum + t.marginReq, 0)
+    : Math.max(...trades.map(t => t.marginReq))
 
   // Calculate weighted average closing price
   let weightedClosingPrice: number | undefined
@@ -169,10 +169,13 @@ export function combineLegGroup(trades: Trade[]): CombinedTrade {
 
   // Use margin requirement as ground truth for worst-case loss.
   let maxLoss: number | undefined
-  if (maxMargin && Number.isFinite(maxMargin)) {
+  if (maxMargin && Number.isFinite(maxMargin) && maxMargin > 0) {
     maxLoss = -maxMargin
   } else if (trades.every(t => t.maxLoss !== undefined)) {
     maxLoss = trades.reduce((sum, t) => sum + t.maxLoss!, 0)
+  } else if (totalPremium < 0) {
+    // Fallback: For debit trades, the max loss is at least the premium paid
+    maxLoss = totalPremium
   }
 
   const combined: CombinedTrade = {

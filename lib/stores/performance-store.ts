@@ -1,13 +1,19 @@
-import { create } from 'zustand'
-import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
+import { Trade } from '@/lib/models/trade'
 import {
   buildPerformanceSnapshot,
-  SnapshotFilters,
-  SnapshotChartData
+  SnapshotChartData,
+  SnapshotFilters
 } from '@/lib/services/performance-snapshot'
-import { groupTradesByEntry } from '@/lib/utils/combine-leg-groups'
+import {
+  deriveGroupedLegOutcomes,
+  GroupedLegOutcomes
+} from '@/lib/utils/performance-helpers'
+import { create } from 'zustand'
+
+// Re-export types from helper if needed or redefine locally if they are store specific.
+// The helper exported GroupedLegOutcomes, GroupedOutcome, etc.
 
 export interface DateRange {
   from: Date | undefined
@@ -22,38 +28,8 @@ export interface ChartSettings {
   rollingMetricType: 'win_rate' | 'sharpe' | 'profit_factor'
 }
 
-export type GroupedOutcome =
-  | 'all_losses'
-  | 'all_wins'
-  | 'mixed'
-  | 'single_direction'
-
-export interface GroupedLegEntry {
-  id: string
-  dateOpened: string
-  timeOpened: string
-  strategy: string
-  legCount: number
-  positiveLegs: number
-  negativeLegs: number
-  outcome: GroupedOutcome
-  combinedPl: number
-  legPlValues: number[]
-}
-
-export interface GroupedLegSummary {
-  totalEntries: number
-  allLosses: number
-  allWins: number
-  mixedOutcomes: number
-  singleDirection: number
-  totalAllLossMagnitude: number
-}
-
-export interface GroupedLegOutcomes {
-  entries: GroupedLegEntry[]
-  summary: GroupedLegSummary
-}
+// Re-export types for consumers
+export type { GroupedLegEntry, GroupedLegOutcomes, GroupedLegSummary, GroupedOutcome } from '@/lib/utils/performance-helpers'
 
 export interface PerformanceData extends SnapshotChartData {
   trades: Trade[]
@@ -240,97 +216,6 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
 
 // Re-export for existing unit tests that rely on chart processing helpers
 export { processChartData } from '@/lib/services/performance-snapshot'
-
-function classifyOutcome(positiveLegs: number, negativeLegs: number, legCount: number): GroupedOutcome {
-  if (legCount <= 1) return 'single_direction'
-  if (negativeLegs === legCount) return 'all_losses'
-  if (positiveLegs === legCount) return 'all_wins'
-  if (positiveLegs > 0 && negativeLegs > 0) return 'mixed'
-  return 'single_direction'
-}
-
-function deriveGroupedLegOutcomes(rawTrades: Trade[]): GroupedLegOutcomes | null {
-  if (rawTrades.length === 0) {
-    return null
-  }
-
-  const groups = groupTradesByEntry(rawTrades)
-  const entries: GroupedLegEntry[] = []
-
-  let allLosses = 0
-  let allWins = 0
-  let mixedOutcomes = 0
-  let singleDirection = 0
-  let totalAllLossMagnitude = 0
-
-  for (const [key, group] of groups.entries()) {
-    if (group.length < 2) continue
-
-    const sorted = [...group].sort((a, b) => {
-      const dateCompare = a.dateOpened.getTime() - b.dateOpened.getTime()
-      if (dateCompare !== 0) return dateCompare
-      return a.timeOpened.localeCompare(b.timeOpened)
-    })
-
-    const legPlValues = group.map(trade => trade.pl)
-    const positiveLegs = legPlValues.filter(pl => pl > 0).length
-    const negativeLegs = legPlValues.filter(pl => pl < 0).length
-    const combinedPl = legPlValues.reduce((sum, pl) => sum + pl, 0)
-    const outcome = classifyOutcome(positiveLegs, negativeLegs, group.length)
-
-    const entry: GroupedLegEntry = {
-      id: key,
-      dateOpened: sorted[0].dateOpened.toISOString(),
-      timeOpened: sorted[0].timeOpened,
-      strategy: sorted[0].strategy,
-      legCount: group.length,
-      positiveLegs,
-      negativeLegs,
-      outcome,
-      combinedPl,
-      legPlValues
-    }
-
-    switch (outcome) {
-      case 'all_losses':
-        allLosses += 1
-        totalAllLossMagnitude += Math.abs(combinedPl)
-        break
-      case 'all_wins':
-        allWins += 1
-        break
-      case 'mixed':
-        mixedOutcomes += 1
-        break
-      default:
-        singleDirection += 1
-    }
-
-    entries.push(entry)
-  }
-
-  if (entries.length === 0) {
-    return null
-  }
-
-  entries.sort((a, b) => {
-    const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
-    if (dateCompare !== 0) return dateCompare
-    return a.timeOpened.localeCompare(b.timeOpened)
-  })
-
-  return {
-    entries,
-    summary: {
-      totalEntries: entries.length,
-      allLosses,
-      allWins,
-      mixedOutcomes,
-      singleDirection,
-      totalAllLossMagnitude
-    }
-  }
-}
 
 function filterTradesForSnapshot(trades: Trade[], filters: SnapshotFilters): Trade[] {
   let filtered = [...trades]
