@@ -1,10 +1,12 @@
 "use client";
 
 import type { Data } from "plotly.js";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ChartWrapper } from "@/components/performance-charts/chart-wrapper";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
 import type { WalkForwardPeriodResult } from "@/lib/models/walk-forward";
 
 interface WalkForwardAnalysisChartProps {
@@ -16,22 +18,44 @@ export function WalkForwardAnalysisChart({
   periods,
   targetMetricLabel,
 }: WalkForwardAnalysisChartProps) {
+  const [timelineRange, setTimelineRange] = useState<[number, number]>([
+    1,
+    periods.length || 1,
+  ]);
+  const [paramRange, setParamRange] = useState<[number, number]>([
+    1,
+    periods.length || 1,
+  ]);
+
+  useEffect(() => {
+    const count = periods.length || 1;
+    setTimelineRange([1, count]);
+    setParamRange([1, count]);
+  }, [periods]);
+
+  const slicePeriods = (range: [number, number]) =>
+    periods.slice(
+      Math.max(0, range[0] - 1),
+      Math.min(periods.length, range[1])
+    );
+
+  const timelinePeriods = slicePeriods(timelineRange);
+  const paramPeriods = slicePeriods(paramRange);
+
   const periodSignature = useMemo(() => {
     if (!periods.length) return "empty";
-
     return periods
       .map((period) => {
         const inSampleStart = new Date(period.inSampleStart).toISOString();
         const outOfSampleEnd = new Date(period.outOfSampleEnd).toISOString();
         const oosMetric = period.targetMetricOutOfSample.toFixed(4);
-
         return `${inSampleStart}-${outOfSampleEnd}-${oosMetric}`;
       })
       .join("|");
   }, [periods]);
 
   const timeline = useMemo(() => {
-    if (!periods.length) {
+    if (!timelinePeriods.length) {
       return null;
     }
     const midpoint = (start: Date, end: Date) =>
@@ -43,10 +67,10 @@ export function WalkForwardAnalysisChart({
       type: "scatter",
       mode: "lines+markers",
       name: "In-Sample",
-      x: periods.map((period) =>
+      x: timelinePeriods.map((period) =>
         midpoint(period.inSampleStart, period.inSampleEnd)
       ),
-      y: periods.map((period) =>
+      y: timelinePeriods.map((period) =>
         Number(period.targetMetricInSample.toFixed(3))
       ),
       marker: { color: "#2563eb", size: 8 },
@@ -60,10 +84,10 @@ export function WalkForwardAnalysisChart({
       type: "scatter",
       mode: "lines+markers",
       name: "Out-of-Sample",
-      x: periods.map((period) =>
+      x: timelinePeriods.map((period) =>
         midpoint(period.outOfSampleStart, period.outOfSampleEnd)
       ),
-      y: periods.map((period) =>
+      y: timelinePeriods.map((period) =>
         Number(period.targetMetricOutOfSample.toFixed(3))
       ),
       marker: { color: "#f97316", size: 8 },
@@ -73,7 +97,7 @@ export function WalkForwardAnalysisChart({
         `Window: %{x}<extra></extra>`,
     };
 
-    const shapes = periods.flatMap((period) => [
+    const shapes = timelinePeriods.flatMap((period) => [
       {
         type: "rect" as const,
         xref: "x" as const,
@@ -98,6 +122,18 @@ export function WalkForwardAnalysisChart({
       },
     ]);
 
+    // Reduce tick clutter similar to parameter chart: limit to ~12 ticks
+    const tickStep = Math.max(1, Math.ceil(timelinePeriods.length / 12));
+    const tickVals: string[] = [];
+    const tickText: string[] = [];
+    timelinePeriods.forEach((period, index) => {
+      if (index % tickStep === 0 || index === timelinePeriods.length - 1) {
+        const label = midpoint(period.inSampleStart, period.inSampleEnd);
+        tickVals.push(label);
+        tickText.push(new Date(label).toLocaleDateString());
+      }
+    });
+
     return {
       data: [inSampleTrace, outSampleTrace],
       layout: {
@@ -105,7 +141,12 @@ export function WalkForwardAnalysisChart({
         xaxis: {
           title: { text: "Timeline" },
           type: "date" as const,
-          tickformat: "%b %d",
+          tickmode: "array" as const,
+          tickvals: tickVals,
+          ticktext: tickText,
+          tickangle: -45,
+          automargin: true,
+          tickfont: { size: 10 },
         },
         yaxis: {
           title: { text: targetMetricLabel },
@@ -114,20 +155,20 @@ export function WalkForwardAnalysisChart({
         shapes,
         legend: {
           orientation: "h" as const,
-          y: -0.4,
-          yanchor: "top" as const,
+          y: 1.15,
+          yanchor: "bottom" as const,
           x: 0,
           xanchor: "left" as const,
         },
-        margin: { b: 110 },
+        margin: { t: 60, b: 90, l: 70, r: 20 },
       },
     };
-  }, [periods, targetMetricLabel]);
+  }, [timelinePeriods, targetMetricLabel]);
 
   const parameterEvolution = useMemo(() => {
     const parameterKeys = Array.from(
       new Set(
-        periods.flatMap((period) => Object.keys(period.optimalParameters))
+        paramPeriods.flatMap((period) => Object.keys(period.optimalParameters))
       )
     );
 
@@ -135,38 +176,74 @@ export function WalkForwardAnalysisChart({
       return null;
     }
 
+    const toLabel = (key: string) => {
+      if (key.startsWith("strategy:")) return `Strategy: ${key.replace("strategy:", "")}`;
+      switch (key) {
+        case "kellyMultiplier":
+          return "Kelly Multiplier";
+        case "fixedFractionPct":
+          return "Fixed Fraction %";
+        case "maxDrawdownPct":
+          return "Max Drawdown %";
+        case "maxDailyLossPct":
+          return "Max Daily Loss %";
+        case "consecutiveLossLimit":
+          return "Consecutive Loss Limit";
+        default:
+          return key;
+      }
+    };
+
     const traces: Data[] = parameterKeys.map((key) => {
-      const friendlyName = key.startsWith("strategy:")
-        ? `Strategy: ${key.replace("strategy:", "")}`
-        : key;
+      const friendlyName = toLabel(key);
 
       return {
         type: "scatter",
         mode: "lines+markers",
         name: friendlyName,
-        x: periods.map((_, index) => `Period ${index + 1}`),
-        y: periods.map((period) => period.optimalParameters[key] ?? null),
+        x: paramPeriods.map((_, index) => `Period ${index + 1}`),
+        y: paramPeriods.map((period) => period.optimalParameters[key] ?? null),
         connectgaps: true,
       };
+    });
+
+    // Reduce tick clutter: show at most ~12 ticks across the window
+    const tickStep = Math.max(1, Math.ceil(paramPeriods.length / 12));
+    const tickVals: string[] = [];
+    const tickText: string[] = [];
+    paramPeriods.forEach((_, index) => {
+      if (index % tickStep === 0 || index === paramPeriods.length - 1) {
+        const label = `Period ${index + 1}`;
+        tickVals.push(label);
+        tickText.push(label);
+      }
     });
 
     return {
       data: traces,
       layout: {
         title: undefined,
-        xaxis: { title: { text: "Optimization Window" } },
+        xaxis: {
+          title: { text: "Optimization Window" },
+          tickangle: -45,
+          tickmode: "array" as const,
+          tickvals: tickVals,
+          ticktext: tickText,
+          automargin: true,
+          tickfont: { size: 10 },
+        },
         yaxis: { title: { text: "Parameter Value" } },
         legend: {
           orientation: "h" as const,
-          y: -0.4,
-          yanchor: "top" as const,
+          y: 1.15,
+          yanchor: "bottom" as const,
           x: 0,
           xanchor: "left" as const,
         },
-        margin: { b: 110 },
+        margin: { t: 60, b: 80, l: 70, r: 20 },
       },
     };
-  }, [periods]);
+  }, [paramPeriods]);
 
   if (!timeline) {
     return (
@@ -179,33 +256,77 @@ export function WalkForwardAnalysisChart({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="space-y-4">
       <ChartWrapper
         key={`timeline-${periodSignature}-${targetMetricLabel}`}
         title="Performance Timeline"
         description="Compare in-sample versus out-of-sample performance along the rolling windows."
         headerAddon={
-          <div className="flex gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-blue-500/80" />
-              In-Sample Window
-            </span>
-            <span className="flex items-center gap-1">
+              <span>In-Sample</span>
+            </div>
+            <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-orange-500/80" />
-              Out-of-Sample Window
-            </span>
+              <span>Out-of-Sample</span>
+            </div>
+            {periods.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Range</span>
+                <div className="w-32 sm:w-40">
+                  <Slider
+                    min={1}
+                    max={periods.length}
+                    step={1}
+                    value={[timelineRange[0], timelineRange[1]]}
+                    onValueChange={(v) => {
+                      if (!v || v.length < 2) return;
+                      const [a, b] = v as [number, number];
+                      setTimelineRange([Math.min(a, b), Math.max(a, b)]);
+                    }}
+                  />
+                </div>
+                <Badge variant="secondary" className="text-[11px]">
+                  {timelineRange[0]}–{timelineRange[1]}
+                </Badge>
+              </div>
+            )}
           </div>
         }
         data={timeline.data}
-        layout={timeline.layout}
+        layout={{ ...timeline.layout, height: 380 }}
       />
       {parameterEvolution ? (
         <ChartWrapper
           key={`parameters-${periodSignature}`}
           title="Parameter Evolution"
           description="Track how optimal sizing or risk parameters changed across walk-forward runs."
+          headerAddon={
+            periods.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="text-muted-foreground">Range</span>
+                <div className="w-32 sm:w-40">
+                  <Slider
+                    min={1}
+                    max={periods.length}
+                    step={1}
+                    value={[paramRange[0], paramRange[1]]}
+                    onValueChange={(v) => {
+                      if (!v || v.length < 2) return;
+                      const [a, b] = v as [number, number];
+                      setParamRange([Math.min(a, b), Math.max(a, b)]);
+                    }}
+                  />
+                </div>
+                <Badge variant="secondary" className="text-[11px]">
+                  {paramRange[0]}–{paramRange[1]}
+                </Badge>
+              </div>
+            ) : null
+          }
           data={parameterEvolution.data}
-          layout={parameterEvolution.layout}
+          layout={{ ...parameterEvolution.layout, height: 380 }}
         />
       ) : (
         <Card>
