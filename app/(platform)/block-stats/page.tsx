@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { SizingModeToggle } from "@/components/sizing-mode-toggle";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
 import {
+  getBlock,
   getDailyLogsByBlock,
-  getTradesByBlock,
+  getTradesByBlockWithOptions,
 } from "@/lib/db";
 import {
   calculatePremiumEfficiencyPercent,
@@ -109,9 +110,12 @@ export default function BlockStatsPage() {
       setDataError(null);
 
       try {
-        // Fetch trades and daily logs for the active block
+        const processedBlock = await getBlock(activeBlock.id);
+        const combineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+
         const [blockTrades, blockDailyLogs] = await Promise.all([
-          getTradesByBlock(activeBlock.id),
+          getTradesByBlockWithOptions(activeBlock.id, { combineLegGroups }),
           getDailyLogsByBlock(activeBlock.id),
         ]);
 

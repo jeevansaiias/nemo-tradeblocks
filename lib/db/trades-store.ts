@@ -48,7 +48,9 @@ export async function addTrades(
 /**
  * Get all trades for a block
  */
-export async function getTradesByBlock(blockId: string): Promise<StoredTrade[]> {
+export async function getTradesByBlock(
+  blockId: string
+): Promise<StoredTrade[]> {
   return withReadTransaction(STORES.TRADES, async (transaction) => {
     const store = transaction.objectStore(STORES.TRADES);
     const index = store.index(INDEXES.TRADES_BY_BLOCK);
@@ -249,7 +251,8 @@ export async function getTradeStatistics(blockId: string): Promise<{
   const winningTrades = trades.filter((trade) => trade.pl > 0).length;
   const losingTrades = trades.filter((trade) => trade.pl < 0).length;
   const totalCommissions = trades.reduce(
-    (sum, trade) => sum + trade.openingCommissionsFees + trade.closingCommissionsFees,
+    (sum, trade) =>
+      sum + trade.openingCommissionsFees + trade.closingCommissionsFees,
     0
   );
 
@@ -259,7 +262,9 @@ export async function getTradeStatistics(blockId: string): Promise<{
   const end = new Date(Math.max(...dates.map((d) => d.getTime())));
 
   // Get unique strategies
-  const strategies = Array.from(new Set(trades.map((trade) => trade.strategy))).sort();
+  const strategies = Array.from(
+    new Set(trades.map((trade) => trade.strategy))
+  ).sort();
 
   return {
     totalTrades,
@@ -275,7 +280,10 @@ export async function getTradeStatistics(blockId: string): Promise<{
 /**
  * Search trades by text (strategy, legs, reason for close)
  */
-export async function searchTrades(blockId: string, query: string): Promise<StoredTrade[]> {
+export async function searchTrades(
+  blockId: string,
+  query: string
+): Promise<StoredTrade[]> {
   const trades = await getTradesByBlock(blockId);
   const lowerQuery = query.toLowerCase();
 
@@ -283,7 +291,8 @@ export async function searchTrades(blockId: string, query: string): Promise<Stor
     (trade) =>
       trade.strategy.toLowerCase().includes(lowerQuery) ||
       trade.legs.toLowerCase().includes(lowerQuery) ||
-      (trade.reasonForClose && trade.reasonForClose.toLowerCase().includes(lowerQuery))
+      (trade.reasonForClose &&
+        trade.reasonForClose.toLowerCase().includes(lowerQuery))
   );
 }
 
@@ -344,11 +353,12 @@ export async function exportTradesToCSV(blockId: string): Promise<string> {
   // Convert trades to CSV rows
   const rows = trades.map((trade) => {
     // Format dateOpened - handle both Date objects and strings
-    const dateOpened = trade.dateOpened instanceof Date
-      ? trade.dateOpened.toISOString().split("T")[0]
-      : typeof trade.dateOpened === "string"
-      ? new Date(trade.dateOpened).toISOString().split("T")[0]
-      : trade.dateOpened;
+    const dateOpened =
+      trade.dateOpened instanceof Date
+        ? trade.dateOpened.toISOString().split("T")[0]
+        : typeof trade.dateOpened === "string"
+        ? new Date(trade.dateOpened).toISOString().split("T")[0]
+        : trade.dateOpened;
 
     return [
       dateOpened,

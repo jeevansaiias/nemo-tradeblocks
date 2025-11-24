@@ -1,12 +1,19 @@
-import { create } from 'zustand'
-import { Trade } from '@/lib/models/trade'
 import { DailyLogEntry } from '@/lib/models/daily-log'
 import { PortfolioStats } from '@/lib/models/portfolio-stats'
+import { Trade } from '@/lib/models/trade'
 import {
   buildPerformanceSnapshot,
-  SnapshotFilters,
-  SnapshotChartData
+  SnapshotChartData,
+  SnapshotFilters
 } from '@/lib/services/performance-snapshot'
+import {
+  deriveGroupedLegOutcomes,
+  GroupedLegOutcomes
+} from '@/lib/utils/performance-helpers'
+import { create } from 'zustand'
+
+// Re-export types from helper if needed or redefine locally if they are store specific.
+// The helper exported GroupedLegOutcomes, GroupedOutcome, etc.
 
 export interface DateRange {
   from: Date | undefined
@@ -21,12 +28,17 @@ export interface ChartSettings {
   rollingMetricType: 'win_rate' | 'sharpe' | 'profit_factor'
 }
 
+// Re-export types for consumers
+export type { GroupedLegEntry, GroupedLegOutcomes, GroupedLegSummary, GroupedOutcome } from '@/lib/utils/performance-helpers'
+
 export interface PerformanceData extends SnapshotChartData {
   trades: Trade[]
   allTrades: Trade[]
+  allRawTrades: Trade[]
   dailyLogs: DailyLogEntry[]
   allDailyLogs: DailyLogEntry[]
   portfolioStats: PortfolioStats | null
+  groupedLegOutcomes: GroupedLegOutcomes | null
 }
 
 interface PerformanceStore {
@@ -76,6 +88,19 @@ function buildSnapshotFilters(dateRange: DateRange, strategies: string[]): Snaps
   return filters
 }
 
+// Selecting every available strategy should behave the same as selecting none.
+// This prevents "(Select All)" in the UI from acting like a restrictive filter
+// and keeps the output aligned with the default "All Strategies" view.
+function normalizeStrategyFilter(selected: string[], trades?: Trade[]): string[] {
+  if (!trades || selected.length === 0) return selected
+
+  const uniqueStrategies = new Set(trades.map(trade => trade.strategy || 'Unknown'))
+
+  // If the user picked every strategy we know about, drop the filter so the
+  // snapshot uses the full data set (identical to the default state).
+  return selected.length === uniqueStrategies.size ? [] : selected
+}
+
 export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   isLoading: false,
   error: null,
@@ -110,14 +135,26 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const { getTradesByBlock, getDailyLogsByBlock } = await import('@/lib/db')
-      const [trades, dailyLogs] = await Promise.all([
-        getTradesByBlock(blockId),
-        getDailyLogsByBlock(blockId)
-      ])
+      const {
+        getTradesByBlockWithOptions,
+        getTradesByBlock,
+        getDailyLogsByBlock,
+        getBlock
+      } = await import('@/lib/db')
+
+      // Fetch block to get analysis config
+      const block = await getBlock(blockId)
+      const combineLegGroups = block?.analysisConfig?.combineLegGroups ?? false
+
+      const rawTrades = await getTradesByBlock(blockId)
+      const trades = combineLegGroups
+        ? await getTradesByBlockWithOptions(blockId, { combineLegGroups })
+        : rawTrades
+      const dailyLogs = await getDailyLogsByBlock(blockId)
 
       const state = get()
-      const filters = buildSnapshotFilters(state.dateRange, state.selectedStrategies)
+      const normalizedStrategies = normalizeStrategyFilter(state.selectedStrategies, trades)
+      const filters = buildSnapshotFilters(state.dateRange, normalizedStrategies)
       const snapshot = await buildPerformanceSnapshot({
         trades,
         dailyLogs,
@@ -126,13 +163,18 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         normalizeTo1Lot: state.normalizeTo1Lot
       })
 
+      const filteredRawTrades = filterTradesForSnapshot(rawTrades, filters)
+      const groupedLegOutcomes = deriveGroupedLegOutcomes(filteredRawTrades)
+
       set({
         data: {
           trades: snapshot.filteredTrades,
           allTrades: trades,
+          allRawTrades: rawTrades,
           dailyLogs: snapshot.filteredDailyLogs,
           allDailyLogs: dailyLogs,
           portfolioStats: snapshot.portfolioStats,
+          groupedLegOutcomes,
           ...snapshot.chartData
         },
         isLoading: false
@@ -149,7 +191,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     const { data, dateRange, selectedStrategies, normalizeTo1Lot } = get()
     if (!data) return
 
-    const filters = buildSnapshotFilters(dateRange, selectedStrategies)
+    const normalizedStrategies = normalizeStrategyFilter(selectedStrategies, data.allTrades)
+    const filters = buildSnapshotFilters(dateRange, normalizedStrategies)
 
     const snapshot = await buildPerformanceSnapshot({
       trades: data.allTrades,
@@ -159,12 +202,15 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       normalizeTo1Lot
     })
 
+    const filteredRawTrades = filterTradesForSnapshot(data.allRawTrades, filters)
+
     set(state => ({
       data: state.data ? {
         ...state.data,
         trades: snapshot.filteredTrades,
         dailyLogs: snapshot.filteredDailyLogs,
         portfolioStats: snapshot.portfolioStats,
+        groupedLegOutcomes: deriveGroupedLegOutcomes(filteredRawTrades),
         ...snapshot.chartData
       } : null
     }))
@@ -185,3 +231,23 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
 
 // Re-export for existing unit tests that rely on chart processing helpers
 export { processChartData } from '@/lib/services/performance-snapshot'
+
+function filterTradesForSnapshot(trades: Trade[], filters: SnapshotFilters): Trade[] {
+  let filtered = [...trades]
+
+  if (filters.dateRange?.from || filters.dateRange?.to) {
+    filtered = filtered.filter(trade => {
+      const tradeDate = new Date(trade.dateOpened)
+      if (filters.dateRange?.from && tradeDate < filters.dateRange.from) return false
+      if (filters.dateRange?.to && tradeDate > filters.dateRange.to) return false
+      return true
+    })
+  }
+
+  if (filters.strategies && filters.strategies.length > 0) {
+    const allowed = new Set(filters.strategies)
+    filtered = filtered.filter(trade => allowed.has(trade.strategy || 'Unknown'))
+  }
+
+  return filtered
+}

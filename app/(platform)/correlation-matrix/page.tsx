@@ -26,7 +26,7 @@ import {
   CorrelationMatrix,
   CorrelationNormalization,
 } from "@/lib/calculations/correlation";
-import { getTradesByBlock } from "@/lib/db/trades-store";
+import { getBlock, getTradesByBlockWithOptions } from "@/lib/db";
 import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
 import { truncateStrategyName } from "@/lib/utils";
@@ -68,7 +68,12 @@ export default function CorrelationMatrixPage() {
 
       setLoading(true);
       try {
-        const loadedTrades = await getTradesByBlock(activeBlockId);
+        const processedBlock = await getBlock(activeBlockId);
+        const combineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+        const loadedTrades = await getTradesByBlockWithOptions(activeBlockId, {
+          combineLegGroups,
+        });
         setTrades(loadedTrades);
       } catch (error) {
         console.error("Failed to load trades:", error);
