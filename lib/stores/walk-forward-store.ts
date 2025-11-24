@@ -35,6 +35,7 @@ interface WalkForwardStore {
   exportResultsAsJson: () => string | null
   exportResultsAsCsv: () => string | null
   selectAnalysis: (analysisId: string) => void
+  deleteAnalysis: (analysisId: string) => Promise<void>
 }
 
 const analyzer = new WalkForwardAnalyzer()
@@ -332,6 +333,27 @@ export const useWalkForwardStore = create<WalkForwardStore>((set, get) => ({
     set((state) => ({
       results: state.history.find((analysis) => analysis.id === analysisId) ?? state.results,
     }))
+  },
+
+  deleteAnalysis: async (analysisId: string) => {
+    if (!analysisId) return
+    try {
+      const db = await import('@/lib/db')
+      await db.deleteWalkForwardAnalysis(analysisId)
+
+      set((state) => {
+        const filtered = state.history.filter((item) => item.id !== analysisId)
+        const nextCurrent = state.results?.id === analysisId ? filtered[0] ?? null : state.results
+        return {
+          history: filtered,
+          results: nextCurrent,
+          error: null,
+        }
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete analysis'
+      set({ error: message })
+    }
   },
 
   exportResultsAsJson: () => {

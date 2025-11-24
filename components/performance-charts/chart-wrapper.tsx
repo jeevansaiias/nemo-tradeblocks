@@ -86,9 +86,24 @@ export function ChartWrapper({
     .replace(/\s+/g, "-")}-${Math.random().toString(36).substring(2, 11)}`;
 
   const triggerResize = useCallback(() => {
+    const div = graphDivRef.current;
+    if (
+      typeof window === "undefined" ||
+      !window.Plotly ||
+      !div ||
+      !div.isConnected ||
+      // offsetParent will be null when hidden (e.g., inactive tab or collapsed)
+      div.offsetParent === null
+    ) {
+      return;
+    }
+
     try {
-      if (typeof window !== "undefined" && window.Plotly && graphDivRef.current) {
-        window.Plotly.Plots.resize(graphDivRef.current);
+      const maybePromise = window.Plotly.Plots.resize(div);
+      if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === "function") {
+        (maybePromise as Promise<unknown>).catch((error) => {
+          console.warn("Failed to resize chart (async):", error);
+        });
       }
     } catch (error) {
       console.warn("Failed to resize chart:", error);

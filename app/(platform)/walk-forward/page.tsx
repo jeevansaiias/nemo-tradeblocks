@@ -1,16 +1,29 @@
 "use client"
 
 import { useEffect, useMemo } from "react"
-import { Download, History, Loader2, TrendingUp, AlertTriangle, Activity } from "lucide-react"
+import { Download, Loader2, TrendingUp, AlertTriangle, Activity } from "lucide-react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { ChartWrapper } from "@/components/performance-charts/chart-wrapper"
 import { WalkForwardPeriodSelector } from "@/components/walk-forward/period-selector"
 import { WalkForwardAnalysisChart } from "@/components/walk-forward/analysis-chart"
 import { RobustnessMetrics } from "@/components/walk-forward/robustness-metrics"
+import { RunSwitcher } from "@/components/walk-forward/run-switcher"
 import { useBlockStore } from "@/lib/stores/block-store"
 import { useWalkForwardStore } from "@/lib/stores/walk-forward-store"
 import { WalkForwardOptimizationTarget } from "@/lib/models/walk-forward"
@@ -50,8 +63,14 @@ export default function WalkForwardPage() {
   const config = useWalkForwardStore((state) => state.config)
   const loadHistory = useWalkForwardStore((state) => state.loadHistory)
   const selectAnalysis = useWalkForwardStore((state) => state.selectAnalysis)
+  const deleteAnalysis = useWalkForwardStore((state) => state.deleteAnalysis)
   const exportResultsAsCsv = useWalkForwardStore((state) => state.exportResultsAsCsv)
   const exportResultsAsJson = useWalkForwardStore((state) => state.exportResultsAsJson)
+
+  const [showFailingOnly, setShowFailingOnly] = useState(false)
+  const [minOosTrades, setMinOosTrades] = useState(0)
+  const [periodRange, setPeriodRange] = useState<[number, number]>([1, 1])
+  const [showCards, setShowCards] = useState(true)
 
   const activeBlockId = activeBlock?.id ?? null
 
@@ -66,6 +85,12 @@ export default function WalkForwardPage() {
       loadHistory(activeBlockId).catch(console.error)
     }
   }, [activeBlockId, loadHistory])
+
+  useEffect(() => {
+    if (results?.results.periods?.length) {
+      setPeriodRange([1, results.results.periods.length])
+    }
+  }, [results?.results.periods?.length])
 
   const targetMetricLabel =
     TARGET_LABELS[
@@ -177,10 +202,44 @@ export default function WalkForwardPage() {
     })
   }, [results])
 
-  const slopegraph = useMemo(() => {
-    if (!periodSummaries.length) return null
+  const rangeFilteredSummaries = useMemo(() => {
+    const [start, end] = periodRange
+    return periodSummaries.filter((_, idx) => {
+      const n = idx + 1
+      return n >= start && n <= end
+    })
+  }, [periodSummaries, periodRange])
 
-    const traces: Data[] = periodSummaries.map((period) => ({
+  const filteredPeriodSummaries = useMemo(() => {
+    return rangeFilteredSummaries.filter((period) => {
+      if (showFailingOnly && period.efficiencyPct >= 60) return false
+      if (minOosTrades > 0 && (period.oosTrades ?? 0) < minOosTrades) return false
+      return true
+    })
+  }, [rangeFilteredSummaries, showFailingOnly, minOosTrades])
+
+  const miniBars = useMemo(() => {
+    return filteredPeriodSummaries.map((period) => {
+      const isVal = period.inSampleMetric
+      const oosVal = period.outSampleMetric
+      const maxVal = Math.max(Math.abs(isVal), Math.abs(oosVal), 1)
+      const isWidth = Math.min(100, (Math.abs(isVal) / maxVal) * 100)
+      const oosWidth = Math.min(100, (Math.abs(oosVal) / maxVal) * 100)
+      return {
+        label: period.label,
+        isVal,
+        oosVal,
+        isWidth,
+        oosWidth,
+        status: period.status,
+      }
+    })
+  }, [filteredPeriodSummaries])
+
+  const slopegraph = useMemo(() => {
+    if (!filteredPeriodSummaries.length) return null
+
+    const traces: Data[] = filteredPeriodSummaries.map((period) => ({
       type: "scatter",
       mode: "lines+markers",
       name: period.label,
@@ -197,7 +256,7 @@ export default function WalkForwardPage() {
       showlegend: false,
     }))
 
-    const height = Math.max(220, periodSummaries.length * 60)
+    const height = Math.max(220, filteredPeriodSummaries.length * 50)
 
     return {
       data: traces,
@@ -220,7 +279,14 @@ export default function WalkForwardPage() {
         showlegend: false,
       },
     }
-  }, [periodSummaries, targetMetricLabel])
+  }, [filteredPeriodSummaries, targetMetricLabel])
+
+  const periodCount = results?.results.periods.length ?? 0
+  const visiblePeriods =
+    results?.results.periods?.slice(
+      Math.max(0, periodRange[0] - 1),
+      Math.min(results.results.periods.length, periodRange[1])
+    ) ?? []
 
   const handleExport = (format: "csv" | "json") => {
     const payload = format === "csv" ? exportResultsAsCsv() : exportResultsAsJson()
@@ -267,6 +333,13 @@ export default function WalkForwardPage() {
 
   return (
     <div className="space-y-6">
+      <RunSwitcher
+        history={history}
+        currentId={results?.id ?? null}
+        onSelect={selectAnalysis}
+        onDelete={deleteAnalysis}
+      />
+
       {/* How to Use This Page */}
       <Card className="p-6">
         <div className="space-y-4">
@@ -309,236 +382,224 @@ export default function WalkForwardPage() {
       <RobustnessMetrics results={results?.results ?? null} targetMetricLabel={targetMetricLabel} />
 
       <WalkForwardAnalysisChart
-        periods={results?.results.periods ?? []}
+        periods={visiblePeriods}
         targetMetricLabel={targetMetricLabel}
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Window Comparison</CardTitle>
-                <CardDescription>Evaluate each walk-forward step at a glance.</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={!results}
-                  onClick={() => handleExport("csv")}
-                  size="sm"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  CSV
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={!results}
-                  onClick={() => handleExport("json")}
-                  size="sm"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  JSON
-                </Button>
-              </div>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Window Table</CardTitle>
+              <CardDescription>
+                Scan retention, drawdowns, and samples quickly. Use filters to surface weak slices.
+              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {periodSummaries.length > 0 ? (
-              <>
-                <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 p-4 text-sm text-muted-foreground">
-                  <p className="text-foreground text-sm font-medium">How to read these windows</p>
-                  <ul className="mt-3 space-y-2 text-xs">
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-blue-500" />
-                      In-sample ranges (blue) show what the optimizer saw. Orange ranges show how that setup behaved on unseen data.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-orange-500" />
-                      OOS retention ≥ 80% generally signals a robust hand-off. Anything below ~60% deserves a parameter tweak.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
-                      Action chips highlight what to do next (scale up, monitor, or re-optimize).
-                    </li>
-                  </ul>
-                </div>
-
-                {slopegraph && (
-                  <ChartWrapper
-                    title="IS vs OOS retention"
-                    description={`Each slope shows how ${targetMetricLabel} travelled from the training window to the test window.`}
-                    data={slopegraph.data}
-                    layout={slopegraph.layout}
-                    style={{ height: (slopegraph.layout.height as number | undefined) ?? 280 }}
+            <div className="flex gap-2">
+              <Button variant="outline" disabled={!results} onClick={() => handleExport("csv")} size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                CSV
+              </Button>
+              <Button variant="outline" disabled={!results} onClick={() => handleExport("json")} size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                JSON
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={showFailingOnly}
+                onCheckedChange={(v) => setShowFailingOnly(Boolean(v))}
+              />
+              <span className="text-muted-foreground">Only failing windows (&lt;60% retention)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-xs">Min OOS trades</span>
+              <div className="w-32">
+                <Slider
+                  min={0}
+                  max={Math.max(...periodSummaries.map((p) => p.oosTrades ?? 0), 20)}
+                  step={1}
+                  value={[minOosTrades]}
+                  onValueChange={(v) => setMinOosTrades(v[0] ?? 0)}
+                />
+              </div>
+              <Badge variant="secondary" className="text-xs">{minOosTrades}</Badge>
+            </div>
+            {periodCount > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs">Window range</span>
+                <div className="w-44">
+                  <Slider
+                    min={1}
+                    max={periodCount}
+                    step={1}
+                    value={[periodRange[0], periodRange[1]]}
+                    onValueChange={(v) => {
+                      if (!v || v.length < 2) return
+                      const [a, b] = v as [number, number]
+                      setPeriodRange([Math.min(a, b), Math.max(a, b)])
+                    }}
                   />
-                )}
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {periodSummaries.map((period) => {
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {periodRange[0]}–{periodRange[1]} / {periodCount}
+                </Badge>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filteredPeriodSummaries.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              {periodSummaries.length === 0 ? "Run the analysis to populate this table." : "No windows match the current filters."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Window</TableHead>
+                    <TableHead>IS Range</TableHead>
+                    <TableHead>OOS Range</TableHead>
+                    <TableHead className="text-right">OOS Retention</TableHead>
+                    <TableHead className="text-right">Delta</TableHead>
+                    <TableHead className="text-right">OOS Trades</TableHead>
+                    <TableHead className="text-right">Max DD</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPeriodSummaries.map((period) => {
                     const delta = period.outSampleMetric - period.inSampleMetric
                     const deltaClass = delta >= 0 ? "text-emerald-600" : "text-rose-600"
                     const StatusIcon = period.status.icon
-                    const progressValue = Math.max(0, Math.min(100, period.efficiencyPct))
 
                     return (
-                      <div
-                        key={period.label}
-                        className="rounded-2xl border bg-card/40 p-4 shadow-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              Window
-                            </p>
-                            <p className="text-lg font-semibold">{period.label}</p>
-                          </div>
-                          <span className={cn("rounded-full px-3 py-1 text-xs font-medium", period.status.chipClass)}>
+                      <TableRow key={period.label}>
+                        <TableCell className="font-medium">{period.label}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{period.inSampleRange}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{period.outSampleRange}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {period.efficiencyPct.toFixed(1)}%
+                        </TableCell>
+                        <TableCell className={cn("text-right", deltaClass)}>
+                          {delta >= 0 ? "+" : ""}
+                          {formatMetricValue(delta)}
+                        </TableCell>
+                        <TableCell className="text-right">{period.oosTrades ?? "—"}</TableCell>
+                        <TableCell className="text-right">
+                          {period.oosDrawdown != null ? `${Math.abs(period.oosDrawdown).toFixed(2)}%` : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs", period.status.chipClass)}>
+                            <StatusIcon className="h-3 w-3" />
                             {period.status.label}
                           </span>
-                        </div>
-
-                        <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-blue-500" />
-                            <span>{period.inSampleRange}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-orange-500" />
-                            <span>{period.outSampleRange}</span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 space-y-2">
-                          <div className="flex items-center justify-between text-sm font-medium">
-                            <span>{`IS ${targetMetricLabel}`}</span>
-                            <span>{formatMetricValue(period.inSampleMetric)}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm font-medium">
-                            <span>{`OOS ${targetMetricLabel}`}</span>
-                            <span>{formatMetricValue(period.outSampleMetric)}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Delta</span>
-                            <span className={deltaClass}>
-                              {delta >= 0 ? "+" : ""}
-                              {formatMetricValue(delta)} {targetMetricLabel}
-                            </span>
-                          </div>
-                          <Progress value={progressValue} />
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>OOS retained</span>
-                            <span className="font-semibold text-foreground">
-                              {period.efficiencyPct.toFixed(1)}%
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                          <div>
-                            <p className="text-base font-semibold text-foreground">
-                              {period.oosTrades ?? "—"}
-                            </p>
-                            <p className="text-[11px] uppercase tracking-wide">OOS trades</p>
-                          </div>
-                          <div>
-                            <p className="text-base font-semibold text-foreground">
-                              {period.oosDrawdown != null
-                                ? `${Math.abs(period.oosDrawdown).toFixed(2)}%`
-                                : "—"}
-                            </p>
-                            <p className="text-[11px] uppercase tracking-wide">Max drawdown</p>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 space-y-2">
-                          <p className="text-xs font-semibold text-muted-foreground">
-                            Parameters that won this window
-                          </p>
-                          {period.parameterItems.length ? (
-                            <div className="flex flex-wrap gap-2">
-                              {period.parameterItems.map((item) => (
-                                <span
-                                  key={`${period.label}-${item}`}
-                                  className="rounded-full bg-muted px-2 py-1 text-xs"
-                                >
-                                  {item}
-                                </span>
-                              ))}
-                              {period.parameterOverflow > 0 && (
-                                <span className="rounded-full border px-2 py-1 text-xs text-muted-foreground">
-                                  +{period.parameterOverflow} more
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">
-                              No parameter adjustments captured for this slice.
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="mt-4 flex items-start gap-2 rounded-lg bg-muted/40 p-3 text-sm">
-                          <StatusIcon className={cn("h-4 w-4 flex-shrink-0", period.status.iconClass)} />
-                          <p className="text-muted-foreground">{period.status.action}</p>
-                        </div>
-                      </div>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </div>
-              </>
-            ) : (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                Run the analysis to populate this comparison.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-primary" />
-              <CardTitle>Run History</CardTitle>
+                </TableBody>
+              </Table>
             </div>
-            <CardDescription>Switch between prior walk-forward snapshots.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {history.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No saved runs yet.</p>
-            ) : (
-              history.map((analysis) => {
-                const isActive = analysis.id === results?.id
-                return (
-                  <button
-                    key={analysis.id}
-                    onClick={() => selectAnalysis(analysis.id)}
-                    className={cn(
-                      "w-full rounded-md border px-3 py-2 text-left text-sm transition hover:border-primary",
-                      isActive
-                        ? "border-primary bg-primary/5 text-primary"
-                        : "border-border/60 text-foreground"
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {formatDate(new Date(analysis.createdAt))}
-                      </span>
-                      <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                        {TARGET_LABELS[analysis.config.optimizationTarget]}
-                      </Badge>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Retention Visuals</CardTitle>
+              <CardDescription>See how each window hands off from IS to OOS.</CardDescription>
+            </div>
+            <Collapsible>
+              <CollapsibleTrigger className="text-xs text-primary hover:underline">How to read</CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                <ul className="space-y-1">
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-blue-500" />
+                    Blue spans show the in-sample window; orange spans show out-of-sample.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-orange-500" />
+                    OOS retention ≥ 80% is robust; 60–80% monitor; &lt;60% needs a re-run or sizing tweak.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                    Status chips suggest next action per window.
+                  </li>
+                </ul>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {slopegraph ? (
+            <ChartWrapper
+              title="IS vs OOS retention"
+              description={`Each slope shows how ${targetMetricLabel} travelled from the training window to the test window.`}
+              data={slopegraph.data}
+              layout={slopegraph.layout}
+              style={{ height: (slopegraph.layout.height as number | undefined) ?? 280 }}
+            />
+          ) : (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Run the analysis to populate these visuals.
+            </div>
+          )}
+
+          {miniBars.length > 0 && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch
+                  id="show-cards"
+                  checked={showCards}
+                  onCheckedChange={(v) => setShowCards(Boolean(v))}
+                />
+                <label htmlFor="show-cards" className="cursor-pointer">
+                  Show mini-cards
+                </label>
+              </div>
+            </div>
+          )}
+
+          {miniBars.length > 0 && showCards && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {miniBars.map((bar) => (
+                <div key={bar.label} className="rounded-lg border bg-card/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{bar.label}</span>
+                    <span className={cn("rounded-full px-2 py-0.5 text-[11px]", bar.status.chipClass)}>
+                      {bar.status.label}
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
+                      <span>IS {formatMetricValue(bar.isVal)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {analysis.results.periods.length} windows ·{" "}
-                      {(analysis.results.summary.degradationFactor * 100).toFixed(1)}% efficiency
-                    </p>
-                  </button>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-orange-500" />
+                      <span>OOS {formatMetricValue(bar.oosVal)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-2 rounded-full bg-blue-500/15">
+                      <div className="h-2 rounded-full bg-blue-500" style={{ width: `${bar.isWidth}%` }} />
+                    </div>
+                    <div className="h-2 rounded-full bg-orange-500/15">
+                      <div className="h-2 rounded-full bg-orange-500" style={{ width: `${bar.oosWidth}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
