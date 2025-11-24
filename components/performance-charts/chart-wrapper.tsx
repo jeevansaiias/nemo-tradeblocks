@@ -99,12 +99,8 @@ export function ChartWrapper({
     }
 
     try {
-      const maybePromise = window.Plotly.Plots.resize(div);
-      if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === "function") {
-        (maybePromise as Promise<unknown>).catch((error) => {
-          console.warn("Failed to resize chart (async):", error);
-        });
-      }
+      // Plotly.resize may return void or a promise depending on version; we safely ignore the return.
+      void window.Plotly.Plots.resize(div);
     } catch (error) {
       console.warn("Failed to resize chart:", error);
     }
@@ -167,8 +163,8 @@ export function ChartWrapper({
   }, [data, layout, triggerResize]);
 
   const handleInitialized = useCallback(
-    (figure: unknown, graphDiv: PlotlyHTMLElement) => {
-      graphDivRef.current = graphDiv ?? null;
+    (figure: Readonly<unknown>, graphDiv: Readonly<HTMLElement>) => {
+      graphDivRef.current = graphDiv as PlotlyHTMLElement | null;
       triggerResize();
       onInitialized?.(figure);
     },
@@ -176,8 +172,8 @@ export function ChartWrapper({
   );
 
   const handleUpdate = useCallback(
-    (figure: unknown, graphDiv: PlotlyHTMLElement) => {
-      graphDivRef.current = graphDiv ?? null;
+    (figure: Readonly<unknown>, graphDiv: Readonly<HTMLElement>) => {
+      graphDivRef.current = graphDiv as PlotlyHTMLElement | null;
       triggerResize();
       onUpdate?.(figure);
     },
