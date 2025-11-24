@@ -18,6 +18,7 @@ import {
 } from "@/lib/calculations/mfe-mae"
 import type { EfficiencyBasis } from "@/lib/metrics/trade-efficiency"
 import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 type AxisValueFormat =
   | { type: "currency"; maximumFractionDigits?: number }
@@ -106,6 +107,33 @@ interface PresetConfig {
   // Special trace handling (e.g., reference lines, zones)
   addSpecialTraces?: (points: { point: MFEMAEDataPoint; xValue: number; yValue: number }[], xMetric: string, yMetric: string) => Partial<PlotData>[]
 }
+
+interface DriftBucketConfig {
+  label: string
+  min: number
+  max: number
+}
+
+const SLR_RATIO_BUCKETS: DriftBucketConfig[] = [
+  { label: "< 0.50×", min: 0, max: 0.5 },
+  { label: "0.50× – 0.75×", min: 0.5, max: 0.75 },
+  { label: "0.75× – 1.00×", min: 0.75, max: 1 },
+  { label: "1.00× – 1.25×", min: 1, max: 1.25 },
+  { label: "1.25× – 1.50×", min: 1.25, max: 1.5 },
+  { label: "1.50× – 2.00×", min: 1.5, max: 2 },
+  { label: "≥ 2.00×", min: 2, max: Infinity }
+]
+
+const SLR_PERCENT_BUCKETS: DriftBucketConfig[] = [
+  { label: "≤ -50%", min: -Infinity, max: -50 },
+  { label: "-50% to -30%", min: -50, max: -30 },
+  { label: "-30% to -10%", min: -30, max: -10 },
+  { label: "-10% to 0%", min: -10, max: 0 },
+  { label: "0% to +10%", min: 0, max: 10 },
+  { label: "+10% to +30%", min: 10, max: 30 },
+  { label: "+30% to +60%", min: 30, max: 60 },
+  { label: "≥ +60%", min: 60, max: Infinity }
+]
 
 const PRESETS: PresetConfig[] = [
   {
@@ -218,6 +246,60 @@ const PRESETS: PresetConfig[] = [
     description: "Discover how volatility regime affects trade excursions",
     xMetric: "opening_vix",
     yMetric: "mae_percent_premium",
+  },
+  {
+    id: "slr-drift-vs-return",
+    label: "S/L Drift vs Return",
+    description: "See how changes in the short/long ratio relate to trade outcomes",
+    xMetric: "slr_ratio_change",
+    yMetric: "pl_percent_premium",
+    addSpecialTraces: (points) => {
+      if (points.length === 0) return []
+
+      const minY = Math.min(...points.map(entry => entry.yValue))
+      const maxY = Math.max(...points.map(entry => entry.yValue))
+
+      return [
+        {
+          x: [1, 1],
+          y: [minY, maxY],
+          type: "scatter",
+          mode: "lines",
+          name: "No Drift (1.0x)",
+          line: { color: "#6b7280", width: 1, dash: "dash" },
+          hoverinfo: "skip",
+          showlegend: true
+        }
+      ]
+    },
+    layoutCustomizations: {
+      shapes: [
+        {
+          type: "rect",
+          xref: "x",
+          yref: "paper",
+          x0: 0,
+          x1: 1,
+          y0: 0,
+          y1: 1,
+          fillcolor: "rgba(248, 113, 113, 0.08)",
+          line: { width: 0 },
+          layer: "below"
+        },
+        {
+          type: "rect",
+          xref: "x",
+          yref: "paper",
+          x0: 1,
+          x1: 2,
+          y0: 0,
+          y1: 1,
+          fillcolor: "rgba(134, 239, 172, 0.08)",
+          line: { width: 0 },
+          layer: "below"
+        }
+      ]
+    }
   }
 ]
 
@@ -423,6 +505,22 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     })
 
     addOption({
+      value: "slr_ratio_change",
+      label: "S/L Ratio Drift (Close ÷ Open)",
+      axisLabel: "Short/Long Ratio Drift (Close ÷ Open)",
+      format: ratioFormat,
+      accessor: point => point.shortLongRatioChange ?? null
+    })
+
+    addOption({
+      value: "slr_ratio_change_pct",
+      label: "S/L Ratio Drift (% Change)",
+      axisLabel: "Short/Long Ratio Drift (% Change)",
+      format: percentFormat,
+      accessor: point => point.shortLongRatioChangePct ?? null
+    })
+
+    addOption({
       value: "opening_vix",
       label: "Opening VIX",
       axisLabel: "Opening VIX",
@@ -566,6 +664,16 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     return new Map(axisOptions.map(option => [option.value, option]))
   }, [axisOptions])
 
+  type SlrMode = "ratio" | "percent" | null
+  const slrModeFromMetric = (metric?: string | null): SlrMode => {
+    if (metric === "slr_ratio_change") return "ratio"
+    if (metric === "slr_ratio_change_pct") return "percent"
+    return null
+  }
+
+  const activeSlrMode: SlrMode = slrModeFromMetric(xMetric) ??
+    (selectedPreset === "slr-drift-vs-return" ? "ratio" : null)
+
   // Helper to build typed custom-data payloads for Plotly
   interface TooltipData {
     trade: number
@@ -585,6 +693,9 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
     marginDenominator: string
     premiumPlPercent: string
     marginPlPercent: string
+    openingSlr: string
+    closingSlr: string
+    slrDrift: string
   }
 
   type PlotCustomData = TooltipData
@@ -622,6 +733,18 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
       const premiumMetrics = point.normalizedBy?.premium
       const marginMetrics = point.normalizedBy?.margin
 
+      const openingSlr = point.openingShortLongRatio !== undefined
+        ? formatAxisValue(point.openingShortLongRatio, ratioFormat)
+        : "N/A"
+      const closingSlr = point.closingShortLongRatio !== undefined
+        ? formatAxisValue(point.closingShortLongRatio, ratioFormat)
+        : "N/A"
+      const slrDrift = point.shortLongRatioChange !== undefined
+        ? point.shortLongRatioChangePct !== undefined
+          ? `${formatAxisValue(point.shortLongRatioChange, ratioFormat)} (${formatAxisValue(point.shortLongRatioChangePct, percentFormat)})`
+          : formatAxisValue(point.shortLongRatioChange, ratioFormat)
+        : "N/A"
+
       return {
         trade: point.tradeNumber,
         strategy: point.strategy,
@@ -651,7 +774,10 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
           : "N/A",
         marginPlPercent: marginMetrics?.plPercent !== undefined
           ? formatAxisValue(marginMetrics.plPercent, percentFormat)
-          : "N/A"
+          : "N/A",
+        openingSlr,
+        closingSlr,
+        slrDrift
       }
     }
 
@@ -691,7 +817,10 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
           "Premium Denominator: %{customdata.premiumDenominator}<br>" +
           "Margin Denominator: %{customdata.marginDenominator}<br>" +
           "Premium P&L: %{customdata.premiumPlPercent}<br>" +
-          "Margin P&L: %{customdata.marginPlPercent}" +
+          "Margin P&L: %{customdata.marginPlPercent}<br>" +
+          "Opening S/L: %{customdata.openingSlr}<br>" +
+          "Closing S/L: %{customdata.closingSlr}<br>" +
+          "S/L Drift: %{customdata.slrDrift}" +
           "<extra></extra>"
       })
     }
@@ -728,7 +857,10 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
           "Premium Denominator: %{customdata.premiumDenominator}<br>" +
           "Margin Denominator: %{customdata.marginDenominator}<br>" +
           "Premium P&L: %{customdata.premiumPlPercent}<br>" +
-          "Margin P&L: %{customdata.marginPlPercent}" +
+          "Margin P&L: %{customdata.marginPlPercent}<br>" +
+          "Opening S/L: %{customdata.openingSlr}<br>" +
+          "Closing S/L: %{customdata.closingSlr}<br>" +
+          "S/L Drift: %{customdata.slrDrift}" +
           "<extra></extra>"
       })
     }
@@ -801,6 +933,78 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
 
     return { plotData: traces, layout: finalLayout }
   }, [data, selectedX, selectedY, xMetric, yMetric, selectedPreset])
+
+  interface SlrTableRow {
+    label: string
+    count: number
+    winRate: number
+    avgPlPercent: number
+    avgPlDollar: number
+  }
+
+  const slrCompanionRows = useMemo(() => {
+    if (!data?.mfeMaeData || !activeSlrMode) {
+      return []
+    }
+
+    const buckets = activeSlrMode === "percent" ? SLR_PERCENT_BUCKETS : SLR_RATIO_BUCKETS
+
+    const points = data.mfeMaeData
+      .map(point => {
+        const ratio = point.shortLongRatioChange ?? null
+        const pct = point.shortLongRatioChangePct ?? null
+        const plPercent = point.normalizedBy?.premium?.plPercent ?? point.normalizedBy?.margin?.plPercent ?? point.plPercent ?? null
+
+        if (activeSlrMode === "ratio" && !isFiniteNumber(ratio)) return null
+        if (activeSlrMode === "percent" && !isFiniteNumber(pct)) return null
+        if (!isFiniteNumber(plPercent)) return null
+
+        return {
+          ratio: ratio ?? 0,
+          pct: pct ?? 0,
+          plPercent,
+          isWinner: point.isWinner,
+          pl: point.pl
+        }
+      })
+      .filter((entry): entry is { ratio: number; pct: number; plPercent: number; isWinner: boolean; pl: number } => entry !== null)
+
+    if (points.length === 0) {
+      return []
+    }
+
+    return buckets
+      .map(bucket => {
+        const bucketValues = points.filter(point => {
+          const value = activeSlrMode === "percent" ? point.pct : point.ratio
+          if (bucket.min === -Infinity) {
+            return value < bucket.max
+          }
+          if (bucket.max === Infinity) {
+            return value >= bucket.min
+          }
+          return value >= bucket.min && value < bucket.max
+        })
+
+        if (bucketValues.length === 0) {
+          return null
+        }
+
+        const wins = bucketValues.filter(point => point.isWinner).length
+        const winRate = (wins / bucketValues.length) * 100
+        const avgPlPercent = bucketValues.reduce((sum, point) => sum + point.plPercent, 0) / bucketValues.length
+        const avgPlDollar = bucketValues.reduce((sum, point) => sum + point.pl, 0) / bucketValues.length
+
+        return {
+          label: bucket.label,
+          count: bucketValues.length,
+          winRate,
+          avgPlPercent,
+          avgPlDollar
+        }
+      })
+      .filter((row): row is SlrTableRow => row !== null)
+  }, [data, activeSlrMode])
 
   // Get current preset for description
   const currentPreset = selectedPreset !== "custom" ? PRESETS.find(p => p.id === selectedPreset) : null
@@ -882,21 +1086,7 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
       "Start with preset views like 'MFE vs MAE' or 'Profit Capture Timeline' to discover key patterns. Switch to Custom mode to compare any metric combination - excursions vs premium, VIX, commissions, or any other trade parameter. Winners and losers stay color coded to highlight regime shifts and trading efficiency."
   }
 
-  if (!data || !data.mfeMaeData || data.mfeMaeData.length === 0) {
-    return (
-      <ChartWrapper
-        title="🎯 Excursion Analysis"
-        description="Maximum Favorable vs Adverse Excursion scatter plot (backtest theoretical)"
-        className={className}
-        data={[]}
-        layout={{}}
-        style={{ height: "400px" }}
-        tooltip={tooltip}
-      />
-    )
-  }
-
-  return (
+  const renderChart = (
     <ChartWrapper
       title="🎯 Excursion Analysis"
       description={description}
@@ -907,5 +1097,51 @@ export function MFEMAEScatterChart({ className }: { className?: string }) {
       tooltip={tooltip}
       actions={controls}
     />
+  )
+
+  if (!data || !data.mfeMaeData || data.mfeMaeData.length === 0) {
+    return renderChart
+  }
+
+  return (
+    <div className="space-y-4">
+      {renderChart}
+      {slrCompanionRows.length > 0 && (
+        <div className="rounded-lg border bg-muted/20 p-4">
+          <div className="mb-3 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold">S/L Drift Outcome Table</p>
+              <p className="text-xs text-muted-foreground">
+                Visual drift bands translated into win rate and average returns so you can plug thresholds into the backtest inputs.
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30%]">Drift Band</TableHead>
+                  <TableHead>Trades</TableHead>
+                  <TableHead>Win Rate</TableHead>
+                  <TableHead>Avg P&amp;L (% Premium)</TableHead>
+                  <TableHead>Avg P&amp;L ($)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {slrCompanionRows.map(row => (
+                  <TableRow key={row.label}>
+                    <TableCell>{row.label}</TableCell>
+                    <TableCell>{row.count}</TableCell>
+                    <TableCell>{formatAxisValue(row.winRate, percentFormat)}</TableCell>
+                    <TableCell>{formatAxisValue(row.avgPlPercent, percentFormat)}</TableCell>
+                    <TableCell>{formatAxisValue(row.avgPlDollar, rawCurrencyFormat)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

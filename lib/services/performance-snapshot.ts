@@ -92,6 +92,11 @@ export async function buildPerformanceSnapshot(options: SnapshotOptions): Promis
   const strategies = options.filters?.strategies?.length ? options.filters?.strategies : undefined
   const dateRange = options.filters?.dateRange
 
+  // When filtering by strategy or normalizing, the `fundsAtClose` values from individual trades
+  // represent the entire account balance and include performance from trades outside the current filter.
+  // To avoid this data leakage, we rebuild the equity curve using cumulative P&L calculations instead of the absolute `fundsAtClose` values.
+  const useFundsAtClose = !normalizeTo1Lot && !strategies
+
   const sourceTrades = normalizeTo1Lot
     ? normalizeTradesToOneLot(options.trades)
     : options.trades
@@ -136,7 +141,7 @@ export async function buildPerformanceSnapshot(options: SnapshotOptions): Promis
     Boolean(strategies && strategies.length > 0)
   )
 
-  const chartData = await processChartData(filteredTrades, filteredDailyLogs)
+  const chartData = await processChartData(filteredTrades, filteredDailyLogs, { useFundsAtClose })
 
   return {
     filteredTrades,
@@ -148,9 +153,10 @@ export async function buildPerformanceSnapshot(options: SnapshotOptions): Promis
 
 export async function processChartData(
   trades: Trade[],
-  dailyLogs?: DailyLogEntry[]
+  dailyLogs?: DailyLogEntry[],
+  options?: { useFundsAtClose?: boolean }
 ): Promise<SnapshotChartData> {
-  const { equityCurve, drawdownData } = buildEquityAndDrawdown(trades, dailyLogs)
+  const { equityCurve, drawdownData } = buildEquityAndDrawdown(trades, dailyLogs, options?.useFundsAtClose)
 
   const dayOfWeekData = calculateDayOfWeekData(trades)
 
@@ -214,13 +220,16 @@ export async function processChartData(
 
 function buildEquityAndDrawdown(
   trades: Trade[],
-  dailyLogs?: DailyLogEntry[]
+  dailyLogs?: DailyLogEntry[],
+  useFundsAtClose = true
 ) {
-  if (dailyLogs && dailyLogs.length > 0) {
+  // When we shouldn't trust account-level equity (e.g., strategy filters or normalization),
+  // skip daily logs and rebuild from trade P&L instead of leaking other strategies.
+  if (useFundsAtClose && dailyLogs && dailyLogs.length > 0) {
     return buildEquityAndDrawdownFromDailyLogs(trades, dailyLogs)
   }
 
-  const equityCurve = calculateEquityCurveFromTrades(trades)
+  const equityCurve = calculateEquityCurveFromTrades(trades, useFundsAtClose)
 
   const drawdownData = equityCurve.map(point => {
     const { equity, highWaterMark, date } = point
@@ -315,7 +324,7 @@ function getEquityValueFromDailyLog(entry: DailyLogEntry): number {
   return 0
 }
 
-function calculateEquityCurveFromTrades(trades: Trade[]) {
+function calculateEquityCurveFromTrades(trades: Trade[], useFundsAtClose: boolean) {
   const closedTrades = trades.filter(trade => trade.dateClosed).sort((a, b) => {
     const dateA = new Date(a.dateClosed ?? a.dateOpened).getTime()
     const dateB = new Date(b.dateClosed ?? b.dateOpened).getTime()
@@ -394,7 +403,7 @@ function calculateEquityCurveFromTrades(trades: Trade[]) {
   }]
 
   closedTrades.forEach((trade, index) => {
-    const equity = typeof trade.fundsAtClose === 'number' && isFinite(trade.fundsAtClose)
+    const equity = useFundsAtClose && typeof trade.fundsAtClose === 'number' && isFinite(trade.fundsAtClose)
       ? trade.fundsAtClose
       : runningEquity + trade.pl
 
@@ -583,7 +592,7 @@ function calculateMonthlyReturnsPercentFromDailyLogs(
   // Get starting balance for each month from daily logs
   const monthlyBalances: Record<string, { startBalance: number; endBalance: number }> = {}
 
-  sortedLogs.forEach((log, index) => {
+  sortedLogs.forEach(log => {
     const date = new Date(log.date)
     const year = date.getUTCFullYear()
     const month = date.getUTCMonth() + 1

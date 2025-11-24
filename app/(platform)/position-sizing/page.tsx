@@ -37,8 +37,11 @@ import {
   type MarginMode,
 } from "@/lib/calculations/margin-timeline";
 import { PortfolioStatsCalculator } from "@/lib/calculations/portfolio-stats";
-import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store";
-import { getTradesByBlock } from "@/lib/db/trades-store";
+import {
+  getBlock,
+  getDailyLogsByBlock,
+  getTradesByBlockWithOptions,
+} from "@/lib/db";
 import { DailyLogEntry } from "@/lib/models/daily-log";
 import { Trade } from "@/lib/models/trade";
 import { useBlockStore } from "@/lib/stores/block-store";
@@ -87,11 +90,34 @@ export default function PositionSizingPage() {
 
   // Load trades and daily log when active block changes
   useEffect(() => {
-    if (activeBlockId) {
-      Promise.all([
-        getTradesByBlock(activeBlockId),
-        getDailyLogsByBlock(activeBlockId),
-      ]).then(([loadedTrades, loadedDailyLog]) => {
+    let cancelled = false;
+
+    const loadData = async () => {
+      if (!activeBlockId) {
+        if (!cancelled) {
+          setTrades([]);
+          setDailyLog([]);
+          setSelectedStrategies(new Set());
+          setKellyValues({});
+          setPortfolioKellyPct(100);
+          setPortfolioKellyInput("100");
+          setLastRunConfig(null);
+        }
+        return;
+      }
+
+      try {
+        const processedBlock = await getBlock(activeBlockId);
+        const combineLegGroups =
+          processedBlock?.analysisConfig?.combineLegGroups ?? false;
+
+        const [loadedTrades, loadedDailyLog] = await Promise.all([
+          getTradesByBlockWithOptions(activeBlockId, { combineLegGroups }),
+          getDailyLogsByBlock(activeBlockId),
+        ]);
+
+        if (cancelled) return;
+
         setTrades(loadedTrades);
         setDailyLog(loadedDailyLog);
 
@@ -117,16 +143,24 @@ export default function PositionSizingPage() {
         setPortfolioKellyPct(100);
         setPortfolioKellyInput("100");
         setLastRunConfig(null);
-      });
-    } else {
-      setTrades([]);
-      setDailyLog([]);
-      setSelectedStrategies(new Set());
-      setKellyValues({});
-      setPortfolioKellyPct(100);
-      setPortfolioKellyInput("100");
-      setLastRunConfig(null);
-    }
+      } catch (error) {
+        console.error("Failed to load block data:", error);
+        if (!cancelled) {
+          setTrades([]);
+          setDailyLog([]);
+          setSelectedStrategies(new Set());
+          setKellyValues({});
+          setPortfolioKellyPct(100);
+          setPortfolioKellyInput("100");
+          setLastRunConfig(null);
+        }
+      }
+    };
+
+    loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [activeBlockId]);
 
   // Get unique strategies with trade counts
