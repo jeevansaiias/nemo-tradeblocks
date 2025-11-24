@@ -7,6 +7,7 @@ import {
   SnapshotFilters,
   SnapshotChartData
 } from '@/lib/services/performance-snapshot'
+import { groupTradesByEntry } from '@/lib/utils/combine-leg-groups'
 
 export interface DateRange {
   from: Date | undefined
@@ -21,12 +22,47 @@ export interface ChartSettings {
   rollingMetricType: 'win_rate' | 'sharpe' | 'profit_factor'
 }
 
+export type GroupedOutcome =
+  | 'all_losses'
+  | 'all_wins'
+  | 'mixed'
+  | 'single_direction'
+
+export interface GroupedLegEntry {
+  id: string
+  dateOpened: string
+  timeOpened: string
+  strategy: string
+  legCount: number
+  positiveLegs: number
+  negativeLegs: number
+  outcome: GroupedOutcome
+  combinedPl: number
+  legPlValues: number[]
+}
+
+export interface GroupedLegSummary {
+  totalEntries: number
+  allLosses: number
+  allWins: number
+  mixedOutcomes: number
+  singleDirection: number
+  totalAllLossMagnitude: number
+}
+
+export interface GroupedLegOutcomes {
+  entries: GroupedLegEntry[]
+  summary: GroupedLegSummary
+}
+
 export interface PerformanceData extends SnapshotChartData {
   trades: Trade[]
   allTrades: Trade[]
+  allRawTrades: Trade[]
   dailyLogs: DailyLogEntry[]
   allDailyLogs: DailyLogEntry[]
   portfolioStats: PortfolioStats | null
+  groupedLegOutcomes: GroupedLegOutcomes | null
 }
 
 interface PerformanceStore {
@@ -110,16 +146,22 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const { getTradesByBlockWithOptions, getDailyLogsByBlock, getBlock } = await import('@/lib/db')
+      const {
+        getTradesByBlockWithOptions,
+        getTradesByBlock,
+        getDailyLogsByBlock,
+        getBlock
+      } = await import('@/lib/db')
 
       // Fetch block to get analysis config
       const block = await getBlock(blockId)
       const combineLegGroups = block?.analysisConfig?.combineLegGroups ?? false
 
-      const [trades, dailyLogs] = await Promise.all([
-        getTradesByBlockWithOptions(blockId, { combineLegGroups }),
-        getDailyLogsByBlock(blockId)
-      ])
+      const rawTrades = await getTradesByBlock(blockId)
+      const trades = combineLegGroups
+        ? await getTradesByBlockWithOptions(blockId, { combineLegGroups })
+        : rawTrades
+      const dailyLogs = await getDailyLogsByBlock(blockId)
 
       const state = get()
       const filters = buildSnapshotFilters(state.dateRange, state.selectedStrategies)
@@ -131,13 +173,18 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         normalizeTo1Lot: state.normalizeTo1Lot
       })
 
+      const filteredRawTrades = filterTradesForSnapshot(rawTrades, filters)
+      const groupedLegOutcomes = deriveGroupedLegOutcomes(filteredRawTrades)
+
       set({
         data: {
           trades: snapshot.filteredTrades,
           allTrades: trades,
+          allRawTrades: rawTrades,
           dailyLogs: snapshot.filteredDailyLogs,
           allDailyLogs: dailyLogs,
           portfolioStats: snapshot.portfolioStats,
+          groupedLegOutcomes,
           ...snapshot.chartData
         },
         isLoading: false
@@ -164,12 +211,15 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       normalizeTo1Lot
     })
 
+    const filteredRawTrades = filterTradesForSnapshot(data.allRawTrades, filters)
+
     set(state => ({
       data: state.data ? {
         ...state.data,
         trades: snapshot.filteredTrades,
         dailyLogs: snapshot.filteredDailyLogs,
         portfolioStats: snapshot.portfolioStats,
+        groupedLegOutcomes: deriveGroupedLegOutcomes(filteredRawTrades),
         ...snapshot.chartData
       } : null
     }))
@@ -190,3 +240,114 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
 
 // Re-export for existing unit tests that rely on chart processing helpers
 export { processChartData } from '@/lib/services/performance-snapshot'
+
+function classifyOutcome(positiveLegs: number, negativeLegs: number, legCount: number): GroupedOutcome {
+  if (legCount <= 1) return 'single_direction'
+  if (negativeLegs === legCount) return 'all_losses'
+  if (positiveLegs === legCount) return 'all_wins'
+  if (positiveLegs > 0 && negativeLegs > 0) return 'mixed'
+  return 'single_direction'
+}
+
+function deriveGroupedLegOutcomes(rawTrades: Trade[]): GroupedLegOutcomes | null {
+  if (rawTrades.length === 0) {
+    return null
+  }
+
+  const groups = groupTradesByEntry(rawTrades)
+  const entries: GroupedLegEntry[] = []
+
+  let allLosses = 0
+  let allWins = 0
+  let mixedOutcomes = 0
+  let singleDirection = 0
+  let totalAllLossMagnitude = 0
+
+  for (const [key, group] of groups.entries()) {
+    if (group.length < 2) continue
+
+    const sorted = [...group].sort((a, b) => {
+      const dateCompare = a.dateOpened.getTime() - b.dateOpened.getTime()
+      if (dateCompare !== 0) return dateCompare
+      return a.timeOpened.localeCompare(b.timeOpened)
+    })
+
+    const legPlValues = group.map(trade => trade.pl)
+    const positiveLegs = legPlValues.filter(pl => pl > 0).length
+    const negativeLegs = legPlValues.filter(pl => pl < 0).length
+    const combinedPl = legPlValues.reduce((sum, pl) => sum + pl, 0)
+    const outcome = classifyOutcome(positiveLegs, negativeLegs, group.length)
+
+    const entry: GroupedLegEntry = {
+      id: key,
+      dateOpened: sorted[0].dateOpened.toISOString(),
+      timeOpened: sorted[0].timeOpened,
+      strategy: sorted[0].strategy,
+      legCount: group.length,
+      positiveLegs,
+      negativeLegs,
+      outcome,
+      combinedPl,
+      legPlValues
+    }
+
+    switch (outcome) {
+      case 'all_losses':
+        allLosses += 1
+        totalAllLossMagnitude += Math.abs(combinedPl)
+        break
+      case 'all_wins':
+        allWins += 1
+        break
+      case 'mixed':
+        mixedOutcomes += 1
+        break
+      default:
+        singleDirection += 1
+    }
+
+    entries.push(entry)
+  }
+
+  if (entries.length === 0) {
+    return null
+  }
+
+  entries.sort((a, b) => {
+    const dateCompare = new Date(a.dateOpened).getTime() - new Date(b.dateOpened).getTime()
+    if (dateCompare !== 0) return dateCompare
+    return a.timeOpened.localeCompare(b.timeOpened)
+  })
+
+  return {
+    entries,
+    summary: {
+      totalEntries: entries.length,
+      allLosses,
+      allWins,
+      mixedOutcomes,
+      singleDirection,
+      totalAllLossMagnitude
+    }
+  }
+}
+
+function filterTradesForSnapshot(trades: Trade[], filters: SnapshotFilters): Trade[] {
+  let filtered = [...trades]
+
+  if (filters.dateRange?.from || filters.dateRange?.to) {
+    filtered = filtered.filter(trade => {
+      const tradeDate = new Date(trade.dateOpened)
+      if (filters.dateRange?.from && tradeDate < filters.dateRange.from) return false
+      if (filters.dateRange?.to && tradeDate > filters.dateRange.to) return false
+      return true
+    })
+  }
+
+  if (filters.strategies && filters.strategies.length > 0) {
+    const allowed = new Set(filters.strategies)
+    filtered = filtered.filter(trade => allowed.has(trade.strategy || 'Unknown'))
+  }
+
+  return filtered
+}
