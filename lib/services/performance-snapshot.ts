@@ -223,7 +223,9 @@ function buildEquityAndDrawdown(
   dailyLogs?: DailyLogEntry[],
   useFundsAtClose = true
 ) {
-  if (dailyLogs && dailyLogs.length > 0) {
+  // When we shouldn't trust account-level equity (e.g., strategy filters or normalization),
+  // skip daily logs and rebuild from trade P&L instead of leaking other strategies.
+  if (useFundsAtClose && dailyLogs && dailyLogs.length > 0) {
     return buildEquityAndDrawdownFromDailyLogs(trades, dailyLogs)
   }
 
