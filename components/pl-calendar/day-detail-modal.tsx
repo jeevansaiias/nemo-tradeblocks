@@ -3,59 +3,20 @@
 
 import * as React from "react"
 import { format } from "date-fns"
-import { TrendingUp, Repeat, Trophy, Puzzle, X, Clock, FileText } from "lucide-react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
+import { formatCurrency } from "@/lib/utils"
 
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog"
-import { Card } from "@/components/ui/card"
-import { cn, formatCurrency } from "@/lib/utils"
 
 interface DayDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   summary?: any;
   trades?: any[];
-}
-
-function MetricCard({
-  title,
-  value,
-  sub,
-  icon,
-  color,
-}: {
-  title: string
-  value: React.ReactNode
-  sub?: string
-  icon: React.ReactNode
-  color?: string
-}) {
-  return (
-    <Card className="bg-muted/20 p-6 rounded-xl border border-border/50 flex flex-col justify-between shadow-sm hover:bg-muted/30 transition-colors">
-      <div>
-        <div className="text-xs font-medium text-muted-foreground flex items-center gap-2 uppercase tracking-wider mb-3">
-          {icon} {title}
-        </div>
-        <div
-          className={cn(
-            "text-3xl font-bold tracking-tight",
-            color || "text-foreground"
-          )}
-        >
-          {value}
-        </div>
-      </div>
-      {sub && (
-        <div className="text-xs text-muted-foreground mt-2 font-medium">{sub}</div>
-      )}
-    </Card>
-  )
 }
 
 export function DayDetailModal({ open, onOpenChange, summary: propSummary, trades: propTrades }: DayDetailModalProps) {
@@ -67,21 +28,29 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
   if (!summary) return null
 
   const dateObj = new Date(summary.date)
-  const isPositive = (summary.realizedPL || summary.totalPL || 0) >= 0
+  const formattedDate = format(dateObj, "MMMM d, yyyy")
+  
   const realizedPL = summary.realizedPL ?? summary.totalPL ?? 0
+  const netPL = realizedPL
+  
   const tradeCount = summary.tradeCount ?? (propTrades?.length || summary.trades?.length || 0)
-  const winRate = summary.winRate ?? 0
+  const winRate = Math.round(summary.winRate || 0)
+  
+  const utilization = Math.round(summary.peakUtilizationPercent || 0)
+  const utilizationAvg = Math.round(summary.utilizationData?.metrics?.avgUtilization || 0)
+  const utilizationMax = Math.round(summary.utilizationData?.metrics?.peakUtilization || 0)
+  const positionsHeld = summary.utilizationData?.metrics?.concurrentPositions || 0
 
   // Map trades to display format
   const tradesToMap = propTrades || summary.trades || []
-  const displayTrades = tradesToMap.map((t: any, i: number) => {
+  const trades = tradesToMap.map((t: any, i: number) => {
     // Handle pre-formatted trades from MonthlyPLCalendar
     if (t.time && (t.legsSummary || t.legs)) {
       return {
         id: t.id?.toString() || `trade-${i}`,
         time: t.time,
         strategy: t.strategy || "Unknown",
-        legs: t.legsSummary || t.legs || "-",
+        legsSummary: t.legsSummary || t.legs || "-",
         pl: t.pl || 0,
       }
     }
@@ -91,184 +60,117 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
       id: t.id?.toString() || `trade-${i}`,
       time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
       strategy: t.strategy || "Unknown",
-      legs: t.legs || "-",
+      legsSummary: t.legs || "-",
       pl: t.pl || 0,
     }
   })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1000px] p-0 gap-0 overflow-hidden rounded-2xl bg-background border-border shadow-2xl flex flex-col max-h-[90vh]">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Daily Performance Review</DialogTitle>
-        </DialogHeader>
+      <DialogContent 
+        className="max-w-5xl p-0 border-none bg-transparent shadow-none sm:max-w-5xl"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">Daily Performance Review</DialogTitle>
+        
+        <div className="w-full rounded-xl bg-[#0d0d0d] border border-white/10 shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
 
-        {/* Header */}
-        <div className="p-6 border-b border-border flex items-center justify-between bg-muted/10">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-              {format(dateObj, "MMMM d, yyyy")}
-            </h2>
-            <p className="text-sm text-muted-foreground font-medium mt-1">
-              Daily Performance Review
-            </p>
-          </div>
-          <DialogClose className="rounded-full p-2 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-        </div>
-
-        <div className="overflow-y-auto flex-1">
-          <div className="p-6 space-y-8">
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <MetricCard
-                title="NET P/L"
-                value={formatCurrency(realizedPL)}
-                color={isPositive ? "text-emerald-500" : "text-rose-500"}
-                icon={<TrendingUp className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="TOTAL TRADES"
-                value={tradeCount}
-                sub={`${displayTrades.length} Executed`}
-                icon={<Repeat className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="WIN RATE"
-                value={`${Math.round(winRate || 0)}%`}
-                sub="Daily Win Rate"
-                icon={<Trophy className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="UTILIZATION"
-                value={`${Math.round(summary.peakUtilizationPercent || 0)}%`}
-                sub={`Avg: ${Math.round(
-                  summary.utilizationData?.metrics?.avgUtilization || 0
-                )}% • Max Pos: ${
-                  summary.utilizationData?.metrics?.concurrentPositions || 0
-                }`}
-                icon={<Puzzle className="h-4 w-4" />}
-              />
+            {/* HEADER */}
+            <div className="flex justify-between items-start mb-6">
+            <div>
+                <h2 className="text-3xl font-semibold text-white">{formattedDate}</h2>
+                <p className="text-white/50 mt-1 text-sm">Daily Performance Review</p>
             </div>
 
-            {/* Body Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
-              {/* Left Column: Trade Log */}
-              <div className="flex flex-col space-y-4">
-                <h3 className="text-lg font-semibold text-foreground/80 flex items-center gap-2">
-                  Trade Log
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    ({displayTrades.length} Entries)
-                  </span>
-                </h3>
-
-                <div className="rounded-xl border border-border overflow-hidden bg-card">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50 text-muted-foreground border-b border-border">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-medium text-xs uppercase tracking-wider w-[100px]">
-                            Time
-                          </th>
-                          <th className="px-4 py-3 text-left font-medium text-xs uppercase tracking-wider">
-                            Strategy
-                          </th>
-                          <th className="px-4 py-3 text-right font-medium text-xs uppercase tracking-wider">
-                            Legs
-                          </th>
-                          <th className="px-4 py-3 text-right font-medium text-xs uppercase tracking-wider">
-                            P/L
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/50">
-                        {displayTrades.length === 0 && (
-                          <tr>
-                            <td
-                              colSpan={4}
-                              className="p-12 text-center text-muted-foreground text-sm"
-                            >
-                              No trades recorded for this day.
-                            </td>
-                          </tr>
-                        )}
-
-                        {displayTrades.map((t: any, idx: number) => (
-                          <tr
-                            key={t.id || idx}
-                            className="hover:bg-muted/30 transition-colors group"
-                          >
-                            <td className="px-4 py-3 text-muted-foreground font-mono text-xs group-hover:text-foreground">
-                              {t.time}
-                            </td>
-                            <td className="px-4 py-3 text-foreground font-medium text-sm">
-                              <div className="truncate max-w-[180px]" title={t.strategy}>
-                                {t.strategy}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground text-xs text-right">
-                              <div className="truncate max-w-[120px] ml-auto" title={t.legs}>
-                                {t.legs}
-                              </div>
-                            </td>
-                            <td
-                              className={cn(
-                                "px-4 py-3 text-right font-mono font-medium text-sm",
-                                (t.pl || 0) >= 0
-                                  ? "text-emerald-500"
-                                  : "text-rose-500"
-                              )}
-                            >
-                              {formatCurrency(t.pl || 0)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Timing & Notes */}
-              <div className="flex flex-col space-y-8">
-                {/* Trade Timing */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground/80 flex items-center gap-2">
-                    Trade Timing
-                  </h3>
-                  <div className="bg-muted/20 h-40 rounded-xl border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground text-sm gap-3">
-                    <Clock className="h-6 w-6 opacity-50" />
-                    <span>Timing analysis coming soon</span>
-                  </div>
-                </div>
-
-                {/* Daily Notes */}
-                <div className="space-y-4 flex-1 flex flex-col">
-                  <h3 className="text-lg font-semibold text-foreground/80 flex items-center gap-2">
-                    Daily Notes
-                  </h3>
-                  <Card className="bg-muted/20 flex-1 min-h-[150px] rounded-xl border border-border p-0 overflow-hidden shadow-none">
-                    <div className="p-4 h-full">
-                      {summary.hasDailyLog ? (
-                        <div className="flex items-start gap-3 text-sm text-foreground/90">
-                          <FileText className="h-4 w-4 mt-0.5 text-primary" />
-                          <p>Daily log entry available.</p>
-                        </div>
-                      ) : (
-                        <textarea
-                          className="w-full h-full bg-transparent text-sm text-muted-foreground resize-none focus:outline-none placeholder:text-muted-foreground/50"
-                          placeholder="No notes added for this day."
-                          disabled
-                        />
-                      )}
-                    </div>
-                  </Card>
-                </div>
-              </div>
+            <button onClick={() => onOpenChange(false)} className="text-white/50 hover:text-white text-2xl">
+                ✕
+            </button>
             </div>
-          </div>
+
+            {/* PERFORMANCE METRICS GRID */}
+            <div className="grid grid-cols-4 gap-4 mb-10">
+
+            {/* NET P/L */}
+            <div className="rounded-lg bg-white/5 p-5 border border-white/10 shadow-inner">
+                <p className="text-xs text-white/50 mb-1 flex items-center gap-1">📈 NET P/L</p>
+                <p className={`text-3xl font-bold truncate ${netPL >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {formatCurrency(netPL)}
+                </p>
+            </div>
+
+            {/* TOTAL TRADES */}
+            <div className="rounded-lg bg-white/5 p-5 border border-white/10 shadow-inner">
+                <p className="text-xs text-white/50 mb-1">🔄 TOTAL TRADES</p>
+                <p className="text-3xl font-bold text-white">{tradeCount}</p>
+                <p className="text-xs text-white/40 mt-1">{tradeCount} Executed</p>
+            </div>
+
+            {/* WIN RATE */}
+            <div className="rounded-lg bg-white/5 p-5 border border-white/10 shadow-inner">
+                <p className="text-xs text-white/50 mb-1">🏆 WIN RATE</p>
+                <p className="text-3xl font-bold text-yellow-300">{winRate}%</p>
+                <p className="text-xs text-white/40 mt-1">Daily Win Rate</p>
+            </div>
+
+            {/* UTILIZATION */}
+            <div className="rounded-lg bg-white/5 p-5 border border-white/10 shadow-inner">
+                <p className="text-xs text-white/50 mb-1">⚡ UTILIZATION</p>
+                <p className="text-3xl font-bold text-blue-300">{utilization}%</p>
+                <div className="text-xs text-white/40 mt-2 leading-5">
+                Avg: {utilizationAvg}% <br />
+                Max: {utilizationMax}% <br />
+                Pos: {positionsHeld}
+                </div>
+            </div>
+
+            </div>
+
+            {/* TRADE LOG */}
+            <h3 className="text-lg font-semibold mb-3 text-white">Trade Log ({trades.length} Entries)</h3>
+
+            <div className="rounded-lg border border-white/10 overflow-hidden bg-black/20 shadow-lg">
+            <table className="w-full text-sm">
+                <thead className="bg-white/5 text-white/50">
+                <tr>
+                    <th className="text-left px-4 py-2 w-20">Time</th>
+                    <th className="text-left px-4 py-2 w-64">Strategy</th>
+                    <th className="text-left px-4 py-2 w-48">Legs</th>
+                    <th className="text-left px-4 py-2 w-28">P/L</th>
+                </tr>
+                </thead>
+
+                <tbody>
+                {trades.length === 0 && (
+                    <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-white/40">
+                        No trades recorded for this day.
+                    </td>
+                    </tr>
+                )}
+
+                {trades.map((trade: any, idx: number) => (
+                    <tr key={trade.id || idx} className="border-t border-white/5 hover:bg-white/5">
+                    <td className="px-4 py-2 text-white/80">{trade.time}</td>
+
+                    <td className="px-4 py-2 truncate text-white">{trade.strategy}</td>
+
+                    <td className="px-4 py-2 truncate text-white/60">
+                        {trade.legsSummary}
+                    </td>
+
+                    <td
+                        className={`px-4 py-2 font-semibold ${trade.pl >= 0 ? "text-green-400" : "text-red-400"}`}
+                    >
+                        {formatCurrency(trade.pl)}
+                    </td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+            </div>
+
+            {/* FOOTER SPACING */}
+            <div className="h-6" />
         </div>
       </DialogContent>
     </Dialog>
