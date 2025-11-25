@@ -56,6 +56,7 @@ interface PerformanceStore {
   data: PerformanceData | null
   chartSettings: ChartSettings
   normalizeTo1Lot: boolean
+  tpSlResults: ExitRuleScenarioResult[]
   tpSlBasis: ExitBasis
   tpSlGrid: TPSlScenarioConfig[]
   runTpSlOptimizer: (grid?: TPSlScenarioConfig[], basis?: ExitBasis) => void
@@ -121,6 +122,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   data: null,
   chartSettings: initialChartSettings,
   normalizeTo1Lot: false,
+  tpSlResults: [],
   tpSlBasis: 'margin',
   tpSlGrid: [
     { tpPct: 10, slPct: -10 },
@@ -163,7 +165,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     const state = get()
     const data = state.data
     if (!data?.mfeMaeData || data.mfeMaeData.length === 0) {
-      set(state => state.data ? { data: { ...state.data, tpSlResults: [] } } : {})
+      set(state => state.data ? { data: { ...state.data, tpSlResults: [] }, tpSlResults: [] } : { tpSlResults: [] })
       return
     }
 
@@ -171,7 +173,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
     const activeBasis = basis || state.tpSlBasis
     const results = simulateExitRuleGrid(data.mfeMaeData, activeBasis, activeGrid)
 
-    set(state => state.data ? { data: { ...state.data, tpSlResults: results } } : {})
+    set(state => state.data ? { data: { ...state.data, tpSlResults: results }, tpSlResults: results } : { tpSlResults: results })
   },
 
   fetchPerformanceData: async (blockId: string) => {
@@ -218,9 +220,11 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
           allDailyLogs: dailyLogs,
           portfolioStats: snapshot.portfolioStats,
           groupedLegOutcomes,
+          tpSlResults: [],
           ...snapshot.chartData
         },
-        isLoading: false
+        isLoading: false,
+        tpSlResults: []
       })
       // Run TP/SL optimizer with defaults when data is available.
       get().runTpSlOptimizer()
@@ -257,7 +261,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         portfolioStats: snapshot.portfolioStats,
         groupedLegOutcomes: deriveGroupedLegOutcomes(filteredRawTrades),
         ...snapshot.chartData
-      } : null
+      } : null,
+      tpSlResults: state.data?.tpSlResults ?? []
     }))
 
     get().runTpSlOptimizer()
@@ -272,6 +277,7 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       data: null,
       chartSettings: initialChartSettings,
       normalizeTo1Lot: false,
+      tpSlResults: [],
       tpSlBasis: 'margin',
       tpSlGrid: [
         { tpPct: 10, slPct: -10 },
