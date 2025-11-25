@@ -24,6 +24,17 @@ const BASIS_LABELS: Record<NormalizationBasis, string> = {
 
 type EditableScenario = TPSlScenarioConfig & { id: string }
 
+const generateScenarioId = () => {
+	if (typeof globalThis !== 'undefined') {
+		const cryptoRef = globalThis.crypto
+		if (cryptoRef?.randomUUID) {
+			return cryptoRef.randomUUID()
+		}
+	}
+
+	return Math.random().toString(36).slice(2)
+}
+
 const formatPercent = (value?: number, digits = 1) => {
 	if (typeof value !== 'number' || Number.isNaN(value)) {
 		return '—'
@@ -45,7 +56,7 @@ const formatNumber = (value?: number, digits = 0) => {
 }
 
 const createScenario = (tpPct = 20, slPct = -10): EditableScenario => ({
-	id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+	id: generateScenarioId(),
 	tpPct,
 	slPct
 })
@@ -74,13 +85,11 @@ export function TPSLOptimizerPanel({ className }: TPSLOptimizerPanelProps) {
 	}))
 
 	const tpSlResults = data?.tpSlResults
-	const [gridDraft, setGridDraft] = useState<EditableScenario[]>(() =>
-		tpSlGrid.map(scenario => ({ ...scenario, id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) }))
-	)
+	const [gridDraft, setGridDraft] = useState<EditableScenario[]>(() => tpSlGrid.map(scenario => ({ ...scenario, id: generateScenarioId() })))
 	const [gridError, setGridError] = useState<string | null>(null)
 
 	useEffect(() => {
-		setGridDraft(tpSlGrid.map(scenario => ({ ...scenario, id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) })))
+		setGridDraft(tpSlGrid.map(scenario => ({ ...scenario, id: generateScenarioId() })))
 	}, [tpSlGrid])
 
 	const tradesWithExcursions = data?.mfeMaeData?.length ?? 0
@@ -113,7 +122,7 @@ export function TPSLOptimizerPanel({ className }: TPSLOptimizerPanelProps) {
 	}
 
 	const handleResetDraft = () => {
-		setGridDraft(tpSlGrid.map(scenario => ({ ...scenario, id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) })))
+		setGridDraft(tpSlGrid.map(scenario => ({ ...scenario, id: generateScenarioId() })))
 		setGridError(null)
 	}
 
