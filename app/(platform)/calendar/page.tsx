@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { useBlockStore } from "@/lib/stores/block-store"
 import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
@@ -69,11 +69,17 @@ export default function CalendarPage() {
     yearlySnapshot
   } = useCalendarStore()
 
+  const [highlightedWeek, setHighlightedWeek] = useState<WeeklyBucket | null>(null)
+
   useEffect(() => {
     if (activeBlockId) {
       loadData(activeBlockId)
     }
   }, [activeBlockId, view, currentDate, colorBy, loadData])
+
+  useEffect(() => {
+    setHighlightedWeek(null)
+  }, [view, currentDate])
 
   const handlePrevious = () => {
     if (view === 'month') setCurrentDate(subMonths(currentDate, 1))
@@ -112,6 +118,9 @@ export default function CalendarPage() {
       .filter(s => s.originalData)
       .map(s => [s.date, s.originalData as CalendarDayData])
   )
+
+  const monthStart = startOfMonth(currentDate)
+  const monthlyWeeks = getMonthlyWeeklyBuckets(monthStart, weeklySummaries)
 
   if (!activeBlockId) {
       return (
@@ -248,13 +257,15 @@ export default function CalendarPage() {
                     colorMode={colorBy}
                     onDateChange={setCurrentDate}
                     showHeader={false}
+                    highlightedWeek={highlightedWeek}
                     />
                 </div>
-                <WeeklySummaryPanel 
-                    monthStart={startOfMonth(currentDate)}
-                    weeks={getMonthlyWeeklyBuckets(startOfMonth(currentDate), weeklySummaries)}
-                    metric={colorBy}
-                />
+        <WeeklySummaryPanel 
+          monthStart={monthStart}
+          weeks={monthlyWeeks}
+          metric={colorBy}
+          onWeekHover={setHighlightedWeek}
+        />
              </div>
           )}
         </div>

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-import { CalendarDayData, CalendarColorMode } from "@/lib/services/calendar-data-service"
+import { CalendarDayData, CalendarColorMode, WeeklyBucket } from "@/lib/services/calendar-data-service"
 import { cn } from "@/lib/utils"
 import { formatCompactPL } from "@/lib/utils/format"
 import { DayDetailModal } from "./day-detail-modal"
@@ -34,6 +34,7 @@ interface MonthlyPLCalendarProps {
   colorMode?: CalendarColorMode
   compact?: boolean
   showHeader?: boolean
+  highlightedWeek?: WeeklyBucket | null
 }
 
 interface WeekSummary {
@@ -47,7 +48,7 @@ interface WeekSummary {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode = "pl", compact = false, showHeader = true }: MonthlyPLCalendarProps) {
+export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode = "pl", compact = false, showHeader = true, highlightedWeek = null }: MonthlyPLCalendarProps) {
   const [selectedDayData, setSelectedDayData] = useState<CalendarDayData | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -203,6 +204,11 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
                   const isCurrentMonth = isSameMonth(dayData.date, currentDate)
                   const hasData = dayData.tradeCount > 0
                   
+                  // Check if this day belongs to the highlighted week
+                  const isHighlighted = highlightedWeek && isCurrentMonth
+                    ? dayData.date >= highlightedWeek.startDate && dayData.date <= highlightedWeek.endDate
+                    : false;
+
                   return (
                     <div
                       key={index}
@@ -212,8 +218,13 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
                         compact ? "min-h-[60px]" : "min-h-[80px]",
                         getDayColor(dayData, hasData),
                         isCurrentMonth ? 'border-border' : 'border-transparent opacity-40',
-                        isCurrentMonth && hasData ? 'hover:scale-105 hover:shadow-lg' : ''
+                        isCurrentMonth && hasData ? 'hover:scale-105 hover:shadow-lg' : '',
+                        isHighlighted && "ring-2 ring-primary shadow-lg scale-[1.02] z-10"
                       )}
+                      style={{
+                          // Dim non-highlighted days when a week is highlighted
+                          opacity: highlightedWeek && !isHighlighted && isCurrentMonth ? 0.3 : 1
+                      }}
                     >
                       {/* Date Number */}
                       <div className={cn("text-xs font-semibold", getDayTextColor(dayData.pl, hasData))}>

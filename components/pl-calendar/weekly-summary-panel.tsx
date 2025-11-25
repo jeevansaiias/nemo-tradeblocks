@@ -9,12 +9,14 @@ interface WeeklySummaryPanelProps {
   monthStart: Date;
   weeks: WeeklyBucket[];
   metric: CalendarColorMode;
+  onWeekHover?: (week: WeeklyBucket | null) => void;
 }
 
 export function WeeklySummaryPanel({
   monthStart,
   weeks,
   metric,
+  onWeekHover,
 }: WeeklySummaryPanelProps) {
   const monthLabel = format(monthStart, "MMMM yyyy");
 
@@ -46,6 +48,8 @@ export function WeeklySummaryPanel({
           return (
             <div
               key={week.weekIndex}
+              onMouseEnter={() => onWeekHover?.(week)}
+              onMouseLeave={() => onWeekHover?.(null)}
               className={cn(
                 "flex cursor-pointer flex-col gap-1 rounded-2xl px-4 py-3 text-sm transition",
                 "border bg-card/40 hover:bg-card hover:border-primary/40",
