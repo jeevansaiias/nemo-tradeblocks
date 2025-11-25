@@ -247,7 +247,7 @@ export function TPSLOptimizerPanel() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">Scenario Results</h3>
             <p className="text-xs text-muted-foreground">
-              Based on {data.filteredTrades.length} filtered trades.
+              Based on {data?.trades?.length ?? 0} filtered trades.
             </p>
           </div>
           {tpSlResults && tpSlResults.length > 0 ? (
