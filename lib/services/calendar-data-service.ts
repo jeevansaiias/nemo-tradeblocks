@@ -21,6 +21,7 @@ export interface CalendarDayData {
 export interface CalendarDaySummary {
   date: string;              // "YYYY-MM-DD"
   realizedPL: number;
+  totalPLPercent?: number;
   tradeCount: number;
   winRate: number | null;
   utilizationPercent: number | null;
@@ -151,6 +152,8 @@ export class CalendarDataService {
         
         const utilizationPercent = utilData?.metrics.utilizationPercent || 0
         const peakUtilizationPercent = utilData?.metrics.peakUtilization || 0
+        const accountValue = utilData?.metrics.accountValue || 0
+        const totalPLPercent = accountValue > 0 ? (realizedPL / accountValue) * 100 : 0
         
         let utilizationBucket: "low" | "medium" | "high" | "extreme" = "low"
         if (peakUtilizationPercent > 80) utilizationBucket = "extreme"
@@ -160,6 +163,7 @@ export class CalendarDataService {
         tempSummaries.push({
             date: dateKey,
             realizedPL,
+            totalPLPercent,
             tradeCount,
             winRate: dayData ? dayData.winRate : null,
             utilizationPercent: utilData ? utilizationPercent : null,

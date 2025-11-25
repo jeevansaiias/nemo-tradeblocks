@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { useBlockStore } from "@/lib/stores/block-store"
-import { TradeCalendar } from "@/components/pl-calendar/trade-calendar"
+import { CalendarGrid } from "@/components/pl-calendar/calendar-grid"
 import { DayDetailModal } from "@/components/pl-calendar/day-detail-modal"
 import { UtilizationPanel } from "@/components/pl-calendar/utilization-panel"
 import { CalendarViewMode, CalendarColorMode } from "@/lib/services/calendar-data-service"
@@ -148,7 +148,7 @@ export default function CalendarPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <TradeCalendar />
+        <CalendarGrid />
       )}
 
       {/* Utilization Panel */}
