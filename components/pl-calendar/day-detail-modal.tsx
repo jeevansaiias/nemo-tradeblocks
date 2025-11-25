@@ -4,6 +4,8 @@ import * as React from "react"
 import { format } from "date-fns"
 import { Activity, TrendingUp, Repeat, Trophy, Puzzle, X } from "lucide-react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
+import { CalendarDaySummary } from "@/lib/services/calendar-data-service"
+import { StoredTrade } from "@/lib/db/trades-store"
 
 import {
   Dialog,
@@ -22,8 +24,10 @@ import {
 import { cn, formatCurrency } from "@/lib/utils"
 
 interface DayDetailModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  summary?: CalendarDaySummary;
+  trades?: StoredTrade[];
 }
 
 function MetricCard({
@@ -61,16 +65,23 @@ function MetricCard({
   )
 }
 
-export function DayDetailModal({ open, onOpenChange }: DayDetailModalProps) {
-  const summary = useCalendarStore((s) => s.getSelectedDaySummary())
+export function DayDetailModal({ open, onOpenChange, summary: propSummary, trades: propTrades }: DayDetailModalProps) {
+  const storeSummary = useCalendarStore((s) => s.getSelectedDaySummary())
+  
+  // Use prop summary if available (from MonthlyPLCalendar), otherwise use store summary
+  const summary = propSummary || storeSummary
 
   if (!summary) return null
 
   const dateObj = new Date(summary.date)
   const isPositive = summary.realizedPL >= 0
+  const realizedPL = summary.realizedPL
+  const tradeCount = summary.tradeCount ?? (propTrades?.length || summary.trades?.length || 0)
+  const winRate = summary.winRate ?? 0
 
   // Map trades to display format
-  const displayTrades = (summary.trades || []).map((t, i) => ({
+  const tradesToMap = propTrades || summary.trades || []
+  const displayTrades = tradesToMap.map((t: StoredTrade, i: number) => ({
     id: t.id?.toString() || `trade-${i}`,
     time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
     strategy: t.strategy || "Unknown",
@@ -105,19 +116,19 @@ export function DayDetailModal({ open, onOpenChange }: DayDetailModalProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 px-6 py-6 gap-4">
           <MetricCard
             title="NET P/L"
-            value={formatCurrency(summary.realizedPL)}
+            value={formatCurrency(realizedPL)}
             color={isPositive ? "text-emerald-400" : "text-rose-400"}
             icon={<TrendingUp className="h-4 w-4" />}
           />
           <MetricCard
             title="TOTAL TRADES"
-            value={summary.tradeCount}
+            value={tradeCount}
             sub={`${displayTrades.length} Executed`}
             icon={<Repeat className="h-4 w-4" />}
           />
           <MetricCard
             title="WIN RATE"
-            value={`${Math.round(summary.winRate || 0)}%`}
+            value={`${Math.round(winRate || 0)}%`}
             sub="Daily Win Rate"
             icon={<Trophy className="h-4 w-4" />}
           />
@@ -125,9 +136,9 @@ export function DayDetailModal({ open, onOpenChange }: DayDetailModalProps) {
             title="UTILIZATION"
             value={`${Math.round(summary.peakUtilizationPercent || 0)}%`}
             sub={`Avg: ${Math.round(
-              summary.utilizationData?.metrics.avgUtilization || 0
+              summary.utilizationData?.metrics?.avgUtilization || 0
             )}% • Max Pos: ${
-              summary.utilizationData?.metrics.concurrentPositions || 0
+              summary.utilizationData?.metrics?.concurrentPositions || 0
             }`}
             icon={<Puzzle className="h-4 w-4" />}
           />
