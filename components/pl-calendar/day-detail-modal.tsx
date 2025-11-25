@@ -93,7 +93,7 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
             {/* NET P/L */}
             <div className="rounded-lg bg-white/5 p-5 border border-white/10 shadow-inner">
                 <p className="text-xs text-white/50 mb-1 flex items-center gap-1">📈 NET P/L</p>
-                <p className={`text-3xl font-bold truncate ${netPL >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <p className={`text-3xl md:text-4xl font-bold font-mono tabular-nums leading-tight break-words ${netPL >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {formatCurrency(netPL)}
                 </p>
             </div>
