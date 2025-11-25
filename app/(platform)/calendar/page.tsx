@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
-import { format, addMonths, subMonths, addYears, subYears } from "date-fns"
+import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters } from "date-fns"
 import { formatCurrency, cn } from "@/lib/utils"
 
 export default function CalendarPage() {
@@ -33,14 +33,20 @@ export default function CalendarPage() {
 
   const handlePrevious = () => {
     if (view === 'month') setCurrentDate(subMonths(currentDate, 1))
-    else if (view === 'quarter') setCurrentDate(subMonths(currentDate, 3))
+    else if (view === 'quarter') setCurrentDate(subQuarters(currentDate, 1))
     else if (view === 'year') setCurrentDate(subYears(currentDate, 1))
   }
 
   const handleNext = () => {
     if (view === 'month') setCurrentDate(addMonths(currentDate, 1))
-    else if (view === 'quarter') setCurrentDate(addMonths(currentDate, 3))
+    else if (view === 'quarter') setCurrentDate(addQuarters(currentDate, 1))
     else if (view === 'year') setCurrentDate(addYears(currentDate, 1))
+  }
+
+  const getHeaderLabel = () => {
+    if (view === 'month') return format(currentDate, 'MMMM yyyy')
+    if (view === 'quarter') return `Q${getQuarter(currentDate)} ${format(currentDate, 'yyyy')}`
+    return format(currentDate, 'yyyy')
   }
 
   // Calculate view stats
@@ -77,7 +83,7 @@ export default function CalendarPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-2xl font-bold min-w-[200px] text-center">
-            {format(currentDate, view === 'year' ? 'yyyy' : 'MMMM yyyy')}
+            {getHeaderLabel()}
           </h2>
           <Button variant="outline" size="icon" onClick={handleNext}>
             <ChevronRight className="h-4 w-4" />
