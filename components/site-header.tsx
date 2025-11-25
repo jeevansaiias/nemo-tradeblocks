@@ -1,9 +1,9 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 
 import { ModeToggle } from "@/components/mode-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -26,24 +26,6 @@ const routeMeta: Record<
     title: "Performance Blocks",
     description: "Equity curves, streaks, and drawdown coverage across time.",
   },
-  "/comparison-blocks": {
-    title: "Comparison Blocks",
-    description: "Align and compare backtested vs reported trade data.",
-  },
-  "/tp-optimizer-mae-mfe": {
-    title: "TP Optimizer (MAE/MFE)",
-    description: "Upload trade CSVs, tune take-profit targets, and review MAE/MFE analytics.",
-    badge: "Latest",
-  },
-  "/calendar": {
-    title: "P/L Calendar",
-    description: "Track monthly and yearly performance trends across your blocks.",
-  },
-  "/walk-forward": {
-    title: "Walk-Forward Analysis",
-    description: "Optimize parameters and validate out-of-sample performance.",
-    badge: "Beta",
-  },
   "/risk-simulator": {
     title: "Risk Simulator",
     description: "Monte Carlo projections using your uploaded trade history.",
@@ -56,6 +38,10 @@ const routeMeta: Record<
   "/correlation-matrix": {
     title: "Correlation Matrix",
     description: "Understand strategy overlap before deploying capital.",
+  },
+  "/comparison-blocks": {
+    title: "Comparison Blocks",
+    description: "Align and compare backtested vs reported trade data.",
   },
   "/settings": {
     title: "Settings",
@@ -79,7 +65,7 @@ export function SiteHeader() {
         <SidebarTrigger className="-ml-1" />
         <Link href="/" className="flex items-center space-x-2">
           <Image
-            src="/nemoblocks-logo.png"
+            src="/logo-nemo.png"
             alt="NemoBlocks"
             width={36}
             height={36}

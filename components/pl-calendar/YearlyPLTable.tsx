@@ -20,8 +20,8 @@ import { useMemo } from "react"
 
 interface YearlyPLTableProps {
   trades: StoredTrade[]
-  currentYear: number
-  onYearChange: (year: number) => void
+  currentYear?: number
+  onYearChange?: (year: number) => void
   onMonthClick?: (year: number, month: number) => void
 }
 
@@ -42,7 +42,7 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ]
 
-export function YearlyPLTable({ trades, currentYear, onYearChange, onMonthClick }: YearlyPLTableProps) {
+export function YearlyPLTable({ trades, onMonthClick }: YearlyPLTableProps) {
   // Aggregate data by year and month
   const yearlyData = useMemo(() => {
     const data: { [year: number]: YearData } = {}

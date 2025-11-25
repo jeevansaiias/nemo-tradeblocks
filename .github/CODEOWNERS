@@ -1,12 +1,12 @@
 # NemoBlocks Code Owners
 # Global owners for all files
-* @jeevansai
+* @davidromeo
 
 # Critical configuration files
-vercel.json @jeevansai
-requirements.txt @jeevansai
-.github/ @jeevansai
+vercel.json @davidromeo
+requirements.txt @davidromeo
+.github/ @davidromeo
 
 # Core application
-app/main.py @jeevansai
-app/api/ @jeevansai
+app/main.py @davidromeo
+app/api/ @davidromeo

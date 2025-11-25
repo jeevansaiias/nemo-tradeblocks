@@ -6,6 +6,12 @@ import {
   SnapshotChartData,
   SnapshotFilters
 } from '@/lib/services/performance-snapshot'
+import { simulateExitRuleGrid } from '@/lib/calculations/exit-optimization'
+import type {
+  ExitBasis,
+  ExitRuleScenarioResult,
+  TPSlScenarioConfig
+} from '@/lib/types/exit-optimization'
 import {
   deriveGroupedLegOutcomes,
   GroupedLegOutcomes
@@ -39,6 +45,7 @@ export interface PerformanceData extends SnapshotChartData {
   allDailyLogs: DailyLogEntry[]
   portfolioStats: PortfolioStats | null
   groupedLegOutcomes: GroupedLegOutcomes | null
+  tpSlResults?: ExitRuleScenarioResult[]
 }
 
 interface PerformanceStore {
@@ -49,6 +56,11 @@ interface PerformanceStore {
   data: PerformanceData | null
   chartSettings: ChartSettings
   normalizeTo1Lot: boolean
+  tpSlBasis: ExitBasis
+  tpSlGrid: TPSlScenarioConfig[]
+  runTpSlOptimizer: (grid?: TPSlScenarioConfig[], basis?: ExitBasis) => void
+  setTpSlBasis: (basis: ExitBasis) => void
+  setTpSlGrid: (grid: TPSlScenarioConfig[]) => void
   setDateRange: (dateRange: DateRange) => void
   setSelectedStrategies: (strategies: string[]) => void
   updateChartSettings: (settings: Partial<ChartSettings>) => void
@@ -109,6 +121,12 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   data: null,
   chartSettings: initialChartSettings,
   normalizeTo1Lot: false,
+  tpSlBasis: 'margin',
+  tpSlGrid: [
+    { tpPct: 10, slPct: -10 },
+    { tpPct: 20, slPct: -10 },
+    { tpPct: 30, slPct: -15 },
+  ],
 
   setDateRange: (dateRange) => {
     set({ dateRange })
@@ -129,6 +147,31 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
   setNormalizeTo1Lot: (value) => {
     set({ normalizeTo1Lot: value })
     get().applyFilters().catch(console.error)
+  },
+
+  setTpSlBasis: (basis) => {
+    set({ tpSlBasis: basis })
+    get().runTpSlOptimizer()
+  },
+
+  setTpSlGrid: (grid) => {
+    set({ tpSlGrid: grid })
+    get().runTpSlOptimizer(grid)
+  },
+
+  runTpSlOptimizer: (grid, basis) => {
+    const state = get()
+    const data = state.data
+    if (!data?.mfeMaeData || data.mfeMaeData.length === 0) {
+      set(state => state.data ? { data: { ...state.data, tpSlResults: [] } } : {})
+      return
+    }
+
+    const activeGrid = grid || state.tpSlGrid
+    const activeBasis = basis || state.tpSlBasis
+    const results = simulateExitRuleGrid(data.mfeMaeData, activeBasis, activeGrid)
+
+    set(state => state.data ? { data: { ...state.data, tpSlResults: results } } : {})
   },
 
   fetchPerformanceData: async (blockId: string) => {
@@ -179,6 +222,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         },
         isLoading: false
       })
+      // Run TP/SL optimizer with defaults when data is available.
+      get().runTpSlOptimizer()
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load performance data',
@@ -214,6 +259,8 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
         ...snapshot.chartData
       } : null
     }))
+
+    get().runTpSlOptimizer()
   },
 
   reset: () => {
@@ -224,7 +271,13 @@ export const usePerformanceStore = create<PerformanceStore>((set, get) => ({
       selectedStrategies: [],
       data: null,
       chartSettings: initialChartSettings,
-      normalizeTo1Lot: false
+      normalizeTo1Lot: false,
+      tpSlBasis: 'margin',
+      tpSlGrid: [
+        { tpPct: 10, slPct: -10 },
+        { tpPct: 20, slPct: -10 },
+        { tpPct: 30, slPct: -15 },
+      ]
     })
   }
 }))

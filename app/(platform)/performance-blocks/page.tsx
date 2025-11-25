@@ -23,6 +23,7 @@ import { ExitReasonChart } from "@/components/performance-charts/exit-reason-cha
 import { HoldingDurationChart } from "@/components/performance-charts/holding-duration-chart";
 import { MarginUtilizationChart } from "@/components/performance-charts/margin-utilization-chart";
 import { MFEMAEScatterChart } from "@/components/performance-charts/mfe-mae-scatter-chart";
+import { TPSLOptimizerPanel } from "@/components/performance-charts/tp-sl-optimizer-panel";
 import { MonthlyReturnsChart } from "@/components/performance-charts/monthly-returns-chart";
 import { GroupedLegOutcomesChart } from "@/components/performance-charts/paired-leg-outcomes-chart";
 import { PremiumEfficiencyChart } from "@/components/performance-charts/premium-efficiency-chart";
@@ -337,6 +338,7 @@ export default function PerformanceBlocksPage() {
         {/* Tab 5: Excursion Analysis */}
         <TabsContent value="excursion" className="space-y-6">
           <MFEMAEScatterChart />
+          <TPSLOptimizerPanel />
         </TabsContent>
       </Tabs>
     </div>

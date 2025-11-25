@@ -32,40 +32,6 @@ export const rawTradeDataSchema = z.object({
 })
 
 /**
- * Zod schema for validating raw reporting trade data from CSV
- */
-export const rawReportingTradeDataSchema = z.object({
-  "Strategy": z.string().min(1, "Strategy is required"),
-  "Date Opened": z.string().min(1, "Date Opened is required"),
-  "Opening Price": z.string().min(1, "Opening Price is required"),
-  "Legs": z.string().min(1, "Legs description is required"),
-  "Initial Premium": z.string().min(1, "Initial Premium is required"),
-  "No. of Contracts": z.string().min(1, "Number of Contracts is required"),
-  "P/L": z.string().min(1, "P/L is required"),
-  "Closing Price": z.string().optional(),
-  "Date Closed": z.string().optional(),
-  "Avg. Closing Cost": z.string().optional(),
-  "Reason For Close": z.string().optional(),
-})
-
-/**
- * Zod schema for validating processed reporting trade data
- */
-export const reportingTradeSchema = z.object({
-  strategy: z.string().min(1),
-  dateOpened: z.date(),
-  openingPrice: z.number().finite(),
-  legs: z.string().min(1),
-  initialPremium: z.number().finite(),
-  numContracts: z.number().int().positive(),
-  pl: z.number().finite(),
-  closingPrice: z.number().finite().optional(),
-  dateClosed: z.date().optional(),
-  avgClosingCost: z.number().finite().optional(),
-  reasonForClose: z.string().optional(),
-})
-
-/**
  * Zod schema for validating processed trade data
  */
 export const tradeSchema = z.object({
@@ -95,6 +61,40 @@ export const tradeSchema = z.object({
   movement: z.number().finite().optional(),
   maxProfit: z.number().finite().optional(),
   maxLoss: z.number().finite().optional(),
+})
+
+/**
+ * Zod schema for validating raw reporting trade data from strategy logs
+ */
+export const rawReportingTradeDataSchema = z.object({
+  "Strategy": z.string().min(1, "Strategy is required"),
+  "Date Opened": z.string().min(1, "Date Opened is required"),
+  "Opening Price": z.string().min(1, "Opening Price is required"),
+  "Legs": z.string().min(1, "Legs description is required"),
+  "Initial Premium": z.string().min(1, "Initial Premium is required"),
+  "No. of Contracts": z.string().min(1, "Number of Contracts is required"),
+  "P/L": z.string().min(1, "P/L is required"),
+  "Closing Price": z.string().optional(),
+  "Date Closed": z.string().optional(),
+  "Avg. Closing Cost": z.string().optional(),
+  "Reason For Close": z.string().optional(),
+})
+
+/**
+ * Zod schema for validating processed reporting trade data
+ */
+export const reportingTradeSchema = z.object({
+  strategy: z.string().min(1),
+  dateOpened: z.date(),
+  openingPrice: z.number().finite(),
+  legs: z.string().min(1),
+  initialPremium: z.number().finite(),
+  numContracts: z.number().finite(),
+  pl: z.number().finite(),
+  closingPrice: z.number().finite().optional(),
+  dateClosed: z.date().optional(),
+  avgClosingCost: z.number().finite().optional(),
+  reasonForClose: z.string().optional(),
 })
 
 /**
@@ -139,8 +139,6 @@ export const portfolioStatsSchema = z.object({
   maxLoss: z.number().finite().max(0),
   sharpeRatio: z.number().finite().optional(),
   maxDrawdown: z.number().finite().max(0),
-  maxDrawdownRealized: z.number().finite().max(0).optional(),
-  maxDrawdownCompounded: z.number().finite().max(0).optional(),
   avgDailyPl: z.number().finite(),
   totalCommissions: z.number().finite().min(0),
   netPl: z.number().finite(),
@@ -200,6 +198,8 @@ export const createBlockRequestSchema = z.object({
  */
 export type RawTradeData = z.infer<typeof rawTradeDataSchema>
 export type ValidatedTrade = z.infer<typeof tradeSchema>
+export type RawReportingTradeData = z.infer<typeof rawReportingTradeDataSchema>
+export type ValidatedReportingTrade = z.infer<typeof reportingTradeSchema>
 export type RawDailyLogData = z.infer<typeof rawDailyLogDataSchema>
 export type ValidatedDailyLogEntry = z.infer<typeof dailyLogEntrySchema>
 export type ValidatedPortfolioStats = z.infer<typeof portfolioStatsSchema>

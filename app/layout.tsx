@@ -17,13 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "NemoBlocks",
-    template: "%s | NemoBlocks",
-  },
+  title: "NemoBlocks",
   description: "NemoBlocks – Advanced options analytics platform",
   icons: {
-    icon: "/nemoblocks-logo.png",
+    icon: "/logo-nemo.png",
   },
 };
 
@@ -40,7 +37,6 @@ export default function RootLayout({
           geistMono.variable,
           "antialiased min-h-screen bg-background text-foreground"
         )}
-        suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}

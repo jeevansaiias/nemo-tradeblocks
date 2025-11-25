@@ -16,7 +16,7 @@ This document explains how NemoBlocks is structured and how to work effectively 
 3. Visit `http://localhost:3000` → you will be redirected to `/blocks`.
 4. Create your first block and upload a trade CSV (sample: `IC_Trades.csv`).
 
-> Resetting locally stored data: open your browser dev tools → **Application** tab → clear IndexedDB storage and the `localStorage` keys `nemoblocks-active-block-id` (and legacy `tradeblocks-active-block-id` if present).
+> Resetting locally stored data: open your browser dev tools → **Application** tab → clear IndexedDB storage and the `localStorage` key `tradeblocks-active-block-id` (internal key name unchanged).
 
 ## Application Architecture
 
@@ -90,7 +90,7 @@ This document explains how NemoBlocks is structured and how to work effectively 
 - Use the `plans/` directory for task breakdowns if you want structured TODOs (optional).
 - Tailwind CSS configuration lives in `tailwind.config.ts` produced via `@tailwindcss/postcss` (Tailwind v4). Check `app/globals.css` for design tokens.
 - Components expect the `@/*` alias (configured in `tsconfig.json`)—prefer it over relative paths.
-- When debugging IndexedDB, the store names mirror file names (e.g., `blocks`, `trades`, `walkForwardAnalyses`); inspect them via browser dev tools. Legacy keys are mirrored for backward compatibility.
+- When debugging IndexedDB, the store names mirror file names (e.g., `tradeblocks-trades`); inspect them via browser dev tools. Note: internal store/key names remain unchanged to preserve backward compatibility.
 - `npm run build` uses Turbopack; large third-party imports (Plotly/Recharts) can impact bundle size, so keep an eye on analytics when adding dependencies.
 
 ## Useful Links
@@ -99,3 +99,37 @@ This document explains how NemoBlocks is structured and how to work effectively 
 - [Math.js](https://mathjs.org/docs/reference/functions.html) – statistics helpers used for parity with the Python implementation.
 
 For questions or larger architectural changes, start with an architecture sketch in `plans/` or open a discussion referencing the relevant modules above.
+
+## Comparison Blocks Roadmap
+
+Tracking the live-vs-reporting comparison work so we keep implementation aligned with the UX we just shipped.
+
+### Phase 1 – Strategy Alignment (done)
+- Optional reporting log upload alongside trade & daily logs.
+- Strategy mapping UI with single-select dialog, inline edit/delete, and auto-save to IndexedDB.
+- Ledger view showing mappings, coverage indicators to spot unmapped strategies.
+
+### Phase 2 – Reconciliation Analytics (in progress)
+1. **Data plumbing**
+   - Fetch aligned reporting + live trades per block (re-use `CsvTestDataLoader` + `reporting-trade-processor`).
+   - Produce normalized trade records for comparison (dates, legs, premium per contract, fees).
+2. **Pair analysis**
+   - For each aligned pair, compute totals: trade count, net P/L, average premium, commissions.
+   - Generate deltas and ratios (actual vs theoretical P/L, fill variance, timing differences).
+   - Flag missing data (trades in one source only, reporting entries with no live fill).
+3. **Aggregated metrics**
+   - Portfolio-level tiles: total delta, % explained by slippage, % by missing trades.
+   - Slippage diagnostics: scatter of premium delta vs VIX/movement; histogram of slippage.
+   - Timeline comparison: cumulative P/L overlay (live vs reporting) + variance bands.
+   - Daily impact: map deltas onto daily log drawdowns to show where discrepancies hurt/benefited equity.
+4. **Exception handling**
+   - Present unmatched items in a dedicated list with quick filters (reporting-only, live-only, stale mapping).
+   - Allow tagging/notes for follow-up.
+
+### Phase 3 – UX polish & automation (planned)
+- Suggested strategy matches (name similarity, date overlap) surfaced in the dialog.
+- Search/filter inputs for long strategy lists.
+- Export report (CSV/PDF) summarizing reconciliation per block.
+- Optional notifications when new uploads introduce mismatched strategies.
+
+Keep this section updated as we implement analytics so future contributors understand what remains.

@@ -372,16 +372,6 @@ function formatDate(dateStr: string): string {
   return date.toISOString().split('T')[0] // YYYY-MM-DD format
 }
 
-function isNonTradingTransaction(description: string, type: string): boolean {
-  const nonTradingKeywords = [
-    'deposit', 'withdrawal', 'transfer', 'dividend', 'interest', 
-    'fee adjustment', 'journal', 'wire', 'ach', 'check'
-  ]
-  
-  const text = `${description} ${type}`.toLowerCase()
-  return nonTradingKeywords.some(keyword => text.includes(keyword))
-}
-
 export function formatCurrency(amount: number): string {
   // Handle NaN, null, undefined, or invalid numbers
   if (!isFinite(amount) || isNaN(amount)) {

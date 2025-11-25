@@ -106,7 +106,7 @@ export function StrategyExitTPMatrix({
             const tpLevels = strategyCurves[0].tp_levels;
             for (let i = 0; i < tpLevels.length; i++) {
               const point: ChartDataPoint = { tp: tpLevels[i] };
-              strategyCurves.forEach((curve, idx) => {
+              strategyCurves.forEach((curve) => {
                 point[`${curve.exit_reason}`] = Math.round(curve.efficiencies[i] * 100) / 100;
               });
               chartData.push(point);
