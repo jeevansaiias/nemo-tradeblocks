@@ -21,7 +21,7 @@ export default function CalendarPage() {
     colorBy, setColorBy, 
     currentDate, setCurrentDate, 
     loadData, isLoading, 
-    daySummaries, dailyUtilizations,
+    daySummaries,
     selectedDate, setSelectedDate
   } = useCalendarStore()
 
@@ -152,7 +152,7 @@ export default function CalendarPage() {
       )}
 
       {/* Utilization Panel */}
-      <UtilizationPanel data={dailyUtilizations} />
+      <UtilizationPanel data={daySummaries} />
 
       {/* Detail Modal */}
       <DayDetailModal 

@@ -38,7 +38,11 @@ export function TradeCalendar() {
         if (summary.tradeCount > 0) return "bg-blue-500/10 border-blue-500/20"
         return "bg-muted/10 border-neutral-800"
       case "risk":
-         return "bg-purple-500/10 border-purple-500/20"
+        const score = summary.riskScore || 0
+        if (score > 75) return "bg-purple-500/40 border-purple-500/50 hover:bg-purple-500/50"
+        if (score > 50) return "bg-purple-500/25 border-purple-500/35 hover:bg-purple-500/35"
+        if (score > 25) return "bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/20"
+        return "bg-muted/10 border-neutral-800"
       default:
         return "bg-muted/10 border-neutral-800"
     }

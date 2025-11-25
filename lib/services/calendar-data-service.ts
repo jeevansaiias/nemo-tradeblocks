@@ -25,6 +25,7 @@ export interface CalendarDaySummary {
   winRate: number | null;
   utilizationPercent: number | null;
   peakUtilizationPercent: number | null;
+  riskScore?: number; // 0-100
   colorMetric: CalendarColorMode;
   utilizationBucket?: "low" | "medium" | "high" | "extreme";
   hasDailyLog: boolean;
@@ -131,12 +132,13 @@ export class CalendarDataService {
     const { dayMap } = await this.getCalendarData(blockId)
     const utilizations = await calculateDailyUtilization(blockId, dateRange)
     
-    const summaries: CalendarDaySummary[] = []
-    
     const utilMap = new Map(utilizations.map(u => [format(u.date, 'yyyy-MM-dd'), u]))
     
     // We need a set of all dates from both sources
     const allDates = new Set([...dayMap.keys(), ...utilMap.keys()])
+    
+    // First pass to collect summaries
+    const tempSummaries: CalendarDaySummary[] = []
     
     allDates.forEach(dateKey => {
         const dayData = dayMap.get(dateKey)
@@ -155,7 +157,7 @@ export class CalendarDataService {
         else if (peakUtilizationPercent > 50) utilizationBucket = "high"
         else if (peakUtilizationPercent > 20) utilizationBucket = "medium"
         
-        summaries.push({
+        tempSummaries.push({
             date: dateKey,
             realizedPL,
             tradeCount,
@@ -168,6 +170,26 @@ export class CalendarDataService {
             originalData: dayData,
             utilizationData: utilData
         })
+    })
+
+    // Calculate Risk Scores
+    const maxAbsPL = Math.max(...tempSummaries.map(d => Math.abs(d.realizedPL)), 1)
+    
+    const summaries = tempSummaries.map(day => {
+        const util = day.peakUtilizationPercent || 0
+        let riskScore = 0
+        
+        if (day.realizedPL >= 0) {
+            // Positive PL: Risk is just utilization scaled down
+            riskScore = Math.min(100, util * 0.3)
+        } else {
+            // Negative PL: Risk combines utilization and loss magnitude
+            // Higher utilization + larger loss = higher risk
+            const lossFactor = Math.abs(day.realizedPL) / maxAbsPL
+            riskScore = Math.min(100, (util * 0.5) + (lossFactor * 50))
+        }
+        
+        return { ...day, riskScore }
     })
     
     return { summaries, utilizations, dayMap }
