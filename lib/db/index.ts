@@ -365,6 +365,7 @@ export {
   getTradesByBlockWithOptions,
   updateTradesForBlock,
 } from "./trades-store";
+
 export {
   saveWalkForwardAnalysis,
   getWalkForwardAnalysis,
@@ -372,3 +373,7 @@ export {
   deleteWalkForwardAnalysis,
   deleteWalkForwardAnalysesByBlock,
 } from "./walk-forward-store";
+
+// Migration helpers
+export { migrateDatabaseName } from "./migration";
+export type { MigrationResult } from "./migration";

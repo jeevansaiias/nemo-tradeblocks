@@ -7,6 +7,7 @@ import {
   getBlock,
   getDailyLogsByBlock,
   getReportingTradesByBlock,
+  getTradesByBlock,
   updateBlockStats,
 } from "../db";
 import { ProcessedBlock } from "../models/block";
@@ -153,17 +154,11 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       const processedBlocks = await getAllBlocks();
       const blocks: Block[] = [];
 
-      // Import getTradesByBlockWithOptions
-      const { getTradesByBlockWithOptions } = await import("../db");
-
       // Convert each ProcessedBlock to Block with trade/daily log counts
       for (const processedBlock of processedBlocks) {
         try {
-          // Use combineLegGroups setting from block config
-          const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
-
           const [trades, dailyLogs, reportingTrades] = await Promise.all([
-            getTradesByBlockWithOptions(processedBlock.id, { combineLegGroups }),
+            getTradesByBlock(processedBlock.id),
             getDailyLogsByBlock(processedBlock.id),
             getReportingTradesByBlock(processedBlock.id),
           ]);
@@ -380,12 +375,8 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       const processedBlock = await getBlock(id);
       if (!processedBlock) return;
 
-      // Use combineLegGroups setting from block config
-      const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
-      const { getTradesByBlockWithOptions } = await import("../db");
-
       const [trades, dailyLogs, reportingTrades] = await Promise.all([
-        getTradesByBlockWithOptions(id, { combineLegGroups }),
+        getTradesByBlock(id),
         getDailyLogsByBlock(id),
         getReportingTradesByBlock(id),
       ]);
@@ -456,12 +447,8 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         throw new Error("Block not found");
       }
 
-      // Use combineLegGroups setting from block config
-      const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
-      const { getTradesByBlockWithOptions } = await import("../db");
-
       const [trades, dailyLogs, reportingTrades] = await Promise.all([
-        getTradesByBlockWithOptions(id, { combineLegGroups }),
+        getTradesByBlock(id),
         getDailyLogsByBlock(id),
         getReportingTradesByBlock(id),
       ]);
