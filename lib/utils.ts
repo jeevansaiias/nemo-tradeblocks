@@ -25,3 +25,10 @@ export function truncateStrategyName(
   }
   return `${strategyName.substring(0, maxLength)}...`
 }
+
+export function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value)
+}
