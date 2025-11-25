@@ -4,16 +4,53 @@ import { useEffect } from "react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { useBlockStore } from "@/lib/stores/block-store"
 import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
-import { MonthlyWeeklySummary } from "@/components/pl-calendar/MonthlyWeeklySummary"
+import { WeeklySummaryPanel } from "@/components/pl-calendar/weekly-summary-panel"
 import { YearHeatmap } from "@/components/pl-calendar/YearHeatmap"
 import { UtilizationPanel } from "@/components/pl-calendar/utilization-panel"
-import { CalendarViewMode, CalendarColorMode, CalendarDayData } from "@/lib/services/calendar-data-service"
+import { CalendarViewMode, CalendarColorMode, CalendarDayData, WeeklySummary, WeeklyBucket } from "@/lib/services/calendar-data-service"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
-import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters, startOfQuarter, isSameMonth, parseISO } from "date-fns"
+import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters, startOfQuarter, isSameMonth, parseISO, startOfMonth } from "date-fns"
 import { formatCurrency, cn } from "@/lib/utils"
+
+/*
+Copilot prompt:
+
+“Update the P/L Calendar ‘month’ view to match TradeZella’s layout:
+	•	Implement a WeeklySummaryPanel component that renders one card per week with: ‘Week N’, date range, compact P/L ($1.2K, $43.5K, $1.1M), trade count, days traded, and optional win rate. Cards should be color-coded for profit / loss / flat and use Tailwind + shadcn styles consistent with the rest of the app.
+	•	Use a shared WeeklyBucket type with startDate, endDate, netPL, tradeCount, and daysTraded.
+	•	Add a helper getMonthlyWeeklyBuckets(monthStart, weeklyBuckets) that filters and sorts weeks so the weekly panel only shows weeks for the selected month.
+	•	Refactor MonthView to render a MonthCalendarGrid on the left and the new WeeklySummaryPanel on the right in a responsive grid.
+	•	Use formatCompactCurrency (Intl compact notation) for P/L values so they render like $1.2K or $1.1M instead of raw numbers.
+	•	Do not change the new Yearly view; ensure navigation between Year → Month still works.”
+*/
+
+function getMonthlyWeeklyBuckets(
+  monthStart: Date,
+  weeklySummaries: WeeklySummary[]
+): WeeklyBucket[] {
+  const month = monthStart.getMonth();
+  const year = monthStart.getFullYear();
+
+  return weeklySummaries
+    .filter((w) => {
+      const start = parseISO(w.startDate);
+      // use startDate to decide which month this week “belongs” to
+      return start.getFullYear() === year && start.getMonth() === month;
+    })
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .map((w, idx) => ({
+      weekIndex: idx + 1,
+      startDate: parseISO(w.startDate),
+      endDate: parseISO(w.endDate),
+      netPL: w.netPL,
+      tradeCount: w.trades,
+      daysTraded: w.daysTraded,
+      winRate: w.winRate
+    }));
+}
 
 export default function CalendarPage() {
   const activeBlockId = useBlockStore((state) => state.activeBlockId)
@@ -208,12 +245,10 @@ export default function CalendarPage() {
                     showHeader={false}
                     />
                 </div>
-                <MonthlyWeeklySummary 
-                    weeklySummaries={weeklySummaries.filter(w => {
-                        const start = parseISO(w.startDate);
-                        const end = parseISO(w.endDate);
-                        return isSameMonth(start, currentDate) || isSameMonth(end, currentDate);
-                    })} 
+                <WeeklySummaryPanel 
+                    monthStart={startOfMonth(currentDate)}
+                    weeks={getMonthlyWeeklyBuckets(startOfMonth(currentDate), weeklySummaries)}
+                    metric={colorBy}
                 />
              </div>
           )}

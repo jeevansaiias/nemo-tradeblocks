@@ -14,6 +14,7 @@ export interface WeeklySummary {
   endDate: string;
   netPL: number;
   trades: number;
+  daysTraded: number;
   winRate?: number;
 }
 
@@ -70,6 +71,16 @@ export interface CalendarStats {
   bestDay: { date: Date; pl: number } | null
   worstDay: { date: Date; pl: number } | null
   averagePL: number
+}
+
+export interface WeeklyBucket {
+  weekIndex: number;        // e.g. 1,2,3,4,5 within the month
+  startDate: Date;
+  endDate: Date;
+  netPL: number;            // total P/L for that week
+  tradeCount: number;       // # trades in week
+  daysTraded: number;       // # days with at least one trade
+  winRate?: number;         // optional: 0–1 or 0–100
 }
 
 export class CalendarDataService {
@@ -245,6 +256,7 @@ export class CalendarDataService {
                     endDate: day.date,
                     netPL: 0,
                     trades: 0,
+                    daysTraded: 0,
                     winRate: 0
                 },
                 wins: 0
@@ -254,6 +266,9 @@ export class CalendarDataService {
         const entry = weeklyMap.get(weekKey)!
         entry.summary.netPL += day.realizedPL
         entry.summary.trades += day.tradeCount
+        if (day.tradeCount > 0) {
+            entry.summary.daysTraded += 1
+        }
         entry.wins += day.trades.filter(t => (t.pl || 0) > 0).length
         
         // Update dates
@@ -296,8 +311,7 @@ export class CalendarDataService {
         // We need to track wins for month to calc winRate correctly
         // Let's just store wins in winRate temporarily as a count? No, let's re-iterate or just approximate?
         // Correct way: store wins separately. But MonthlySummary interface doesn't have wins.
-        // Let's just assume we can calculate it if we had the data. 
-        // For now, let's just sum winRates? No, that's wrong.
+        // Let's just sum winRates? No, that's wrong.
         // Let's add a hidden 'wins' property to MonthlySummary or just recalculate.
         // Since I can't easily change the interface inside the map without casting, I'll just do a quick hack:
         // Store wins in a separate map key or just use the loop.
