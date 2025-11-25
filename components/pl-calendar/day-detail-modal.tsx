@@ -1,11 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import * as React from "react"
 import { format } from "date-fns"
 import { Activity, TrendingUp, Repeat, Trophy, Puzzle, X } from "lucide-react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
-import { CalendarDaySummary } from "@/lib/services/calendar-data-service"
-import { StoredTrade } from "@/lib/db/trades-store"
 
 import {
   Dialog,
@@ -26,8 +25,8 @@ import { cn, formatCurrency } from "@/lib/utils"
 interface DayDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  summary?: CalendarDaySummary;
-  trades?: StoredTrade[];
+  summary?: any;
+  trades?: any[];
 }
 
 function MetricCard({
@@ -81,13 +80,27 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
 
   // Map trades to display format
   const tradesToMap = propTrades || summary.trades || []
-  const displayTrades = tradesToMap.map((t: StoredTrade, i: number) => ({
-    id: t.id?.toString() || `trade-${i}`,
-    time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
-    strategy: t.strategy || "Unknown",
-    legs: t.legs || "-",
-    pl: t.pl || 0,
-  }))
+  const displayTrades = tradesToMap.map((t: any, i: number) => {
+    // Handle pre-formatted trades from MonthlyPLCalendar
+    if (t.time && (t.legsSummary || t.legs)) {
+      return {
+        id: t.id?.toString() || `trade-${i}`,
+        time: t.time,
+        strategy: t.strategy || "Unknown",
+        legs: t.legsSummary || t.legs || "-",
+        pl: t.pl || 0,
+      }
+    }
+    
+    // Handle raw StoredTrade objects
+    return {
+      id: t.id?.toString() || `trade-${i}`,
+      time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
+      strategy: t.strategy || "Unknown",
+      legs: t.legs || "-",
+      pl: t.pl || 0,
+    }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -186,7 +199,7 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
                       </tr>
                     )}
 
-                    {displayTrades.map((t, idx) => (
+                    {displayTrades.map((t: any, idx: number) => (
                       <tr
                         key={t.id || idx}
                         className="border-b border-neutral-800/50 hover:bg-neutral-800/50 transition-colors last:border-0 group"
