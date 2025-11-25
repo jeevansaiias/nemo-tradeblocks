@@ -3,6 +3,8 @@ import { CalendarColorMode, CalendarDaySummary, CalendarViewMode, CalendarDataSe
 import { DailyUtilization } from '@/lib/calculations/utilization-analyzer'
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns'
 
+import { format } from 'date-fns'
+
 interface CalendarState {
   view: CalendarViewMode
   colorBy: CalendarColorMode
@@ -19,6 +21,7 @@ interface CalendarState {
   setCurrentDate: (date: Date) => void
   setSelectedDate: (date: Date | null) => void
   loadData: (blockId: string) => Promise<void>
+  getSelectedDaySummary: () => CalendarDaySummary | undefined
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
@@ -35,6 +38,13 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   setColorBy: (colorBy) => set({ colorBy }),
   setCurrentDate: (currentDate) => set({ currentDate }),
   setSelectedDate: (selectedDate) => set({ selectedDate }),
+  
+  getSelectedDaySummary: () => {
+    const { daySummaries, selectedDate } = get()
+    if (!selectedDate) return undefined
+    const dateKey = format(selectedDate, 'yyyy-MM-dd')
+    return daySummaries.find(s => s.date === dateKey)
+  },
   
   loadData: async (blockId: string) => {
     set({ isLoading: true, error: null })

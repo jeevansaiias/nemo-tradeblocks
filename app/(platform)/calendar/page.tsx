@@ -158,31 +158,6 @@ export default function CalendarPage() {
       <DayDetailModal 
         open={!!selectedDate} 
         onOpenChange={(open) => !open && setSelectedDate(null)}
-        summary={selectedDate ? (() => {
-            const s = daySummaries.find(s => s.date === format(selectedDate, 'yyyy-MM-dd'))
-            if (!s) return null
-            return {
-                date: s.date,
-                totalPL: s.realizedPL,
-                winRate: s.winRate || 0,
-                tradeCount: s.tradeCount,
-                hasDailyLog: s.hasDailyLog,
-                reconciliationDiff: s.originalData?.reconciliationDiff,
-                peakUtilizationPercent: s.peakUtilizationPercent,
-                avgUtilization: s.utilizationData?.metrics.avgUtilization,
-                concurrentPositions: s.utilizationData?.metrics.concurrentPositions
-            }
-        })() : null}
-        trades={selectedDate ? (daySummaries.find(s => s.date === format(selectedDate, 'yyyy-MM-dd'))?.originalData?.trades.map((t, i) => ({
-            id: t.id?.toString() || `trade-${i}`,
-            time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
-            strategy: t.strategy,
-            legsSummary: t.legs,
-            pl: t.pl || 0,
-            maxProfit: t.maxProfit,
-            maxLoss: t.maxLoss
-        })) || []) : []}
-        intradaySnapshots={selectedDate ? (daySummaries.find(s => s.date === format(selectedDate, 'yyyy-MM-dd'))?.utilizationData?.intradaySnapshots || []) : []}
       />
     </div>
   )

@@ -23,6 +23,7 @@ export interface CalendarDaySummary {
   realizedPL: number;
   totalPLPercent?: number;
   tradeCount: number;
+  trades: StoredTrade[];
   winRate: number | null;
   utilizationPercent: number | null;
   peakUtilizationPercent: number | null;
@@ -165,6 +166,7 @@ export class CalendarDataService {
             realizedPL,
             totalPLPercent,
             tradeCount,
+            trades: dayData?.trades || [],
             winRate: dayData ? dayData.winRate : null,
             utilizationPercent: utilData ? utilizationPercent : null,
             peakUtilizationPercent: utilData ? peakUtilizationPercent : null,

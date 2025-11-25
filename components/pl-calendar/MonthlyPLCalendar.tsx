@@ -293,7 +293,7 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
             tradeCount: selectedDayData.tradeCount,
             hasDailyLog: !!selectedDayData.dailyLog,
             reconciliationDiff: selectedDayData.reconciliationDiff
-          } : null}
+          } : undefined}
           trades={selectedDayData?.trades.map((t, i) => ({
             id: t.id?.toString() || `trade-${i}`,
             time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",

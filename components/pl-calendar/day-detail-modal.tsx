@@ -3,6 +3,7 @@
 import * as React from "react"
 import { format } from "date-fns"
 import { X, TrendingUp, TrendingDown, Activity } from "lucide-react"
+import { useCalendarStore } from "@/lib/stores/calendar-store"
 
 import {
   Dialog,
@@ -23,10 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { cn, formatCurrency } from "@/lib/utils"
 
-interface DayDetailModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  summary: {
+interface LegacySummary {
     date: Date | string
     totalPL: number
     winRate: number
@@ -36,8 +34,9 @@ interface DayDetailModalProps {
     peakUtilizationPercent?: number | null
     avgUtilization?: number | null
     concurrentPositions?: number | null
-  } | null
-  trades: Array<{
+}
+
+interface LegacyTrade {
     id: string
     time: string
     strategy: string
@@ -45,24 +44,68 @@ interface DayDetailModalProps {
     pl: number
     maxProfit?: number
     maxLoss?: number
-  }>
-  intradaySnapshots?: Array<{
-    timestamp: Date
-    marginRequired: number
-    openPositions: string[]
-  }>
+}
+
+interface DisplayTrade {
+  id: string
+  time: string
+  strategy: string
+  legs: string
+  pl: number
+}
+
+interface DayDetailModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  summary?: LegacySummary
+  trades?: LegacyTrade[]
 }
 
 export function DayDetailModal({
   open,
   onOpenChange,
-  summary,
-  trades,
+  summary: propSummary,
+  trades: propTrades
 }: DayDetailModalProps) {
+  const storeSummary = useCalendarStore(s => s.getSelectedDaySummary())
+  
+  let summary = null
+  let displayTrades: DisplayTrade[] = []
+
+  if (propSummary) {
+      summary = {
+          ...propSummary,
+          realizedPL: propSummary.totalPL,
+          originalData: { reconciliationDiff: propSummary.reconciliationDiff },
+          utilizationData: { 
+              metrics: { 
+                  avgUtilization: propSummary.avgUtilization,
+                  concurrentPositions: propSummary.concurrentPositions
+              } 
+          }
+      }
+      displayTrades = (propTrades || []).map(t => ({
+          id: t.id,
+          time: t.time,
+          strategy: t.strategy,
+          legs: t.legsSummary,
+          pl: t.pl
+      }))
+  } else if (storeSummary) {
+      summary = storeSummary
+      displayTrades = (storeSummary.trades || []).map((t, i) => ({
+          id: t.id?.toString() || `trade-${i}`,
+          time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
+          strategy: t.strategy,
+          legs: t.legs,
+          pl: t.pl || 0
+      }))
+  }
+  
   if (!summary) return null
 
-  const dateObj = typeof summary.date === "string" ? new Date(summary.date) : summary.date
-  const isPositive = summary.totalPL >= 0
+  const dateObj = new Date(summary.date)
+  const isPositive = summary.realizedPL >= 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,7 +155,7 @@ export function DayDetailModal({
                     isPositive ? "text-emerald-400" : "text-rose-400"
                   )}
                 >
-                  {formatCurrency(summary.totalPL)}
+                  {formatCurrency(summary.realizedPL)}
                 </span>
               </div>
             </div>
@@ -130,7 +173,7 @@ export function DayDetailModal({
                   {summary.tradeCount}
                 </span>
                 <Badge variant="secondary" className="bg-neutral-800 text-neutral-300 hover:bg-neutral-700">
-                  {trades.length} Executed
+                  {displayTrades.length} Executed
                 </Badge>
               </div>
             </div>
@@ -146,12 +189,12 @@ export function DayDetailModal({
                     variant="outline"
                     className={cn(
                       "h-5 px-1.5 text-[10px] border-opacity-30",
-                      summary.reconciliationDiff && Math.abs(summary.reconciliationDiff) > 0.01
+                      summary.originalData?.reconciliationDiff && Math.abs(summary.originalData.reconciliationDiff) > 0.01
                         ? "border-rose-500 text-rose-400 bg-rose-500/10"
                         : "border-emerald-500 text-emerald-400 bg-emerald-500/10"
                     )}
                   >
-                    {summary.reconciliationDiff && Math.abs(summary.reconciliationDiff) > 0.01
+                    {summary.originalData?.reconciliationDiff && Math.abs(summary.originalData.reconciliationDiff) > 0.01
                       ? "Mismatch"
                       : "Verified"}
                   </Badge>
@@ -161,10 +204,10 @@ export function DayDetailModal({
                 <span
                   className={cn(
                     "text-3xl font-bold",
-                    summary.winRate >= 50 ? "text-emerald-400" : "text-amber-400"
+                    (summary.winRate || 0) >= 50 ? "text-emerald-400" : "text-amber-400"
                   )}
                 >
-                  {Math.round(summary.winRate)}%
+                  {Math.round(summary.winRate || 0)}%
                 </span>
                 <span className="text-xs text-neutral-500">
                   Daily Win Rate
@@ -191,7 +234,7 @@ export function DayDetailModal({
                     <span className="text-xs text-neutral-500">Peak</span>
                 </div>
                 <div className="text-xs text-neutral-400">
-                    Avg: {Math.round(summary.avgUtilization || 0)}% · Max Pos: {summary.concurrentPositions || 0}
+                    Avg: {Math.round(summary.utilizationData?.metrics.avgUtilization || 0)}% · Max Pos: {summary.utilizationData?.metrics.concurrentPositions || 0}
                 </div>
               </div>
             </div>
@@ -205,7 +248,7 @@ export function DayDetailModal({
                 <h3 className="text-sm font-medium text-neutral-300 flex items-center gap-2">
                   Trade Log
                   <Badge variant="outline" className="ml-auto text-[10px] h-5 border-neutral-700 text-neutral-400">
-                    {trades.length} Entries
+                    {displayTrades.length} Entries
                   </Badge>
                 </h3>
               </div>
@@ -220,10 +263,10 @@ export function DayDetailModal({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {trades.length > 0 ? (
-                      trades.map((trade) => (
+                    {displayTrades.length > 0 ? (
+                      displayTrades.map((trade, i) => (
                         <TableRow
-                          key={trade.id}
+                          key={trade.id || i}
                           className="hover:bg-neutral-800/50 border-neutral-800/50 cursor-pointer transition-colors group"
                         >
                           <TableCell className="font-mono text-xs text-neutral-400 group-hover:text-neutral-300">
@@ -232,14 +275,14 @@ export function DayDetailModal({
                           <TableCell className="text-xs font-medium text-neutral-300">
                             {trade.strategy}
                           </TableCell>
-                          <TableCell className="text-xs text-neutral-500 max-w-[180px] truncate" title={trade.legsSummary}>
-                            {trade.legsSummary}
+                          <TableCell className="text-xs text-neutral-500 max-w-[180px] truncate" title={trade.legs}>
+                            {trade.legs}
                           </TableCell>
                           <TableCell className={cn(
                             "text-right font-mono text-xs font-medium",
-                            trade.pl >= 0 ? "text-emerald-400" : "text-rose-400"
+                            (trade.pl || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                           )}>
-                            {formatCurrency(trade.pl)}
+                            {formatCurrency(trade.pl || 0)}
                           </TableCell>
                         </TableRow>
                       ))
