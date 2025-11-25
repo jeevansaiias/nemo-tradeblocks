@@ -12,15 +12,6 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { cn, formatCurrency } from "@/lib/utils"
 
@@ -243,59 +234,62 @@ export function DayDetailModal({
           {/* Main Content Area */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[400px]">
             {/* Left Column: Trades Table */}
-            <div className="lg:col-span-2 rounded-xl border border-neutral-800 bg-neutral-900/30 flex flex-col overflow-hidden">
-              <div className="p-3 border-b border-neutral-800 bg-neutral-900/50">
-                <h3 className="text-sm font-medium text-neutral-300 flex items-center gap-2">
+            <div className="lg:col-span-2 flex flex-col">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-neutral-300">
                   Trade Log
-                  <Badge variant="outline" className="ml-auto text-[10px] h-5 border-neutral-700 text-neutral-400">
-                    {displayTrades.length} Entries
-                  </Badge>
                 </h3>
+                <Badge variant="outline" className="text-[10px] h-5 border-neutral-700 text-neutral-400">
+                  {displayTrades.length} Entries
+                </Badge>
               </div>
-              <ScrollArea className="flex-1">
-                <Table>
-                  <TableHeader className="bg-neutral-900/50 sticky top-0 z-10">
-                    <TableRow className="hover:bg-transparent border-neutral-800">
-                      <TableHead className="w-[80px] text-xs font-medium text-neutral-500">Time</TableHead>
-                      <TableHead className="text-xs font-medium text-neutral-500">Strategy</TableHead>
-                      <TableHead className="text-xs font-medium text-neutral-500">Legs</TableHead>
-                      <TableHead className="text-right text-xs font-medium text-neutral-500">P/L</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {displayTrades.length > 0 ? (
-                      displayTrades.map((trade, i) => (
-                        <TableRow
-                          key={trade.id || i}
-                          className="hover:bg-neutral-800/50 border-neutral-800/50 cursor-pointer transition-colors group"
-                        >
-                          <TableCell className="font-mono text-xs text-neutral-400 group-hover:text-neutral-300">
-                            {trade.time}
-                          </TableCell>
-                          <TableCell className="text-xs font-medium text-neutral-300">
-                            {trade.strategy}
-                          </TableCell>
-                          <TableCell className="text-xs text-neutral-500 max-w-[180px] truncate" title={trade.legs}>
-                            {trade.legs}
-                          </TableCell>
-                          <TableCell className={cn(
-                            "text-right font-mono text-xs font-medium",
-                            (trade.pl || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
-                          )}>
-                            {formatCurrency(trade.pl || 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-xs text-neutral-500">
-                          No trades recorded for this day.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+              
+              {displayTrades.length === 0 ? (
+                <div className="h-32 rounded-xl border border-dashed border-neutral-800 flex items-center justify-center text-xs text-neutral-500">
+                  No trades recorded for this day.
+                </div>
+              ) : (
+                <div className="flex-1 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/30">
+                  <div className="h-full overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-neutral-950/80 sticky top-0 z-10 backdrop-blur-sm">
+                        <tr className="text-neutral-500 text-left border-b border-neutral-800">
+                          <th className="px-4 py-3 font-medium w-[80px]">Time</th>
+                          <th className="px-4 py-3 font-medium">Strategy</th>
+                          <th className="px-4 py-3 font-medium">Legs</th>
+                          <th className="px-4 py-3 font-medium text-right">P/L</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayTrades.map((trade, i) => (
+                          <tr
+                            key={trade.id || i}
+                            className="border-b border-neutral-800/50 hover:bg-neutral-800/50 transition-colors group last:border-0"
+                          >
+                            <td className="px-4 py-3 font-mono text-neutral-400 group-hover:text-neutral-300">
+                              {trade.time}
+                            </td>
+                            <td className="px-4 py-3 text-neutral-300 font-medium">
+                              {trade.strategy}
+                            </td>
+                            <td className="px-4 py-3 text-neutral-500 truncate max-w-[180px]" title={trade.legs}>
+                              {trade.legs}
+                            </td>
+                            <td
+                              className={cn(
+                                "px-4 py-3 text-right font-mono font-medium",
+                                (trade.pl || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                              )}
+                            >
+                              {formatCurrency(trade.pl || 0)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: Timing & Notes */}
