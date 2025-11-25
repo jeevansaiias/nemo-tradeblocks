@@ -2,11 +2,39 @@ import { StoredTrade } from "@/lib/db/trades-store"
 import { DailyLogEntry } from "@/lib/models/daily-log"
 import { getTradesByBlock } from "@/lib/db"
 import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store"
-import { format, startOfDay } from "date-fns"
+import { format, startOfDay, getISOWeek, getYear, getMonth } from "date-fns"
 import { calculateDailyUtilization, DailyUtilization } from "@/lib/calculations/utilization-analyzer"
 
 export type CalendarViewMode = "month" | "quarter" | "year"
 export type CalendarColorMode = "pl" | "count" | "winRate" | "utilization" | "risk"
+
+export interface WeeklySummary {
+  weekLabel: string;      // "Week 3", or "Sep 15–19"
+  startDate: string;
+  endDate: string;
+  netPL: number;
+  trades: number;
+  winRate?: number;
+}
+
+export interface MonthlySummary {
+  year: number;
+  month: number;          // 1–12
+  netPL: number;
+  trades: number;
+  winRate?: number;
+}
+
+export interface YearlyCalendarSnapshot {
+  year: number;                    // the main year in view
+  months: MonthlySummary[];        // 12 entries
+  monthlyTotals: MonthlySummary[]; // same as months but maybe rolled for multi-year
+  years: {
+    year: number;
+    months: MonthlySummary[];
+    total: MonthlySummary;         // aggregate row for “Total”
+  }[];
+}
 
 export interface CalendarDayData {
   date: Date
@@ -129,7 +157,9 @@ export class CalendarDataService {
   ): Promise<{
     summaries: CalendarDaySummary[],
     utilizations: DailyUtilization[],
-    dayMap: Map<string, CalendarDayData>
+    dayMap: Map<string, CalendarDayData>,
+    weeklySummaries: WeeklySummary[],
+    yearlySnapshot: YearlyCalendarSnapshot
   }> {
     const { dayMap } = await this.getCalendarData(blockId)
     const utilizations = await calculateDailyUtilization(blockId, dateRange)
@@ -197,8 +227,146 @@ export class CalendarDataService {
         
         return { ...day, riskScore }
     })
+
+    // --- Weekly Summaries ---
+    const weeklyMap = new Map<string, { summary: WeeklySummary, wins: number }>()
     
-    return { summaries, utilizations, dayMap }
+    summaries.forEach(day => {
+        const date = new Date(day.date)
+        const year = getYear(date)
+        const week = getISOWeek(date)
+        const weekKey = `${year}-W${week}`
+        
+        if (!weeklyMap.has(weekKey)) {
+            weeklyMap.set(weekKey, {
+                summary: {
+                    weekLabel: `Week ${week}`,
+                    startDate: day.date,
+                    endDate: day.date,
+                    netPL: 0,
+                    trades: 0,
+                    winRate: 0
+                },
+                wins: 0
+            })
+        }
+        
+        const entry = weeklyMap.get(weekKey)!
+        entry.summary.netPL += day.realizedPL
+        entry.summary.trades += day.tradeCount
+        entry.wins += day.trades.filter(t => (t.pl || 0) > 0).length
+        
+        // Update dates
+        if (day.date < entry.summary.startDate) entry.summary.startDate = day.date
+        if (day.date > entry.summary.endDate) entry.summary.endDate = day.date
+    })
+
+    const weeklySummaries: WeeklySummary[] = Array.from(weeklyMap.values()).map(entry => ({
+        ...entry.summary,
+        winRate: entry.summary.trades > 0 ? entry.wins / entry.summary.trades : 0
+    })).sort((a, b) => a.startDate.localeCompare(b.startDate))
+
+    // --- Yearly Snapshot ---
+    const yearsMap = new Map<number, { months: Map<number, MonthlySummary>, total: MonthlySummary, wins: number }>()
+
+    summaries.forEach(day => {
+        const date = new Date(day.date)
+        const year = getYear(date)
+        const month = getMonth(date) + 1 // 1-12
+
+        if (!yearsMap.has(year)) {
+            yearsMap.set(year, {
+                months: new Map(),
+                total: { year, month: 0, netPL: 0, trades: 0, winRate: 0 },
+                wins: 0
+            })
+        }
+
+        const yearEntry = yearsMap.get(year)!
+        
+        // Update Month
+        if (!yearEntry.months.has(month)) {
+            yearEntry.months.set(month, { year, month, netPL: 0, trades: 0, winRate: 0 })
+        }
+        const monthEntry = yearEntry.months.get(month)!
+        const dayWins = day.trades.filter(t => (t.pl || 0) > 0).length
+
+        monthEntry.netPL += day.realizedPL
+        monthEntry.trades += day.tradeCount
+        // We need to track wins for month to calc winRate correctly
+        // Let's just store wins in winRate temporarily as a count? No, let's re-iterate or just approximate?
+        // Correct way: store wins separately. But MonthlySummary interface doesn't have wins.
+        // Let's just assume we can calculate it if we had the data. 
+        // For now, let's just sum winRates? No, that's wrong.
+        // Let's add a hidden 'wins' property to MonthlySummary or just recalculate.
+        // Since I can't easily change the interface inside the map without casting, I'll just do a quick hack:
+        // Store wins in a separate map key or just use the loop.
+        // Actually, let's just add 'wins' to the map value.
+        
+        // Re-doing month entry with wins tracking
+        // We need a separate structure for aggregation
+    })
+
+    // Proper Yearly Aggregation
+    const yearAggs = new Map<number, {
+        months: Map<number, { netPL: number, trades: number, wins: number }>,
+        total: { netPL: number, trades: number, wins: number }
+    }>()
+
+    summaries.forEach(day => {
+        const date = new Date(day.date)
+        const year = getYear(date)
+        const month = getMonth(date) + 1
+
+        if (!yearAggs.has(year)) {
+            yearAggs.set(year, { months: new Map(), total: { netPL: 0, trades: 0, wins: 0 } })
+        }
+        const y = yearAggs.get(year)!
+        
+        if (!y.months.has(month)) {
+            y.months.set(month, { netPL: 0, trades: 0, wins: 0 })
+        }
+        const m = y.months.get(month)!
+        
+        const dayWins = day.trades.filter(t => (t.pl || 0) > 0).length
+        
+        m.netPL += day.realizedPL
+        m.trades += day.tradeCount
+        m.wins += dayWins
+        
+        y.total.netPL += day.realizedPL
+        y.total.trades += day.tradeCount
+        y.total.wins += dayWins
+    })
+
+    const years = Array.from(yearAggs.entries()).map(([year, data]) => {
+        const months = Array.from(data.months.entries()).map(([month, mData]) => ({
+            year,
+            month,
+            netPL: mData.netPL,
+            trades: mData.trades,
+            winRate: mData.trades > 0 ? mData.wins / mData.trades : 0
+        })).sort((a, b) => a.month - b.month)
+
+        const total = {
+            year,
+            month: 0,
+            netPL: data.total.netPL,
+            trades: data.total.trades,
+            winRate: data.total.trades > 0 ? data.total.wins / data.total.trades : 0
+        }
+
+        return { year, months, total }
+    }).sort((a, b) => b.year - a.year)
+
+    const yearlySnapshot: YearlyCalendarSnapshot = {
+        year: getYear(dateRange.start), // Approximate
+        months: years.find(y => y.year === getYear(dateRange.start))?.months || [],
+        monthlyTotals: [], // Not strictly needed based on the component usage
+        years
+    }
+    
+    return { summaries, utilizations, dayMap, weeklySummaries, yearlySnapshot }
   }
 
   static getStats(dayMap: Map<string, CalendarDayData>): CalendarStats {

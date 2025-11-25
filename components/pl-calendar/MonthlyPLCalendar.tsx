@@ -32,6 +32,7 @@ interface MonthlyPLCalendarProps {
   onDateChange: (date: Date) => void
   colorMode?: CalendarColorMode
   compact?: boolean
+  showHeader?: boolean
 }
 
 interface WeekSummary {
@@ -45,7 +46,7 @@ interface WeekSummary {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode = "pl", compact = false }: MonthlyPLCalendarProps) {
+export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode = "pl", compact = false, showHeader = true }: MonthlyPLCalendarProps) {
   const [selectedDayData, setSelectedDayData] = useState<CalendarDayData | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -145,7 +146,7 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
   return (
     <div className="space-y-6">
       {/* Month Navigation */}
-        {!compact && (
+        {!compact && showHeader && (
           <div className="flex items-center justify-between">
             <Button
               variant="outline"

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { CalendarColorMode, CalendarDaySummary, CalendarViewMode, CalendarDataService } from '@/lib/services/calendar-data-service'
+import { CalendarColorMode, CalendarDaySummary, CalendarViewMode, CalendarDataService, WeeklySummary, YearlyCalendarSnapshot } from '@/lib/services/calendar-data-service'
 import { DailyUtilization } from '@/lib/calculations/utilization-analyzer'
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from 'date-fns'
 
@@ -12,6 +12,8 @@ interface CalendarState {
   selectedDate: Date | null
   daySummaries: CalendarDaySummary[]
   dailyUtilizations: DailyUtilization[]
+  weeklySummaries: WeeklySummary[]
+  yearlySnapshot: YearlyCalendarSnapshot | null
   isLoading: boolean
   error: string | null
   
@@ -31,6 +33,8 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
   selectedDate: null,
   daySummaries: [],
   dailyUtilizations: [],
+  weeklySummaries: [],
+  yearlySnapshot: null,
   isLoading: false,
   error: null,
 
@@ -63,13 +67,19 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         end = endOfYear(currentDate)
       }
       
-      const { summaries, utilizations } = await CalendarDataService.buildCalendarDaySummaries(
+      const { summaries, utilizations, weeklySummaries, yearlySnapshot } = await CalendarDataService.buildCalendarDaySummaries(
         blockId,
         { start, end },
         colorBy
       )
       
-      set({ daySummaries: summaries, dailyUtilizations: utilizations, isLoading: false })
+      set({ 
+        daySummaries: summaries, 
+        dailyUtilizations: utilizations, 
+        weeklySummaries,
+        yearlySnapshot,
+        isLoading: false 
+      })
     } catch (error) {
       console.error("Failed to load calendar data:", error)
       set({ error: "Failed to load calendar data", isLoading: false })

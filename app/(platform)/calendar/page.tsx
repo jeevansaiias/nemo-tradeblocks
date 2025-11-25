@@ -3,10 +3,11 @@
 import { useEffect } from "react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { useBlockStore } from "@/lib/stores/block-store"
-import { CalendarGrid } from "@/components/pl-calendar/calendar-grid"
-import { DayDetailModal } from "@/components/pl-calendar/day-detail-modal"
+import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
+import { MonthlyWeeklySummary } from "@/components/pl-calendar/MonthlyWeeklySummary"
+import { YearHeatmap } from "@/components/pl-calendar/YearHeatmap"
 import { UtilizationPanel } from "@/components/pl-calendar/utilization-panel"
-import { CalendarViewMode, CalendarColorMode } from "@/lib/services/calendar-data-service"
+import { CalendarViewMode, CalendarColorMode, CalendarDayData } from "@/lib/services/calendar-data-service"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -22,7 +23,8 @@ export default function CalendarPage() {
     currentDate, setCurrentDate, 
     loadData, isLoading, 
     daySummaries,
-    selectedDate, setSelectedDate
+    weeklySummaries,
+    yearlySnapshot
   } = useCalendarStore()
 
   useEffect(() => {
@@ -55,6 +57,13 @@ export default function CalendarPage() {
   const winRate = totalTrades > 0 
     ? (daySummaries.reduce((sum, day) => sum + (day.originalData?.trades.filter(t => (t.pl || 0) > 0).length || 0), 0) / totalTrades) * 100 
     : 0
+
+  // Prepare data for views
+  const dayMap = new Map<string, CalendarDayData>(
+    daySummaries
+      .filter(s => s.originalData)
+      .map(s => [s.date, s.originalData as CalendarDayData])
+  )
 
   if (!activeBlockId) {
       return (
@@ -154,17 +163,28 @@ export default function CalendarPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <CalendarGrid />
+        <div className="mt-6">
+          {view === 'year' && yearlySnapshot ? (
+             <YearHeatmap data={yearlySnapshot} metric="pl" />
+          ) : (
+             <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
+                <div className="min-w-0">
+                    <MonthlyPLCalendar
+                    currentDate={currentDate}
+                    dayMap={dayMap}
+                    colorMode={colorBy}
+                    onDateChange={setCurrentDate}
+                    showHeader={false}
+                    />
+                </div>
+                <MonthlyWeeklySummary weeklySummaries={weeklySummaries} />
+             </div>
+          )}
+        </div>
       )}
 
       {/* Utilization Panel */}
       <UtilizationPanel data={daySummaries} />
-
-      {/* Detail Modal */}
-      <DayDetailModal 
-        open={!!selectedDate} 
-        onOpenChange={(open) => !open && setSelectedDate(null)}
-      />
     </div>
   )
 }
