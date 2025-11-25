@@ -1,5 +1,6 @@
 import React from "react";
 import type { WeeklySummary } from "@/lib/services/calendar-data-service";
+import { formatCompactCurrency } from "@/lib/formatters/number-format";
 
 interface MonthlyWeeklySummaryProps {
   weeklySummaries: WeeklySummary[];
@@ -39,11 +40,7 @@ export const MonthlyWeeklySummary: React.FC<MonthlyWeeklySummaryProps> = ({
                   {week.weekLabel}
                 </div>
                 <div className={`font-mono text-sm ${plColor}`}>
-                  {week.netPL === 0 ? "$0" : week.netPL.toLocaleString("en-US", {
-                    style: "currency",
-                    currency: "USD",
-                    maximumFractionDigits: 0,
-                  })}
+                  {formatCompactCurrency(week.netPL)}
                 </div>
               </div>
 

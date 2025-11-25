@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
-import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters } from "date-fns"
+import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters, startOfQuarter, isSameMonth, parseISO } from "date-fns"
 import { formatCurrency, cn } from "@/lib/utils"
 
 export default function CalendarPage() {
@@ -44,6 +44,12 @@ export default function CalendarPage() {
     else if (view === 'quarter') setCurrentDate(addQuarters(currentDate, 1))
     else if (view === 'year') setCurrentDate(addYears(currentDate, 1))
   }
+
+  const handleMonthClick = (year: number, monthIndex: number) => {
+    const newDate = new Date(year, monthIndex, 1);
+    setCurrentDate(newDate);
+    setView('month');
+  };
 
   const getHeaderLabel = () => {
     if (view === 'month') return format(currentDate, 'MMMM yyyy')
@@ -165,7 +171,32 @@ export default function CalendarPage() {
       ) : (
         <div className="mt-6">
           {view === 'year' && yearlySnapshot ? (
-             <YearHeatmap data={yearlySnapshot} metric="pl" />
+             <YearHeatmap 
+                data={yearlySnapshot} 
+                metric="pl" 
+                onMonthClick={handleMonthClick}
+             />
+          ) : view === 'quarter' ? (
+             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                {[0, 1, 2].map((offset) => {
+                    const qStart = startOfQuarter(currentDate);
+                    const monthDate = addMonths(qStart, offset);
+                    return (
+                        <div key={offset} className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+                            <div className="mb-4 text-center font-mono text-sm font-medium text-zinc-400">
+                                {format(monthDate, 'MMMM yyyy')}
+                            </div>
+                            <MonthlyPLCalendar
+                                currentDate={monthDate}
+                                dayMap={dayMap}
+                                colorMode={colorBy}
+                                onDateChange={() => {}}
+                                showHeader={false}
+                            />
+                        </div>
+                    )
+                })}
+             </div>
           ) : (
              <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
                 <div className="min-w-0">
@@ -177,7 +208,13 @@ export default function CalendarPage() {
                     showHeader={false}
                     />
                 </div>
-                <MonthlyWeeklySummary weeklySummaries={weeklySummaries} />
+                <MonthlyWeeklySummary 
+                    weeklySummaries={weeklySummaries.filter(w => {
+                        const start = parseISO(w.startDate);
+                        const end = parseISO(w.endDate);
+                        return isSameMonth(start, currentDate) || isSameMonth(end, currentDate);
+                    })} 
+                />
              </div>
           )}
         </div>

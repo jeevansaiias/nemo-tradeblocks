@@ -1,9 +1,11 @@
 import React from "react";
 import type { YearlyCalendarSnapshot, MonthlySummary } from "@/lib/services/calendar-data-service";
+import { formatCompactCurrency } from "@/lib/formatters/number-format";
 
 interface YearHeatmapProps {
   data: YearlyCalendarSnapshot;
   metric: "pl" | "trades" | "winrate"; // based on your color-by selector
+  onMonthClick?: (year: number, month: number) => void;
 }
 
 function getCellColorClass(value: number) {
@@ -14,19 +16,7 @@ function getCellColorClass(value: number) {
   return "bg-rose-700/70 text-rose-50";
 }
 
-function formatPL(netPL: number) {
-  if (!netPL) return "--";
-  const abs = Math.abs(netPL);
-  const sign = netPL >= 0 ? "" : "-";
-  if (abs >= 1000) return `${sign}$${Math.round(abs / 1000)}K`;
-  return `${sign}${netPL.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  })}`;
-}
-
-export const YearHeatmap: React.FC<YearHeatmapProps> = ({ data }) => {
+export const YearHeatmap: React.FC<YearHeatmapProps> = ({ data, onMonthClick }) => {
   const monthsOrder = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   return (
@@ -89,17 +79,19 @@ export const YearHeatmap: React.FC<YearHeatmapProps> = ({ data }) => {
 
                   return (
                     <td key={monthIndex} className="px-2">
-                      <div
-                        className={`flex h-14 flex-col items-center justify-center rounded-xl px-2 ${colorClass}`}
+                      <button
+                        type="button"
+                        onClick={() => onMonthClick?.(yearRow.year, monthIndex)}
+                        className={`flex h-14 w-full flex-col items-center justify-center rounded-xl px-2 transition hover:ring-2 hover:ring-primary/40 ${colorClass}`}
                       >
                         <div className="font-mono text-xs">
-                          {formatPL(monthSummary.netPL)}
+                          {formatCompactCurrency(monthSummary.netPL)}
                         </div>
                         <div className="mt-0.5 text-[0.65rem] text-zinc-300/80">
                           {monthSummary.trades}{" "}
                           {monthSummary.trades === 1 ? "trade" : "trades"}
                         </div>
-                      </div>
+                      </button>
                     </td>
                   );
                 })}
@@ -107,7 +99,7 @@ export const YearHeatmap: React.FC<YearHeatmapProps> = ({ data }) => {
                 <td className="px-2">
                   <div className="flex h-14 flex-col items-center justify-center rounded-xl bg-zinc-900 px-2">
                     <div className="font-mono text-xs text-zinc-100">
-                      {formatPL(yearRow.total.netPL)}
+                      {formatCompactCurrency(yearRow.total.netPL)}
                     </div>
                     <div className="mt-0.5 text-[0.65rem] text-zinc-400">
                       {yearRow.total.trades} trades
