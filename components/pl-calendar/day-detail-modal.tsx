@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import { format } from "date-fns"
-import { Activity, TrendingUp, Repeat, Trophy, Puzzle, X, Clock, FileText } from "lucide-react"
+import { TrendingUp, Repeat, Trophy, Puzzle, X, Clock, FileText } from "lucide-react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 
 import {
@@ -14,12 +14,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { cn, formatCurrency } from "@/lib/utils"
 
 interface DayDetailModalProps {
