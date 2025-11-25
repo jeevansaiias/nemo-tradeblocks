@@ -11,6 +11,12 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface DayDetailModalProps {
   open: boolean;
@@ -66,11 +72,12 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
   })
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="max-w-5xl p-0 border-none bg-transparent shadow-none sm:max-w-5xl"
-        showCloseButton={false}
-      >
+    <TooltipProvider delayDuration={150}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent 
+          className="max-w-5xl p-0 border-none bg-transparent shadow-none sm:max-w-5xl"
+          showCloseButton={false}
+        >
         <DialogTitle className="sr-only">Daily Performance Review</DialogTitle>
         
         <div className="w-full rounded-xl bg-[#0d0d0d] border border-white/10 shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
@@ -155,8 +162,17 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
 
                         <td className="px-4 py-2 text-white whitespace-nowrap">{trade.strategy}</td>
 
-                        <td className="px-4 py-2 text-white/60 font-mono text-xs whitespace-nowrap">
-                            {trade.legsSummary}
+                        <td className="px-4 py-2 align-middle">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="block max-w-[260px] truncate font-mono text-xs text-white/60 cursor-default">
+                                        {trade.legsSummary}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start" className="max-w-xl whitespace-pre-wrap font-mono text-xs bg-[#1a1a1a] border-white/10 text-white/90">
+                                    {trade.legsSummary}
+                                </TooltipContent>
+                            </Tooltip>
                         </td>
 
                         <td
@@ -176,5 +192,6 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
         </div>
       </DialogContent>
     </Dialog>
+    </TooltipProvider>
   )
 }
