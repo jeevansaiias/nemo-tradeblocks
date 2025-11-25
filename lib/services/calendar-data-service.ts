@@ -3,9 +3,10 @@ import { DailyLogEntry } from "@/lib/models/daily-log"
 import { getTradesByBlock } from "@/lib/db"
 import { getDailyLogsByBlock } from "@/lib/db/daily-logs-store"
 import { format, startOfDay } from "date-fns"
+import { calculateDailyUtilization, DailyUtilization } from "@/lib/calculations/utilization-analyzer"
 
 export type CalendarViewMode = "month" | "quarter" | "year"
-export type CalendarColorMode = "pl" | "count" | "winRate"
+export type CalendarColorMode = "pl" | "count" | "winRate" | "utilization" | "risk"
 
 export interface CalendarDayData {
   date: Date
@@ -15,6 +16,20 @@ export interface CalendarDayData {
   trades: StoredTrade[]
   dailyLog?: DailyLogEntry
   reconciliationDiff?: number // Difference between trade PL and daily log PL
+}
+
+export interface CalendarDaySummary {
+  date: string;              // "YYYY-MM-DD"
+  realizedPL: number;
+  tradeCount: number;
+  winRate: number | null;
+  utilizationPercent: number | null;
+  peakUtilizationPercent: number | null;
+  colorMetric: CalendarColorMode;
+  utilizationBucket?: "low" | "medium" | "high" | "extreme";
+  hasDailyLog: boolean;
+  originalData?: CalendarDayData;
+  utilizationData?: DailyUtilization;
 }
 
 export interface CalendarStats {
@@ -102,6 +117,60 @@ export class CalendarDataService {
     })
 
     return { trades, dailyLogs, dayMap }
+  }
+
+  static async buildCalendarDaySummaries(
+    blockId: string, 
+    dateRange: { start: Date; end: Date },
+    colorBy: CalendarColorMode
+  ): Promise<{
+    summaries: CalendarDaySummary[],
+    utilizations: DailyUtilization[],
+    dayMap: Map<string, CalendarDayData>
+  }> {
+    const { dayMap } = await this.getCalendarData(blockId)
+    const utilizations = await calculateDailyUtilization(blockId, dateRange)
+    
+    const summaries: CalendarDaySummary[] = []
+    
+    const utilMap = new Map(utilizations.map(u => [format(u.date, 'yyyy-MM-dd'), u]))
+    
+    // We need a set of all dates from both sources
+    const allDates = new Set([...dayMap.keys(), ...utilMap.keys()])
+    
+    allDates.forEach(dateKey => {
+        const dayData = dayMap.get(dateKey)
+        const utilData = utilMap.get(dateKey)
+        
+        if (!dayData && !utilData) return
+        
+        const realizedPL = dayData?.pl || utilData?.metrics.realizedPL || 0
+        const tradeCount = dayData?.tradeCount || utilData?.metrics.tradesOpened || 0
+        
+        const utilizationPercent = utilData?.metrics.utilizationPercent || 0
+        const peakUtilizationPercent = utilData?.metrics.peakUtilization || 0
+        
+        let utilizationBucket: "low" | "medium" | "high" | "extreme" = "low"
+        if (peakUtilizationPercent > 80) utilizationBucket = "extreme"
+        else if (peakUtilizationPercent > 50) utilizationBucket = "high"
+        else if (peakUtilizationPercent > 20) utilizationBucket = "medium"
+        
+        summaries.push({
+            date: dateKey,
+            realizedPL,
+            tradeCount,
+            winRate: dayData ? dayData.winRate : null,
+            utilizationPercent: utilData ? utilizationPercent : null,
+            peakUtilizationPercent: utilData ? peakUtilizationPercent : null,
+            colorMetric: colorBy,
+            utilizationBucket,
+            hasDailyLog: !!dayData?.dailyLog,
+            originalData: dayData,
+            utilizationData: utilData
+        })
+    })
+    
+    return { summaries, utilizations, dayMap }
   }
 
   static getStats(dayMap: Map<string, CalendarDayData>): CalendarStats {

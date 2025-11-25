@@ -1,240 +1,189 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CalendarDataService, CalendarViewMode, CalendarColorMode, CalendarDayData, CalendarStats } from "@/lib/services/calendar-data-service"
-import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
-import { QuarterlyPLView } from "@/components/pl-calendar/QuarterlyPLView"
-import { YearlyPLTable } from "@/components/pl-calendar/YearlyPLTable"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-    Tabs,
-    TabsList,
-    TabsTrigger,
-} from "@/components/ui/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { useEffect } from "react"
+import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { useBlockStore } from "@/lib/stores/block-store"
-import { Calendar, Target, TrendingDown, TrendingUp } from "lucide-react"
+import { TradeCalendar } from "@/components/pl-calendar/trade-calendar"
+import { DayDetailModal } from "@/components/pl-calendar/day-detail-modal"
+import { UtilizationPanel } from "@/components/pl-calendar/utilization-panel"
+import { CalendarViewMode, CalendarColorMode } from "@/lib/services/calendar-data-service"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { format, addMonths, subMonths, addYears, subYears } from "date-fns"
 import { formatCurrency, cn } from "@/lib/utils"
-import { StoredTrade } from "@/lib/db/trades-store"
 
 export default function CalendarPage() {
-  const activeBlock = useBlockStore((state) => {
-    const activeBlockId = state.activeBlockId
-    return activeBlockId
-      ? state.blocks.find((block) => block.id === activeBlockId)
-      : null
-  })
-
-  const [dayMap, setDayMap] = useState<Map<string, CalendarDayData>>(new Map())
-  const [stats, setStats] = useState<CalendarStats | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
-  const [colorMode, setColorMode] = useState<CalendarColorMode>("pl")
-  const [trades, setTrades] = useState<StoredTrade[]>([]) // Keep trades for YearlyPLTable compatibility for now
+  const activeBlockId = useBlockStore((state) => state.activeBlockId)
+  const { 
+    view, setView, 
+    colorBy, setColorBy, 
+    currentDate, setCurrentDate, 
+    loadData, isLoading, 
+    daySummaries, dailyUtilizations,
+    selectedDate, setSelectedDate
+  } = useCalendarStore()
 
   useEffect(() => {
-    async function loadData() {
-      if (!activeBlock?.id) {
-        setDayMap(new Map())
-        setStats(null)
-        setIsLoading(false)
-        return
-      }
-
-      setIsLoading(true)
-      try {
-        const { dayMap, trades } = await CalendarDataService.getCalendarData(activeBlock.id)
-        const stats = CalendarDataService.getStats(dayMap)
-        setDayMap(dayMap)
-        setStats(stats)
-        setTrades(trades)
-      } catch (error) {
-        console.error("Failed to load calendar data:", error)
-      } finally {
-        setIsLoading(false)
-      }
+    if (activeBlockId) {
+      loadData(activeBlockId)
     }
+  }, [activeBlockId, view, currentDate, colorBy, loadData])
 
-    loadData()
-  }, [activeBlock?.id])
-
-  const handleMonthClick = (year: number, month: number) => {
-    const selectedDate = new Date(year, month, 1)
-    setCurrentDate(selectedDate)
-    setViewMode("month")
+  const handlePrevious = () => {
+    if (view === 'month') setCurrentDate(subMonths(currentDate, 1))
+    else if (view === 'quarter') setCurrentDate(subMonths(currentDate, 3))
+    else if (view === 'year') setCurrentDate(subYears(currentDate, 1))
   }
 
-  if (!activeBlock) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Card className="max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              No Active Block Selected
-            </CardTitle>
-            <CardDescription>
-              Choose a block from the sidebar to view your trading calendar.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    )
+  const handleNext = () => {
+    if (view === 'month') setCurrentDate(addMonths(currentDate, 1))
+    else if (view === 'quarter') setCurrentDate(addMonths(currentDate, 3))
+    else if (view === 'year') setCurrentDate(addYears(currentDate, 1))
+  }
+
+  // Calculate view stats
+  const totalPL = daySummaries.reduce((sum, day) => sum + day.realizedPL, 0)
+  const totalTrades = daySummaries.reduce((sum, day) => sum + day.tradeCount, 0)
+  const winRate = totalTrades > 0 
+    ? (daySummaries.reduce((sum, day) => sum + (day.originalData?.trades.filter(t => (t.pl || 0) > 0).length || 0), 0) / totalTrades) * 100 
+    : 0
+
+  if (!activeBlockId) {
+      return (
+        <div className="flex h-64 items-center justify-center">
+          <Card className="max-w-md text-center">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                No Active Block Selected
+              </CardTitle>
+              <CardDescription>
+                Choose a block from the sidebar to view your trading calendar.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            📅 P/L Calendar
-          </h1>
-          <p className="text-muted-foreground">
-            Daily profit/loss visualization for {activeBlock.name}
-          </p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handlePrevious}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="text-2xl font-bold min-w-[200px] text-center">
+            {format(currentDate, view === 'year' ? 'yyyy' : 'MMMM yyyy')}
+          </h2>
+          <Button variant="outline" size="icon" onClick={handleNext}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
-        
-        <div className="flex items-center gap-4">
-            {/* Color Mode Selector */}
-            <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Color by:</span>
-                <Select value={colorMode} onValueChange={(v) => setColorMode(v as CalendarColorMode)}>
-                    <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Color Mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="pl">P/L</SelectItem>
-                        <SelectItem value="count">Trade Count</SelectItem>
-                        <SelectItem value="winRate">Win Rate</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
 
-            {/* View Toggle */}
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as CalendarViewMode)}>
-            <TabsList>
-                <TabsTrigger value="month">Month</TabsTrigger>
-                <TabsTrigger value="quarter">Quarter</TabsTrigger>
-                <TabsTrigger value="year">Year</TabsTrigger>
-            </TabsList>
-            </Tabs>
+        <div className="flex items-center gap-2">
+          <Select value={view} onValueChange={(v) => setView(v as CalendarViewMode)}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="View" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Month</SelectItem>
+              <SelectItem value="quarter">Quarter</SelectItem>
+              <SelectItem value="year">Year</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={colorBy} onValueChange={(v) => setColorBy(v as CalendarColorMode)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Color By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pl">P/L</SelectItem>
+              <SelectItem value="utilization">Utilization</SelectItem>
+              <SelectItem value="count">Trade Count</SelectItem>
+              <SelectItem value="risk">Risk</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      {stats && (
-        <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total P/L</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className={cn("text-2xl font-bold", stats.totalPL >= 0 ? 'text-green-600' : 'text-red-600')}>
-                {formatCurrency(stats.totalPL)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                {stats.totalTrades} total trades
-                </p>
-            </CardContent>
-            </Card>
+      {/* Stats Summary (for current view) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Period P/L</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn("text-2xl font-bold", totalPL >= 0 ? "text-emerald-500" : "text-rose-500")}>
+              {formatCurrency(totalPL)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Trades</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalTrades}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn("text-2xl font-bold", winRate >= 50 ? "text-emerald-500" : "text-amber-500")}>
+              {winRate.toFixed(1)}%
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
-                <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                {stats.winRate.toFixed(1)}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                Overall win rate
-                </p>
-            </CardContent>
-            </Card>
-
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Best Day</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                {stats.bestDay ? formatCurrency(stats.bestDay.pl) : "$0.00"}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                {stats.bestDay ? stats.bestDay.date.toLocaleDateString() : "-"}
-                </p>
-            </CardContent>
-            </Card>
-
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Worst Day</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                {stats.worstDay ? formatCurrency(stats.worstDay.pl) : "$0.00"}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                {stats.worstDay ? stats.worstDay.date.toLocaleDateString() : "-"}
-                </p>
-            </CardContent>
-            </Card>
+      {/* Calendar Grid */}
+      {isLoading ? (
+        <div className="h-[400px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : (
+        <TradeCalendar />
       )}
 
-      {/* Calendar Views */}
-      <div className="space-y-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-sm text-muted-foreground">Loading calendar...</div>
-            </div>
-          ) : (
-            <>
-                {viewMode === 'month' && (
-                    <MonthlyPLCalendar
-                        dayMap={dayMap}
-                        currentDate={currentDate}
-                        onDateChange={setCurrentDate}
-                        colorMode={colorMode}
-                    />
-                )}
-                {viewMode === 'quarter' && (
-                    <QuarterlyPLView
-                        dayMap={dayMap}
-                        currentDate={currentDate}
-                        onDateChange={setCurrentDate}
-                        colorMode={colorMode}
-                    />
-                )}
-                {viewMode === 'year' && (
-                    <YearlyPLTable
-                        trades={trades}
-                        currentYear={currentDate.getFullYear()}
-                        onYearChange={(year) => setCurrentDate(new Date(year, 0, 1))}
-                        onMonthClick={handleMonthClick}
-                    />
-                )}
-            </>
-          )}
-      </div>
+      {/* Utilization Panel */}
+      <UtilizationPanel data={dailyUtilizations} />
+
+      {/* Detail Modal */}
+      <DayDetailModal 
+        open={!!selectedDate} 
+        onOpenChange={(open) => !open && setSelectedDate(null)}
+        summary={selectedDate ? (() => {
+            const s = daySummaries.find(s => s.date === format(selectedDate, 'yyyy-MM-dd'))
+            if (!s) return null
+            return {
+                date: s.date,
+                totalPL: s.realizedPL,
+                winRate: s.winRate || 0,
+                tradeCount: s.tradeCount,
+                hasDailyLog: s.hasDailyLog,
+                reconciliationDiff: s.originalData?.reconciliationDiff,
+                peakUtilizationPercent: s.peakUtilizationPercent,
+                avgUtilization: s.utilizationData?.metrics.avgUtilization,
+                concurrentPositions: s.utilizationData?.metrics.concurrentPositions
+            }
+        })() : null}
+        trades={selectedDate ? (daySummaries.find(s => s.date === format(selectedDate, 'yyyy-MM-dd'))?.originalData?.trades.map((t, i) => ({
+            id: t.id?.toString() || `trade-${i}`,
+            time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
+            strategy: t.strategy,
+            legsSummary: t.legs,
+            pl: t.pl || 0,
+            maxProfit: t.maxProfit,
+            maxLoss: t.maxLoss
+        })) || []) : []}
+        intradaySnapshots={selectedDate ? (daySummaries.find(s => s.date === format(selectedDate, 'yyyy-MM-dd'))?.utilizationData?.intradaySnapshots || []) : []}
+      />
     </div>
   )
 }

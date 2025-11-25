@@ -24,7 +24,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { CalendarDayData, CalendarColorMode } from "@/lib/services/calendar-data-service"
 import { cn, formatCurrency } from "@/lib/utils"
-import { DailyDetailModal } from "./DailyDetailModal"
+import { DayDetailModal } from "./day-detail-modal"
 
 interface MonthlyPLCalendarProps {
   dayMap: Map<string, CalendarDayData>
@@ -283,10 +283,26 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
         )}
       </div>
 
-      <DailyDetailModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          dayData={selectedDayData} 
+      <DayDetailModal 
+          open={isModalOpen} 
+          onOpenChange={setIsModalOpen} 
+          summary={selectedDayData ? {
+            date: selectedDayData.date,
+            totalPL: selectedDayData.pl,
+            winRate: selectedDayData.winRate,
+            tradeCount: selectedDayData.tradeCount,
+            hasDailyLog: !!selectedDayData.dailyLog,
+            reconciliationDiff: selectedDayData.reconciliationDiff
+          } : null}
+          trades={selectedDayData?.trades.map((t, i) => ({
+            id: t.id?.toString() || `trade-${i}`,
+            time: t.dateOpened ? format(new Date(t.dateOpened), "HH:mm") : "-",
+            strategy: t.strategy,
+            legsSummary: t.legs,
+            pl: t.pl || 0,
+            maxProfit: t.maxProfit,
+            maxLoss: t.maxLoss
+          })) || []}
       />
     </div>
   )
