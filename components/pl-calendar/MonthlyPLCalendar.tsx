@@ -23,7 +23,8 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { CalendarDayData, CalendarColorMode } from "@/lib/services/calendar-data-service"
-import { cn, formatCurrency } from "@/lib/utils"
+import { cn } from "@/lib/utils"
+import { formatCompactPL } from "@/lib/utils/format"
 import { DayDetailModal } from "./day-detail-modal"
 
 interface MonthlyPLCalendarProps {
@@ -223,7 +224,7 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
                       {isCurrentMonth && hasData && (
                         <div className="mt-1 space-y-0.5">
                           <div className={cn("text-[10px] font-bold truncate", getDayTextColor(dayData.pl, hasData))}>
-                            {colorMode === 'pl' && formatCurrency(dayData.pl)}
+                            {colorMode === 'pl' && formatCompactPL(dayData.pl)}
                             {colorMode === 'count' && `${dayData.tradeCount} trades`}
                             {colorMode === 'winRate' && `${Math.round(dayData.winRate)}%`}
                           </div>
@@ -274,7 +275,7 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
                       </p>
                       </div>
                       <p className={cn("font-semibold", week.totalPL >= 0 ? "text-green-600" : "text-red-600")}>
-                      {formatCurrency(week.totalPL)}
+                      {formatCompactPL(week.totalPL)}
                       </p>
                   </div>
                   ))}

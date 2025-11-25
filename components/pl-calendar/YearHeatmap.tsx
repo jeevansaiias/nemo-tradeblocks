@@ -1,6 +1,6 @@
 import React from "react";
 import type { YearlyCalendarSnapshot, MonthlySummary } from "@/lib/services/calendar-data-service";
-import { formatCompactCurrency } from "@/lib/formatters/number-format";
+import { formatCompactPL } from "@/lib/utils/format";
 
 interface YearHeatmapProps {
   data: YearlyCalendarSnapshot;
@@ -85,7 +85,7 @@ export const YearHeatmap: React.FC<YearHeatmapProps> = ({ data, onMonthClick }) 
                         className={`flex h-14 w-full flex-col items-center justify-center rounded-xl px-2 transition hover:ring-2 hover:ring-primary/40 ${colorClass}`}
                       >
                         <div className="font-mono text-xs">
-                          {formatCompactCurrency(monthSummary.netPL)}
+                          {formatCompactPL(monthSummary.netPL)}
                         </div>
                         <div className="mt-0.5 text-[0.65rem] text-zinc-300/80">
                           {monthSummary.trades}{" "}
@@ -99,7 +99,7 @@ export const YearHeatmap: React.FC<YearHeatmapProps> = ({ data, onMonthClick }) 
                 <td className="px-2">
                   <div className="flex h-14 flex-col items-center justify-center rounded-xl bg-zinc-900 px-2">
                     <div className="font-mono text-xs text-zinc-100">
-                      {formatCompactCurrency(yearRow.total.netPL)}
+                      {formatCompactPL(yearRow.total.netPL)}
                     </div>
                     <div className="mt-0.5 text-[0.65rem] text-zinc-400">
                       {yearRow.total.trades} trades

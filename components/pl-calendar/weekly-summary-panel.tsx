@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { formatCompactCurrency } from "@/lib/formatters/number-format";
+import { formatCompactPL } from "@/lib/utils/format";
 import type { WeeklyBucket, CalendarColorMode } from "@/lib/services/calendar-data-service";
 
 interface WeeklySummaryPanelProps {
@@ -41,7 +41,7 @@ export function WeeklySummaryPanel({
         {weeks.map((week) => {
           const isProfit = week.netPL > 0;
           const isFlat = week.netPL === 0;
-          const plLabel = formatCompactCurrency(week.netPL);
+          const plLabel = formatCompactPL(week.netPL);
 
           return (
             <div

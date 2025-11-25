@@ -15,16 +15,19 @@ import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters, startOfQuarter, isSameMonth, parseISO, startOfMonth } from "date-fns"
 import { formatCurrency, cn } from "@/lib/utils"
 
+import { formatCompactPL } from "@/lib/utils/format"
+
 /*
 Copilot prompt:
 
-“Update the P/L Calendar ‘month’ view to match TradeZella’s layout:
-	•	Implement a WeeklySummaryPanel component that renders one card per week with: ‘Week N’, date range, compact P/L ($1.2K, $43.5K, $1.1M), trade count, days traded, and optional win rate. Cards should be color-coded for profit / loss / flat and use Tailwind + shadcn styles consistent with the rest of the app.
-	•	Use a shared WeeklyBucket type with startDate, endDate, netPL, tradeCount, and daysTraded.
-	•	Add a helper getMonthlyWeeklyBuckets(monthStart, weeklyBuckets) that filters and sorts weeks so the weekly panel only shows weeks for the selected month.
-	•	Refactor MonthView to render a MonthCalendarGrid on the left and the new WeeklySummaryPanel on the right in a responsive grid.
-	•	Use formatCompactCurrency (Intl compact notation) for P/L values so they render like $1.2K or $1.1M instead of raw numbers.
-	•	Do not change the new Yearly view; ensure navigation between Year → Month still works.”
+“Refactor the P/L Calendar monthly view to match the Year view layout.
+	•	The Year view already uses a nice 7-column grid of DayCell-style tiles. Reuse that same visual style for the Month view: a full-width, responsive 7-column grid with consistent gaps and a minimum height.
+	•	For Month view, use a two-column layout: left is the month grid, right is a MonthlyWeeklySummary card that shows only the weeks which intersect the selected month. The weekly panel should be a rounded card with a header (‘Weekly summary’) and a scrollable list of WeekSummaryCard rows; do not render the old tall ‘Weekly Summary’ section that takes the entire right side.
+	•	Implement a helper buildMonthWeeks(trades, monthStart) that groups trades into weeks and then clips weeks to the selected month by filtering trades to monthStart.startOf('month')..monthStart.endOf('month'). Use that helper to feed MonthlyWeeklySummary.
+	•	Make the Yearly P/L grid interactive: each month tile should call onMonthDrillDown({ year, monthIndex }) that switches the calendar to Month view and sets the current cursor.
+	•	Extract a shared formatCompactPL(value: number) utility that returns values like ‘1.12M’, ‘648.3K’, or ‘325’ and use it across monthly cells, yearly cells, weekly summary cards, and modal headers.
+	•	Keep Utilization Trend and Risk Heatmap as a shared footer under both Month and Year views, in a 2-column responsive grid.
+	•	Preserve existing props, types, and store wiring from the feature/pl-calendar-drilldown branch so data continues to flow correctly.”
 */
 
 function getMonthlyWeeklyBuckets(
@@ -37,8 +40,10 @@ function getMonthlyWeeklyBuckets(
   return weeklySummaries
     .filter((w) => {
       const start = parseISO(w.startDate);
-      // use startDate to decide which month this week “belongs” to
-      return start.getFullYear() === year && start.getMonth() === month;
+      const end = parseISO(w.endDate);
+      // Include if the week overlaps with the month
+      return (start.getFullYear() === year && start.getMonth() === month) ||
+             (end.getFullYear() === year && end.getMonth() === month);
     })
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .map((w, idx) => ({
@@ -176,7 +181,7 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent>
             <div className={cn("text-2xl font-bold", totalPL >= 0 ? "text-emerald-500" : "text-rose-500")}>
-              {formatCurrency(totalPL)}
+              {formatCompactPL(totalPL)}
             </div>
           </CardContent>
         </Card>
@@ -235,7 +240,7 @@ export default function CalendarPage() {
                 })}
              </div>
           ) : (
-             <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
+             <div className="grid grid-cols-[minmax(0,3fr)_minmax(260px,1.2fr)] gap-6 xl:grid-cols-[minmax(0,4fr)_minmax(280px,1.3fr)]">
                 <div className="min-w-0">
                     <MonthlyPLCalendar
                     currentDate={currentDate}
