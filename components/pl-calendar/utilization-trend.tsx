@@ -1,89 +1,86 @@
-"use client"
+"use client";
 
-import { CalendarDaySummary } from "@/lib/services/calendar-data-service"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts"
-import { format } from "date-fns"
-import { Info } from "lucide-react"
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { useMemo } from "react";
+import { CalendarDaySummary } from "@/lib/services/calendar-data-service";
 
 interface UtilizationTrendProps {
-  days: CalendarDaySummary[]
+  days: CalendarDaySummary[];
 }
 
 export function UtilizationTrend({ days }: UtilizationTrendProps) {
-  const hasData = days.some(d => d.peakUtilizationPercent !== null && d.peakUtilizationPercent > 0)
-
-  // Sort days by date
-  const sortedDays = [...days].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const data = useMemo(
+    () =>
+      days
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map((d) => ({
+          label: new Date(d.date).getDate().toString(),
+          utilization: d.peakUtilizationPercent ?? 0,
+          fullDate: d.date
+        })),
+    [days]
+  );
 
   return (
-    <Card className="border-neutral-800 bg-neutral-900/50">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-lg font-medium">Utilization Trend</CardTitle>
-          <TooltipProvider>
-            <UITooltip>
-              <TooltipTrigger>
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">Utilization is based on margin requirements vs account value. Higher values indicate more capital at work.</p>
-              </TooltipContent>
-            </UITooltip>
-          </TooltipProvider>
-        </div>
-        <CardDescription>Time-weighted daily capital usage as a percentage of account value.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {hasData ? (
-          <div className="h-[220px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sortedDays}>
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(val) => format(new Date(val), "MMM d")}
-                  stroke="#525252"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis 
-                  domain={[0, 100]} 
-                  tickFormatter={(v) => `${v}%`} 
-                  stroke="#525252"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#171717", borderColor: "#262626", borderRadius: "8px" }}
-                  itemStyle={{ color: "#e5e5e5" }}
-                  formatter={(v: number) => [`${v.toFixed(1)}%`, "Utilization"]}
-                  labelFormatter={(label) => format(new Date(label), "MMMM d, yyyy")}
-                />
-                <ReferenceLine y={50} stroke="#f59e0b" strokeDasharray="3 3" opacity={0.5} />
-                <ReferenceLine y={80} stroke="#ef4444" strokeDasharray="3 3" opacity={0.5} />
-                <Line
-                  type="monotone"
-                  dataKey="peakUtilizationPercent"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4, fill: "#10b981" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="h-[220px] flex items-center justify-center text-center p-4 border border-dashed border-neutral-800 rounded-lg">
-            <p className="text-xs text-muted-foreground">
-              No utilization data for this period. Upload trades with margin requirements or daily logs to enable this view.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-zinc-200">Utilization Trend</h3>
+        <p className="text-xs text-zinc-400">
+          Shows how much of your account margin was deployed each day.
+        </p>
+      </div>
+
+      <div className="h-40 rounded-2xl border border-zinc-800/80 bg-zinc-950/80 p-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data}>
+            <defs>
+              <linearGradient id="utilFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.7} />
+                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="label" tickLine={false} axisLine={false} stroke="#525252" fontSize={12} />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v) => `${v}%`}
+              width={32}
+              stroke="#525252"
+              fontSize={12}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#020617",
+                borderRadius: 8,
+                border: "1px solid #27272a",
+              }}
+              itemStyle={{ color: "#e5e5e5" }}
+              formatter={(v: number) => [`${v.toFixed(1)}%`, "Utilization"]}
+              labelFormatter={(label, payload) => {
+                if (payload && payload.length > 0) {
+                    return payload[0].payload.fullDate;
+                }
+                return label;
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="utilization"
+              stroke="#22c55e"
+              fill="url(#utilFill)"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
+
