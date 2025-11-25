@@ -34,6 +34,7 @@ Open http://localhost:3000 (the root redirects to `/blocks`).
 - **Performance Blocks:** Equity, drawdowns, return distribution, streaks, ROM, premium efficiency, excursion charts.
 - **TP/SL Optimizer (MFE/MAE edition):** In Performance → “TP/SL Optimizer” tab. Adjust TP/SL grids, pick basis (margin/premium), compare scenarios.
 - **TP Optimizer (MAE/MFE):** Import CSVs, tune take-profit targets.
+- **TP/SL Optimizer Page:** Dedicated route `/tp-sl-optimizer` to run what-if exit rules outside the main performance tab.
 - **P/L Calendar:** Monthly and yearly P/L.
 - **Risk & Sizing:** Monte Carlo simulator, position sizing, correlation matrix.
 

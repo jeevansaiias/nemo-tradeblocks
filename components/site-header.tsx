@@ -26,6 +26,25 @@ const routeMeta: Record<
     title: "Performance Blocks",
     description: "Equity curves, streaks, and drawdown coverage across time.",
   },
+  "/tp-sl-optimizer": {
+    title: "TP/SL Optimizer",
+    description: "Simulate TP/SL grids using MFE/MAE excursion data.",
+    badge: "New",
+  },
+  "/tp-optimizer-mae-mfe": {
+    title: "TP Optimizer (MAE/MFE)",
+    description: "Upload trade CSVs, tune take-profit targets, and review MAE/MFE analytics.",
+    badge: "Latest",
+  },
+  "/calendar": {
+    title: "P/L Calendar",
+    description: "Track monthly and yearly performance trends across your blocks.",
+  },
+  "/walk-forward": {
+    title: "Walk-Forward Analysis",
+    description: "Optimize parameters and validate out-of-sample performance.",
+    badge: "Beta",
+  },
   "/risk-simulator": {
     title: "Risk Simulator",
     description: "Monte Carlo projections using your uploaded trade history.",
