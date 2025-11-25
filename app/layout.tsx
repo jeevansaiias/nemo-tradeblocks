@@ -21,8 +21,10 @@ export const metadata: Metadata = {
     default: "NemoBlocks",
     template: "%s | NemoBlocks",
   },
-  description:
-    "Modern analytics workspace for evaluating trading performance and building resilient strategies.",
+  description: "NemoBlocks – Advanced options analytics platform",
+  icons: {
+    icon: "/nemoblocks-logo.png",
+  },
 };
 
 export default function RootLayout({

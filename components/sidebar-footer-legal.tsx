@@ -18,7 +18,7 @@ import { DialogTitle } from "@radix-ui/react-dialog";
 const disclaimerSections = [
   {
     title: "Educational & Research Purposes Only",
-  body: "NemoBlocks is designed for educational exploration and research analysis of trading strategies. Nothing within this platform constitutes investment advice, trading recommendations, or financial guidance of any kind.",
+    body: "NemoBlocks is designed for educational exploration and research analysis of trading strategies. Nothing within this platform constitutes investment advice, trading recommendations, or financial guidance of any kind.",
     accent: "text-destructive",
   },
   {
@@ -28,7 +28,7 @@ const disclaimerSections = [
   },
   {
     title: "Software & Technical Limitations",
-  body: "Like all software, NemoBlocks may contain errors, bugs, or unexpected behaviors. Our algorithms make assumptions that may not align with your specific trading circumstances. Historical performance analysis cannot predict future market outcomes.",
+    body: "Like all software, NemoBlocks may contain errors, bugs, or unexpected behaviors. Our algorithms make assumptions that may not align with your specific trading circumstances. Historical performance analysis cannot predict future market outcomes.",
     accent: "text-secondary-foreground",
   },
   {
@@ -38,7 +38,7 @@ const disclaimerSections = [
   },
   {
     title: "Privacy & Data Handling",
-  body: "NemoBlocks operates entirely in your browser using local storage, indexDB, and session cookies to maintain your data and preferences. We do not transmit, store, or access your trading data on external servers.",
+    body: "NemoBlocks operates entirely in your browser using local storage, indexDB, and session cookies to maintain your data and preferences. We do not transmit, store, or access your trading data on external servers.",
     accent: "text-muted-foreground",
   },
 ];
@@ -106,7 +106,7 @@ export function SidebarFooterLegal() {
           className="h-3.5 w-3.5 text-muted-foreground/70"
           aria-hidden
         />
-  NemoBlocks builds insights, not investment advice.
+        NemoBlocks builds insights, not investment advice.
       </p>
       <div className="flex flex-wrap items-center gap-2 text-[0.7rem] text-muted-foreground">
         <Link
@@ -116,8 +116,8 @@ export function SidebarFooterLegal() {
         >
           Inspired by NinjaTaco
           <Image
-            src="/ninjataco-tribute.png"
-            alt="NinjaTaco"
+            src="/nemoblocks-logo.png"
+            alt="NemoBlocks"
             width={16}
             height={16}
             className="opacity-80"
@@ -125,7 +125,7 @@ export function SidebarFooterLegal() {
         </Link>
         <span className="text-muted-foreground/50">•</span>
         <Link
-          href="https://github.com/jeevansaiias/nemo-trade-app"
+          href="https://github.com/jeevansaiias/nemo-tradeblocks"
           target="_blank"
           className="inline-flex items-center gap-1 transition hover:text-foreground"
         >

@@ -31,6 +31,7 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
+import { TPFileUpload } from "@/components/tp-optimizer/TPFileUpload";
 import { useEffect, useState } from "react";
 
 // Strategy options will be dynamically generated from trades
@@ -413,6 +414,14 @@ export default function BlockStatsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Upload area for quick access to TP optimizer */}
+      <div className="rounded-lg border p-4">
+        <h3 className="text-lg font-semibold">Upload Trade Log CSV</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Upload your trade log here to quickly analyze trades or open the TP Optimizer for MFE/MAE analysis.
+        </p>
+        <TPFileUpload onDataLoaded={() => { /* no-op: TP optimizer store handles tab */ }} />
+      </div>
       {/* Controls */}
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">

@@ -16,7 +16,7 @@ This document explains how NemoBlocks is structured and how to work effectively 
 3. Visit `http://localhost:3000` → you will be redirected to `/blocks`.
 4. Create your first block and upload a trade CSV (sample: `IC_Trades.csv`).
 
-> Resetting locally stored data: open your browser dev tools → **Application** tab → clear IndexedDB storage and `localStorage` key `nemoblocks-active-block-id`.
+> Resetting locally stored data: open your browser dev tools → **Application** tab → clear IndexedDB storage and the `localStorage` keys `nemoblocks-active-block-id` (and legacy `tradeblocks-active-block-id` if present).
 
 ## Application Architecture
 
@@ -90,7 +90,7 @@ This document explains how NemoBlocks is structured and how to work effectively 
 - Use the `plans/` directory for task breakdowns if you want structured TODOs (optional).
 - Tailwind CSS configuration lives in `tailwind.config.ts` produced via `@tailwindcss/postcss` (Tailwind v4). Check `app/globals.css` for design tokens.
 - Components expect the `@/*` alias (configured in `tsconfig.json`)—prefer it over relative paths.
-- When debugging IndexedDB, the store names mirror file names (e.g., `nemoblocks-trades`); inspect them via browser dev tools.
+- When debugging IndexedDB, the store names mirror file names (e.g., `blocks`, `trades`, `walkForwardAnalyses`); inspect them via browser dev tools. Legacy keys are mirrored for backward compatibility.
 - `npm run build` uses Turbopack; large third-party imports (Plotly/Recharts) can impact bundle size, so keep an eye on analytics when adding dependencies.
 
 ## Useful Links
@@ -99,4 +99,3 @@ This document explains how NemoBlocks is structured and how to work effectively 
 - [Math.js](https://mathjs.org/docs/reference/functions.html) – statistics helpers used for parity with the Python implementation.
 
 For questions or larger architectural changes, start with an architecture sketch in `plans/` or open a discussion referencing the relevant modules above.
-

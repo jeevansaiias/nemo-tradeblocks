@@ -1,15 +1,21 @@
 import { create } from "zustand";
 import { PortfolioStatsCalculator } from "../calculations/portfolio-stats";
 import {
-    deleteBlock as dbDeleteBlock,
-    updateBlock as dbUpdateBlock,
-    getAllBlocks,
-    getBlock,
-    getDailyLogsByBlock,
-    getReportingTradesByBlock,
-    updateBlockStats,
+  deleteBlock as dbDeleteBlock,
+  updateBlock as dbUpdateBlock,
+  getAllBlocks,
+  getBlock,
+  getDailyLogsByBlock,
+  getTradesByBlock,
+  updateBlockStats,
 } from "../db";
 import { ProcessedBlock } from "../models/block";
+import { StrategyAlignment } from "../models/strategy-alignment";
+import {
+  migrateLocalStorageKeys,
+  readActiveBlockIdFromStorage,
+  writeActiveBlockIdToStorage,
+} from "@/lib/utils/storage-migration";
 
 export interface Block {
   id: string
@@ -118,26 +124,22 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      // Restore active block ID from localStorage
-  const savedActiveBlockId = localStorage.getItem('nemoblocks-active-block-id')
+      // Run safe migration of localStorage keys (legacy -> nemoblocks)
+      migrateLocalStorageKeys()
+
+      // Restore active block ID from storage (prefer new nemoblocks key)
+      const savedActiveBlockId = readActiveBlockIdFromStorage()
 
       const processedBlocks = await getAllBlocks()
       const blocks: Block[] = []
 
-      // Import getTradesByBlockWithOptions
-      const { getTradesByBlockWithOptions } = await import("../db");
-
       // Convert each ProcessedBlock to Block with trade/daily log counts
       for (const processedBlock of processedBlocks) {
         try {
-          // Use combineLegGroups setting from block config
-          const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
-
-          const [trades, dailyLogs, reportingTrades] = await Promise.all([
-            getTradesByBlockWithOptions(processedBlock.id, { combineLegGroups }),
+          const [trades, dailyLogs] = await Promise.all([
+            getTradesByBlock(processedBlock.id),
             getDailyLogsByBlock(processedBlock.id),
-            getReportingTradesByBlock(processedBlock.id),
-          ]);
+          ])
 
           // Calculate stats from trades
           const stats = trades.length > 0 ? {
@@ -189,8 +191,8 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
 
   // Actions
   setActiveBlock: (blockId: string) => {
-    // Save to localStorage for persistence
-  localStorage.setItem('nemoblocks-active-block-id', blockId)
+    // Save to storage (update both legacy and new keys for compatibility)
+    writeActiveBlockIdToStorage(blockId)
 
     set(state => ({
       blocks: state.blocks.map(block => ({
@@ -202,8 +204,8 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
   },
 
   clearActiveBlock: () => {
-    // Remove from localStorage
-  localStorage.removeItem('nemoblocks-active-block-id')
+    // Clear active block in storage (keep legacy key present but empty)
+    writeActiveBlockIdToStorage(null)
 
     set(state => ({
       blocks: state.blocks.map(block => ({
@@ -233,7 +235,7 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       set(state => {
         if (newBlock.isActive) {
           // If new block is active, deactivate all others and set new one as active
-          localStorage.setItem('nemoblocks-active-block-id', newBlock.id)
+          writeActiveBlockIdToStorage(newBlock.id)
           console.log('Set active block in localStorage:', newBlock.id)
           return {
             blocks: [
@@ -303,7 +305,7 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
 
         // If we deleted the active block, clear localStorage
         if (wasActive) {
-          localStorage.removeItem('nemoblocks-active-block-id')
+          writeActiveBlockIdToStorage(null)
         }
 
         return {
@@ -322,15 +324,10 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
       const processedBlock = await getBlock(id)
       if (!processedBlock) return
 
-      // Use combineLegGroups setting from block config
-      const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
-      const { getTradesByBlockWithOptions } = await import("../db");
-
-      const [trades, dailyLogs, reportingTrades] = await Promise.all([
-        getTradesByBlockWithOptions(id, { combineLegGroups }),
+      const [trades, dailyLogs] = await Promise.all([
+        getTradesByBlock(id),
         getDailyLogsByBlock(id),
-        getReportingTradesByBlock(id),
-      ]);
+      ])
 
       // Calculate fresh stats
       const stats = trades.length > 0 ? {
@@ -376,15 +373,10 @@ export const useBlockStore = create<BlockStore>((set, get) => ({
         throw new Error('Block not found')
       }
 
-      // Use combineLegGroups setting from block config
-      const combineLegGroups = processedBlock.analysisConfig?.combineLegGroups ?? false;
-      const { getTradesByBlockWithOptions } = await import("../db");
-
-      const [trades, dailyLogs, reportingTrades] = await Promise.all([
-        getTradesByBlockWithOptions(id, { combineLegGroups }),
+      const [trades, dailyLogs] = await Promise.all([
+        getTradesByBlock(id),
         getDailyLogsByBlock(id),
-        getReportingTradesByBlock(id),
-      ]);
+      ])
 
       console.log(`Recalculating stats for ${trades.length} trades and ${dailyLogs.length} daily logs`)
 

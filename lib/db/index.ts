@@ -13,7 +13,7 @@
 
 // Database configuration
 export const DB_NAME = 'NemoBlocksDB'
-export const DB_VERSION = 1
+export const DB_VERSION = 3
 
 // Object store names
 export const STORES = {
@@ -22,6 +22,7 @@ export const STORES = {
   DAILY_LOGS: 'dailyLogs',
   CALCULATIONS: 'calculations',
   REPORTING_LOGS: 'reportingLogs',
+  WALK_FORWARD: 'walkForwardAnalyses',
 } as const
 
 // Index names
@@ -33,6 +34,8 @@ export const INDEXES = {
   DAILY_LOGS_BY_DATE: 'date',
   CALCULATIONS_BY_BLOCK: 'blockId',
   REPORTING_LOGS_BY_BLOCK: 'blockId',
+  REPORTING_LOGS_BY_STRATEGY: 'strategy',
+  WALK_FORWARD_BY_BLOCK: 'blockId',
 } as const
 
 /**
@@ -105,8 +108,19 @@ export async function initializeDatabase(): Promise<IDBDatabase> {
         const reportingLogsStore = db.createObjectStore(STORES.REPORTING_LOGS, { autoIncrement: true })
         reportingLogsStore.createIndex(INDEXES.REPORTING_LOGS_BY_BLOCK, 'blockId', { unique: false })
         reportingLogsStore.createIndex('dateOpened', 'dateOpened', { unique: false })
-        reportingLogsStore.createIndex('strategy', 'strategy', { unique: false })
+        reportingLogsStore.createIndex(INDEXES.REPORTING_LOGS_BY_STRATEGY, 'strategy', { unique: false })
         reportingLogsStore.createIndex('composite_block_date', ['blockId', 'dateOpened'], { unique: false })
+      }
+
+      // Create walk-forward analysis store
+      if (!db.objectStoreNames.contains(STORES.WALK_FORWARD)) {
+        const walkForwardStore = db.createObjectStore(STORES.WALK_FORWARD, {
+          keyPath: 'id',
+        })
+        walkForwardStore.createIndex(INDEXES.WALK_FORWARD_BY_BLOCK, 'blockId', {
+          unique: false,
+        })
+        walkForwardStore.createIndex('createdAt', 'createdAt', { unique: false })
       }
 
       transaction.oncomplete = () => {
@@ -266,35 +280,46 @@ export class TransactionError extends DatabaseError {
 
 // Re-export functions from individual stores
 export {
-    createBlock,
-    deleteBlock,
-    getActiveBlock,
-    getAllBlocks,
-    getBlock,
-    updateBlock,
-    updateBlockStats
+  createBlock,
+  deleteBlock,
+  getActiveBlock,
+  getAllBlocks,
+  getBlock,
+  updateBlock,
+  updateBlockStats,
 } from "./blocks-store"
 export {
-    addDailyLogEntries,
-    deleteDailyLogsByBlock,
-    getDailyLogCountByBlock,
-    getDailyLogsByBlock,
-    updateDailyLogsForBlock
+  addDailyLogEntries,
+  deleteDailyLogsByBlock,
+  getDailyLogCountByBlock,
+  getDailyLogsByBlock,
+  updateDailyLogsForBlock,
 } from "./daily-logs-store"
 export {
-    addReportingTrades,
-    deleteReportingTradesByBlock,
-    getReportingStrategiesByBlock,
-    getReportingTradeCountByBlock,
-    getReportingTradesByBlock,
-    updateReportingTradesForBlock
+  addReportingTrades,
+  deleteReportingTradesByBlock,
+  getReportingStrategiesByBlock,
+  getReportingTradeCountByBlock,
+  getReportingTradesByBlock,
+  updateReportingTradesForBlock,
 } from "./reporting-logs-store"
 export {
-    addTrades,
-    deleteTradesByBlock,
-    getTradeCountByBlock,
-    getTradesByBlock,
-    getTradesByBlockWithOptions,
-    updateTradesForBlock
+  addTrades,
+  deleteTradesByBlock,
+  getTradeCountByBlock,
+  getTradesByBlock,
+  getTradesByBlockWithOptions,
+  updateTradesForBlock,
 } from "./trades-store"
 
+export {
+  saveWalkForwardAnalysis,
+  getWalkForwardAnalysis,
+  getWalkForwardAnalysesByBlock,
+  deleteWalkForwardAnalysis,
+  deleteWalkForwardAnalysesByBlock,
+} from "./walk-forward-store"
+
+// Migration helpers
+export { migrateDatabaseName } from "./migration"
+export type { MigrationResult } from "./migration"

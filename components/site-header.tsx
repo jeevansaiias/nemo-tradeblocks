@@ -2,6 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
+import Image from "next/image";
+import Link from "next/link";
 
 import { ModeToggle } from "@/components/mode-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +25,24 @@ const routeMeta: Record<
   "/performance-blocks": {
     title: "Performance Blocks",
     description: "Equity curves, streaks, and drawdown coverage across time.",
+  },
+  "/comparison-blocks": {
+    title: "Comparison Blocks",
+    description: "Align and compare backtested vs reported trade data.",
+  },
+  "/tp-optimizer-mae-mfe": {
+    title: "TP Optimizer (MAE/MFE)",
+    description: "Upload trade CSVs, tune take-profit targets, and review MAE/MFE analytics.",
+    badge: "Latest",
+  },
+  "/calendar": {
+    title: "P/L Calendar",
+    description: "Track monthly and yearly performance trends across your blocks.",
+  },
+  "/walk-forward": {
+    title: "Walk-Forward Analysis",
+    description: "Optimize parameters and validate out-of-sample performance.",
+    badge: "Beta",
   },
   "/risk-simulator": {
     title: "Risk Simulator",
@@ -57,6 +77,18 @@ export function SiteHeader() {
     <header className="flex h-(--header-height) shrink-0 items-center border-b bg-background/70 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
       <div className="flex w-full items-center gap-3">
         <SidebarTrigger className="-ml-1" />
+        <Link href="/" className="flex items-center space-x-2">
+          <Image
+            src="/nemoblocks-logo.png"
+            alt="NemoBlocks"
+            width={36}
+            height={36}
+            className="mr-1"
+          />
+          <span className="font-semibold text-xl tracking-wide hidden sm:inline">
+            NemoBlocks
+          </span>
+        </Link>
         <Separator orientation="vertical" className="h-6" />
         <div className="flex flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">

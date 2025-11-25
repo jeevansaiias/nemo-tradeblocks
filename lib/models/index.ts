@@ -3,6 +3,7 @@ export * from './trade'
 export * from './daily-log'
 export * from './portfolio-stats'
 export * from './block'
+export * from './walk-forward'
 
 // Type utilities
 export type ProcessingStage = 'uploading' | 'parsing' | 'processing' | 'calculating' | 'storing'

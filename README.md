@@ -30,7 +30,7 @@ NemoBlocks is a Next.js 15 analytics workspace for evaluating options trading pe
    ```bash
    npm run dev
    ```
-5. **Start tradeblocks:**
+5. **Start NemoBlocks:**
 
    Open a browser of your choice and visit:
    

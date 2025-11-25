@@ -1,8 +1,11 @@
+import {
+  runMonteCarloSimulation,
+  type MonteCarloParams,
+} from "@/lib/calculations/monte-carlo";
 import { CsvTestDataLoader } from "../data/csv-loader";
-import { runMonteCarloSimulation, type MonteCarloParams } from "@/lib/calculations/monte-carlo";
 
 describe("Monte Carlo legacy comparison", () => {
- it("prints stats for legacy parameter set", async () => {
+  it("prints stats for legacy parameter set", async () => {
     const { trades } = await CsvTestDataLoader.loadTestData();
 
     const params: MonteCarloParams = {
