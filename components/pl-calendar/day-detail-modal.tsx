@@ -129,44 +129,46 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
             <h3 className="text-lg font-semibold mb-3 text-white">Trade Log ({trades.length} Entries)</h3>
 
             <div className="rounded-lg border border-white/10 overflow-hidden bg-black/20 shadow-lg">
-            <table className="w-full text-sm">
-                <thead className="bg-white/5 text-white/50">
-                <tr>
-                    <th className="text-left px-4 py-2 w-20">Time</th>
-                    <th className="text-left px-4 py-2 w-64">Strategy</th>
-                    <th className="text-left px-4 py-2 w-48">Legs</th>
-                    <th className="text-left px-4 py-2 w-28">P/L</th>
-                </tr>
-                </thead>
-
-                <tbody>
-                {trades.length === 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-[800px] w-full text-sm">
+                    <thead className="bg-white/5 text-white/50">
                     <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-white/40">
-                        No trades recorded for this day.
-                    </td>
+                        <th className="text-left px-4 py-2 w-20">Time</th>
+                        <th className="text-left px-4 py-2 w-64">Strategy</th>
+                        <th className="text-left px-4 py-2">Legs</th>
+                        <th className="text-left px-4 py-2 w-28">P/L</th>
                     </tr>
-                )}
+                    </thead>
 
-                {trades.map((trade: any, idx: number) => (
-                    <tr key={trade.id || idx} className="border-t border-white/5 hover:bg-white/5">
-                    <td className="px-4 py-2 text-white/80">{trade.time}</td>
+                    <tbody>
+                    {trades.length === 0 && (
+                        <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-white/40">
+                            No trades recorded for this day.
+                        </td>
+                        </tr>
+                    )}
 
-                    <td className="px-4 py-2 truncate text-white">{trade.strategy}</td>
+                    {trades.map((trade: any, idx: number) => (
+                        <tr key={trade.id || idx} className="border-t border-white/5 hover:bg-white/5">
+                        <td className="px-4 py-2 text-white/80 whitespace-nowrap">{trade.time}</td>
 
-                    <td className="px-4 py-2 truncate text-white/60">
-                        {trade.legsSummary}
-                    </td>
+                        <td className="px-4 py-2 text-white whitespace-nowrap">{trade.strategy}</td>
 
-                    <td
-                        className={`px-4 py-2 font-semibold ${trade.pl >= 0 ? "text-green-400" : "text-red-400"}`}
-                    >
-                        {formatCurrency(trade.pl)}
-                    </td>
-                    </tr>
-                ))}
-                </tbody>
-            </table>
+                        <td className="px-4 py-2 text-white/60 font-mono text-xs whitespace-nowrap">
+                            {trade.legsSummary}
+                        </td>
+
+                        <td
+                            className={`px-4 py-2 font-semibold whitespace-nowrap ${trade.pl >= 0 ? "text-green-400" : "text-red-400"}`}
+                        >
+                            {formatCurrency(trade.pl)}
+                        </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+              </div>
             </div>
 
             {/* FOOTER SPACING */}
