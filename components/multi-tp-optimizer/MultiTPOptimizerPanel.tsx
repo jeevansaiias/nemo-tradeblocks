@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ExcursionTrade,
   MultiTPScenarioResult,
   runMultiTPGridSearch,
+  runAutoMultiTPGridSearch,
   MultiTPRule,
   ExitBasis
 } from "@/lib/calculations/multi-tp-optimizer";
@@ -22,10 +24,24 @@ interface MultiTPOptimizerPanelProps {
 }
 
 export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimizerPanelProps) {
+  // Mode State
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
+
   // Configuration State
   const [basis, setBasis] = useState<ExitBasis>("margin");
   
-  // TP1
+  // Auto Mode State
+  const [tpMin, setTpMin] = useState<string>("20");
+  const [tpMax, setTpMax] = useState<string>("140");
+  const [tpStep, setTpStep] = useState<string>("20");
+  
+  const [slMin, setSlMin] = useState<string>("-10");
+  const [slMax, setSlMax] = useState<string>("-50");
+  const [slStep, setSlStep] = useState<string>("-10");
+  
+  const [maxTargets, setMaxTargets] = useState<1 | 2 | 3>(3);
+
+  // Manual Mode State - TP1
   const [tp1Level, setTp1Level] = useState<string>("40");
   const [tp1Fraction, setTp1Fraction] = useState<string>("0.25");
   
@@ -37,7 +53,7 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
   const [tp3Level, setTp3Level] = useState<string>("120");
   const [tp3Fraction, setTp3Fraction] = useState<string>("0.25");
   
-  // Stop Loss
+  // Stop Loss (Manual)
   const [stopLoss, setStopLoss] = useState<string>("-30");
 
   // Results State
@@ -45,58 +61,83 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
   const [results, setResults] = useState<MultiTPScenarioResult[]>([]);
 
   const handleUseDefaults = () => {
-    setTp1Level("40");
-    setTp1Fraction("0.25");
-    setTp2Level("80");
-    setTp2Fraction("0.25");
-    setTp3Level("120");
-    setTp3Fraction("0.25");
-    setStopLoss("-30");
+    if (mode === "auto") {
+      setTpMin("20");
+      setTpMax("140");
+      setTpStep("20");
+      setSlMin("-10");
+      setSlMax("-50");
+      setSlStep("-10");
+      setMaxTargets(3);
+    } else {
+      setTp1Level("40");
+      setTp1Fraction("0.25");
+      setTp2Level("80");
+      setTp2Fraction("0.25");
+      setTp3Level("120");
+      setTp3Fraction("0.25");
+      setStopLoss("-30");
+    }
   };
 
   const handleRunOptimization = async () => {
     if (trades.length === 0) return;
     
     setIsOptimizing(true);
+    setResults([]); // Clear previous results
     
     // Allow UI to update before heavy calculation
     setTimeout(() => {
       try {
-        // Parse inputs
-        const tp1 = parseFloat(tp1Level);
-        const f1 = parseFloat(tp1Fraction);
-        const tp2 = parseFloat(tp2Level);
-        const f2 = parseFloat(tp2Fraction);
-        const tp3 = parseFloat(tp3Level);
-        const f3 = parseFloat(tp3Fraction);
-        const sl = parseFloat(stopLoss);
+        let scenarios: MultiTPScenarioResult[] = [];
 
-        // Build grid config around user inputs (±10% range for levels)
-        // This creates a small local grid around the user's specific inputs
-        const config = {
-          basis,
-          startingCapital,
-          // Create small ranges around user inputs
-          tp1Levels: [tp1 * 0.9, tp1, tp1 * 1.1].map(n => Math.round(n)),
-          tp2Levels: [tp2 * 0.9, tp2, tp2 * 1.1].map(n => Math.round(n)),
-          tp3Levels: [tp3 * 0.9, tp3, tp3 * 1.1].map(n => Math.round(n)),
-          
-          tp1Fractions: [f1],
-          tp2Fractions: [f2],
-          tp3Fractions: [f3],
-          
-          // Simple trailing stop logic
-          tp1TrailStops: [0, 10],
-          tp2TrailStops: [10, 20],
-          tp3TrailStops: [20, 30],
-          
-          stopLossLevels: [sl, sl - 10, sl + 10].filter(n => n < 0),
-          
-          maxDrawdownConstraintPct: 50, // Loose constraint
-          minWinRatePct: 0
-        };
+        if (mode === "auto") {
+          scenarios = runAutoMultiTPGridSearch(trades, {
+            basis,
+            startingCapital,
+            tpMin: parseFloat(tpMin),
+            tpMax: parseFloat(tpMax),
+            tpStep: parseFloat(tpStep),
+            slMin: parseFloat(slMin),
+            slMax: parseFloat(slMax),
+            slStep: parseFloat(slStep),
+            maxTargets
+          });
+        } else {
+          // Manual Mode Logic
+          const tp1 = parseFloat(tp1Level);
+          const f1 = parseFloat(tp1Fraction);
+          const tp2 = parseFloat(tp2Level);
+          const f2 = parseFloat(tp2Fraction);
+          const tp3 = parseFloat(tp3Level);
+          const f3 = parseFloat(tp3Fraction);
+          const sl = parseFloat(stopLoss);
 
-        const scenarios = runMultiTPGridSearch(trades, config);
+          // Build grid config around user inputs (±10% range for levels)
+          const config = {
+            basis,
+            startingCapital,
+            tp1Levels: [tp1 * 0.9, tp1, tp1 * 1.1].map(n => Math.round(n)),
+            tp2Levels: [tp2 * 0.9, tp2, tp2 * 1.1].map(n => Math.round(n)),
+            tp3Levels: [tp3 * 0.9, tp3, tp3 * 1.1].map(n => Math.round(n)),
+            
+            tp1Fractions: [f1],
+            tp2Fractions: [f2],
+            tp3Fractions: [f3],
+            
+            tp1TrailStops: [0, 10],
+            tp2TrailStops: [10, 20],
+            tp3TrailStops: [20, 30],
+            
+            stopLossLevels: [sl, sl - 10, sl + 10].filter(n => n < 0),
+            
+            maxDrawdownConstraintPct: 50,
+            minWinRatePct: 0
+          };
+
+          scenarios = runMultiTPGridSearch(trades, config);
+        }
+        
         setResults(scenarios);
       } catch (error) {
         console.error("Optimization failed:", error);
@@ -155,11 +196,27 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="space-y-6">
+            {/* Mode Selection */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Optimization Mode</Label>
+                <p className="text-xs text-muted-foreground">
+                  Choose how to find the best exit strategy.
+                </p>
+              </div>
+              <Tabs value={mode} onValueChange={(v) => setMode(v as "auto" | "manual")} className="w-[400px]">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="auto">Auto Search</TabsTrigger>
+                  <TabsTrigger value="manual">Manual Scenario</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
             {/* Basis Selection */}
             <div className="space-y-3">
               <Label>Optimization Basis</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 max-w-md">
                 <Button 
                   variant={basis === "margin" ? "default" : "outline"}
                   onClick={() => setBasis("margin")}
@@ -180,103 +237,167 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
               </p>
             </div>
 
-            {/* TP1 Config */}
-            <div className="space-y-3">
-              <Label className="flex items-center gap-2">
-                <Badge variant="outline" className="h-5">TP1</Badge>
-                First Target
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Level %</span>
-                  <Input 
-                    type="number" 
-                    value={tp1Level} 
-                    onChange={(e) => setTp1Level(e.target.value)}
-                  />
+            {mode === "auto" ? (
+              /* Auto Mode Controls */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t pt-6">
+                <div className="space-y-3">
+                  <Label>TP Range (%)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Min</span>
+                      <Input type="number" value={tpMin} onChange={(e) => setTpMin(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Max</span>
+                      <Input type="number" value={tpMax} onChange={(e) => setTpMax(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Step</span>
+                      <Input type="number" value={tpStep} onChange={(e) => setTpStep(e.target.value)} />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Fraction (0-1)</span>
-                  <Input 
-                    type="number" 
-                    step="0.05"
-                    max="1"
-                    value={tp1Fraction} 
-                    onChange={(e) => setTp1Fraction(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* TP2 Config */}
-            <div className="space-y-3">
-              <Label className="flex items-center gap-2">
-                <Badge variant="outline" className="h-5">TP2</Badge>
-                Second Target
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Level %</span>
-                  <Input 
-                    type="number" 
-                    value={tp2Level} 
-                    onChange={(e) => setTp2Level(e.target.value)}
-                  />
+                <div className="space-y-3">
+                  <Label>SL Range (%)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Min</span>
+                      <Input type="number" value={slMin} onChange={(e) => setSlMin(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Max</span>
+                      <Input type="number" value={slMax} onChange={(e) => setSlMax(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Step</span>
+                      <Input type="number" value={slStep} onChange={(e) => setSlStep(e.target.value)} />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Fraction (0-1)</span>
-                  <Input 
-                    type="number" 
-                    step="0.05"
-                    max="1"
-                    value={tp2Fraction} 
-                    onChange={(e) => setTp2Fraction(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* TP3 Config */}
-            <div className="space-y-3">
-              <Label className="flex items-center gap-2">
-                <Badge variant="outline" className="h-5">TP3</Badge>
-                Third Target
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Level %</span>
-                  <Input 
-                    type="number" 
-                    value={tp3Level} 
-                    onChange={(e) => setTp3Level(e.target.value)}
-                  />
+                <div className="space-y-3">
+                  <Label>Max Targets</Label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((n) => (
+                      <Button
+                        key={n}
+                        variant={maxTargets === n ? "default" : "outline"}
+                        onClick={() => setMaxTargets(n as 1 | 2 | 3)}
+                        className="flex-1"
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Allow up to {maxTargets} scale-out levels.
+                  </p>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Fraction (0-1)</span>
+              </div>
+            ) : (
+              /* Manual Mode Controls */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 border-t pt-6">
+                {/* TP1 Config */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Badge variant="outline" className="h-5">TP1</Badge>
+                    First Target
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Level %</span>
+                      <Input 
+                        type="number" 
+                        value={tp1Level} 
+                        onChange={(e) => setTp1Level(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Fraction (0-1)</span>
+                      <Input 
+                        type="number" 
+                        step="0.05"
+                        max="1"
+                        value={tp1Fraction} 
+                        onChange={(e) => setTp1Fraction(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* TP2 Config */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Badge variant="outline" className="h-5">TP2</Badge>
+                    Second Target
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Level %</span>
+                      <Input 
+                        type="number" 
+                        value={tp2Level} 
+                        onChange={(e) => setTp2Level(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Fraction (0-1)</span>
+                      <Input 
+                        type="number" 
+                        step="0.05"
+                        max="1"
+                        value={tp2Fraction} 
+                        onChange={(e) => setTp2Fraction(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* TP3 Config */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <Badge variant="outline" className="h-5">TP3</Badge>
+                    Third Target
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Level %</span>
+                      <Input 
+                        type="number" 
+                        value={tp3Level} 
+                        onChange={(e) => setTp3Level(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Fraction (0-1)</span>
+                      <Input 
+                        type="number" 
+                        step="0.05"
+                        max="1"
+                        value={tp3Fraction} 
+                        onChange={(e) => setTp3Fraction(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stop Loss (Manual) */}
+                <div className="space-y-3">
+                  <Label>Stop Loss %</Label>
                   <Input 
                     type="number" 
-                    step="0.05"
-                    max="1"
-                    value={tp3Fraction} 
-                    onChange={(e) => setTp3Fraction(e.target.value)}
+                    value={stopLoss} 
+                    onChange={(e) => setStopLoss(e.target.value)}
+                    className="text-red-600 font-medium"
                   />
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Stop Loss & Actions */}
+          {/* Actions */}
           <div className="flex flex-col md:flex-row gap-6 items-end border-t pt-6">
-            <div className="w-full md:w-48 space-y-2">
-              <Label>Stop Loss %</Label>
-              <Input 
-                type="number" 
-                value={stopLoss} 
-                onChange={(e) => setStopLoss(e.target.value)}
-                className="text-red-600 font-medium"
-              />
-            </div>
-
             <div className="flex gap-2 ml-auto">
               <Button variant="outline" onClick={handleUseDefaults} className="gap-2">
                 <Settings2 className="h-4 w-4" />
@@ -310,6 +431,42 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Best Result Summary */}
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 mb-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                    Best Configuration Found
+                  </p>
+                  <p className="text-lg font-semibold mt-1">
+                    {describeRule(results[0].rule)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-green-600">
+                    {formatCurrency(results[0].totalPL)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total P/L
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-amber-500/20">
+                <div>
+                  <span className="text-xs text-muted-foreground">Win Rate</span>
+                  <p className="font-medium">{results[0].winRate.toFixed(1)}%</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Capture Rate</span>
+                  <p className="font-medium">{results[0].captureRate.toFixed(2)}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Max Drawdown</span>
+                  <p className="font-medium text-red-600">{results[0].maxDrawdownPct.toFixed(1)}%</p>
+                </div>
+              </div>
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>

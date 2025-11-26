@@ -383,3 +383,126 @@ export function runMultiTPGridSearch(
 
   return scenarios;
 }
+
+/**
+ * Configuration for AUTO grid search.
+ */
+export interface AutoMultiTPGridConfig {
+  basis: ExitBasis;
+  startingCapital: number;
+  
+  tpMin: number;
+  tpMax: number;
+  tpStep: number;
+  
+  slMin: number; // e.g. -15
+  slMax: number; // e.g. -40 (more negative)
+  slStep: number; // e.g. -5
+  
+  maxTargets: 1 | 2 | 3;
+}
+
+/**
+ * Run an AUTO grid search over 1..maxTargets using generated ranges.
+ */
+export function runAutoMultiTPGridSearch(
+  trades: ExcursionTrade[],
+  config: AutoMultiTPGridConfig
+): MultiTPScenarioResult[] {
+  const {
+    basis,
+    startingCapital,
+    tpMin,
+    tpMax,
+    tpStep,
+    slMin,
+    slMax,
+    slStep,
+    maxTargets
+  } = config;
+
+  const scenarios: MultiTPScenarioResult[] = [];
+
+  // 1. Generate Candidates
+  const tpCandidates: number[] = [];
+  for (let tp = tpMin; tp <= tpMax; tp += tpStep) {
+    tpCandidates.push(tp);
+  }
+
+  const slCandidates: number[] = [];
+  // Ensure we iterate from less negative (closer to 0) to more negative, or vice versa.
+  // Let's just normalize: start from Math.max(slMin, slMax) down to Math.min(slMin, slMax)
+  const startSl = Math.max(slMin, slMax);
+  const endSl = Math.min(slMin, slMax);
+  const stepSl = Math.abs(slStep); // ensure positive step for subtraction
+  
+  for (let sl = startSl; sl >= endSl; sl -= stepSl) {
+    slCandidates.push(sl);
+  }
+
+  // 2. Define Fraction Patterns
+  // [target1_fraction, target2_fraction, ...]
+  const fractionPatterns: Record<number, number[][]> = {
+    1: [[1.0]],
+    2: [
+      [0.5, 0.5],
+      [0.3, 0.7],
+      [0.7, 0.3]
+    ],
+    3: [
+      [0.33, 0.33, 0.34],
+      [0.25, 0.25, 0.50],
+      [0.50, 0.25, 0.25]
+    ]
+  };
+
+  // Helper to generate combinations of k elements from array
+  function getCombinations(arr: number[], k: number): number[][] {
+    if (k === 1) return arr.map(val => [val]);
+    
+    const combs: number[][] = [];
+    for (let i = 0; i < arr.length; i++) {
+      const head = arr[i];
+      // For TPs, we generally want distinct levels in ascending order.
+      // So we recurse on the *remaining* array elements (i+1).
+      const tailCombs = getCombinations(arr.slice(i + 1), k - 1);
+      tailCombs.forEach(tail => {
+        combs.push([head, ...tail]);
+      });
+    }
+    return combs;
+  }
+
+  // 3. Run Search
+  for (let n = 1; n <= maxTargets; n++) {
+    const tpCombs = getCombinations(tpCandidates, n);
+    const patterns = fractionPatterns[n] || [];
+
+    for (const sl of slCandidates) {
+      for (const tps of tpCombs) {
+        for (const fracs of patterns) {
+          // Construct Rule
+          const takeProfits: MultiTPLevel[] = tps.map((level, idx) => ({
+            levelPct: level,
+            closeFraction: fracs[idx],
+            trailToPct: undefined // Simple auto-search doesn't do complex trailing yet
+          }));
+
+          const rule: MultiTPRule = {
+            basis,
+            stopLossPct: sl,
+            takeProfits
+          };
+
+          const result = evaluateMultiTPRuleOverTrades(trades, rule, startingCapital);
+          scenarios.push(result);
+        }
+      }
+    }
+  }
+
+  // Sort by totalPL descending
+  scenarios.sort((a, b) => b.totalPL - a.totalPL);
+
+  return scenarios;
+}
