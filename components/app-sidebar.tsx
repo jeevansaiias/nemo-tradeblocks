@@ -45,6 +45,12 @@ const navData = {
       badge: "Latest",
     },
     {
+      title: "Multi-TP Optimizer",
+      href: "/multi-tp-optimizer",
+      icon: IconRouteSquare,
+      badge: "Exp",
+    },
+    {
       title: "Block Stats",
       href: "/block-stats",
       icon: IconLayoutDashboard,
