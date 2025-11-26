@@ -9,6 +9,9 @@ export interface TradeRecord {
   maxProfitPct: number;
   maxLossPct: number;
   resultPct: number;  // realized (baseline) percentage
+  pl?: number;        // realized P/L in dollars
+  premium?: number;   // premium collected/paid in dollars
+  marginReq?: number; // margin requirement in dollars
 }
 
 export interface TPResult {

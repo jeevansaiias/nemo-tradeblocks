@@ -8,11 +8,40 @@ import { Badge } from "@/components/ui/badge";
 import { useTPOptimizerStore } from "@/lib/stores/tp-optimizer-store";
 import Papa from "papaparse";
 import { TradeRecord } from "@/lib/stores/tp-optimizer-store";
-import { pct } from "@/lib/processing/auto-tp";
 
 interface TPFileUploadProps {
   onDataLoaded?: () => void;
 }
+
+const parseOptionalNumber = (value: string | number | null | undefined): number | undefined => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+
+  const normalized = trimmed
+    .replace(/[$,%\s,]/g, "")
+    .replace(/[^0-9+\-\.]/g, "");
+
+  if (!normalized) return undefined;
+
+  const parsed = parseFloat(normalized);
+  if (!Number.isFinite(parsed)) return undefined;
+
+  const isParenNegative = trimmed.includes("(") && trimmed.includes(")");
+  return isParenNegative ? -Math.abs(parsed) : parsed;
+};
+
+const parseRequiredPercentage = (value: string | number | null | undefined, label: string): number => {
+  const parsed = parseOptionalNumber(value);
+  if (typeof parsed !== "number") {
+    throw new Error(`Invalid ${label}: ${value}`);
+  }
+  return parsed;
+};
 
 export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
   const { setData, data, setActiveTab } = useTPOptimizerStore();
@@ -48,17 +77,67 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
         ));
         
         // Handle percentages/values - support your CSV format
-        const maxProfitPct = parsePercentage(
-          row["Max Profit"] || row["Max Profit %"] || row["max_profit_pct"] || row["max_profit"]
+        const maxProfitPct = parseRequiredPercentage(
+          row["Max Profit"] || row["Max Profit %"] || row["max_profit_pct"] || row["max_profit"],
+          "Max Profit"
         );
-        const maxLossPct = parsePercentage(
-          row["Max Loss"] || row["Max Loss %"] || row["max_loss_pct"] || row["max_loss"]
-        );
-        const resultPct = parsePercentage(
-          row["P/L"] || row["Result %"] || row["result_pct"] || row["Result"] || row["PnL"]
+        const maxLossPct = parseRequiredPercentage(
+          row["Max Loss"] || row["Max Loss %"] || row["max_loss_pct"] || row["max_loss"],
+          "Max Loss"
         );
 
-        if (isNaN(maxProfitPct) || isNaN(maxLossPct) || isNaN(resultPct)) {
+        const realizedPl = parseOptionalNumber(
+          row["P/L ($)"] ||
+          row["P/L $"] ||
+          row["Actual P/L"] ||
+          row["Net P/L"] ||
+          row["P/L"] ||
+          row["PnL"]
+        );
+
+        const premium = parseOptionalNumber(
+          row["Premium"] ||
+          row["Initial Premium"] ||
+          row["Credit"] ||
+          row["premium"]
+        );
+
+        const marginReq = parseOptionalNumber(
+          row["Margin Req."] ||
+          row["Margin Req"] ||
+          row["Margin Requirement"] ||
+          row["margin_req"]
+        );
+
+        const resultPctSources = [
+          row["Result %"],
+          row["Result Pct"],
+          row["result_pct"],
+          row["Result"],
+          row["PnL %"]
+        ];
+
+        let resultPct: number | undefined;
+        for (const source of resultPctSources) {
+          const parsed = parseOptionalNumber(source);
+          if (typeof parsed === "number" && !Number.isNaN(parsed)) {
+            resultPct = parsed;
+            break;
+          }
+        }
+
+        if (typeof resultPct !== "number" && typeof realizedPl === "number") {
+          const marginBasis = typeof marginReq === "number" && Math.abs(marginReq) > 0 ? Math.abs(marginReq) : undefined;
+          const premiumBasis = typeof premium === "number" && Math.abs(premium) > 0 ? Math.abs(premium) : undefined;
+
+          if (marginBasis) {
+            resultPct = (realizedPl / marginBasis) * 100;
+          } else if (premiumBasis) {
+            resultPct = (realizedPl / premiumBasis) * 100;
+          }
+        }
+
+        if (typeof resultPct !== "number" || Number.isNaN(resultPct)) {
           console.warn("Skipping row with invalid percentages:", row);
           continue;
         }
@@ -69,7 +148,10 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
           exitDate: exitDate.toISOString(),
           maxProfitPct,
           maxLossPct,
-          resultPct
+          resultPct,
+          pl: realizedPl,
+          premium,
+          marginReq
         });
       } catch (err) {
         console.warn("Skipping invalid row:", row, err);
@@ -95,13 +177,6 @@ export function TPFileUpload({ onDataLoaded }: TPFileUploadProps) {
     return date;
   };
 
-  const parsePercentage = (value: string | number): number => {
-    try {
-      return pct(value);
-    } catch {
-      throw new Error(`Invalid percentage: ${value}`);
-    }
-  };
 
   const handleFile = useCallback((file: File) => {
     if (!file.name.toLowerCase().endsWith('.csv')) {

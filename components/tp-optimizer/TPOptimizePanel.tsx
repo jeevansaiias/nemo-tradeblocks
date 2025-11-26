@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Play, Target, TrendingUp, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +9,66 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTPOptimizerStore } from "@/lib/stores/tp-optimizer-store";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { runMultiTPGridSearch, ExcursionTrade, MultiTPScenarioResult, MultiTPRule } from "@/lib/calculations/multi-tp-optimizer";
 
 interface TPOptimizePanelProps {
   onOptimizationComplete?: () => void;
 }
+
+const MULTI_TP_STARTING_CAPITAL = 160000;
+const MIN_MULTI_TP_TRADES = 10;
+
+const MULTI_TP_GRID_CONFIG = {
+  tp1Levels: [20, 35, 50],
+  tp2Levels: [60, 80, 100],
+  tp3Levels: [120, 150],
+  tp1Fractions: [0.25, 0.4],
+  tp2Fractions: [0.2, 0.3],
+  tp3Fractions: [0.1, 0.2],
+  tp1TrailStops: [0, 15],
+  tp2TrailStops: [10, 20],
+  tp3TrailStops: [15, 25],
+  stopLossLevels: [-10, -20, -30],
+  maxDrawdownConstraintPct: 35,
+  minWinRatePct: 30
+};
+
+const formatCurrency = (value: number, digits = 0) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: digits
+  }).format(value);
+
+const formatCurrencyDelta = (value: number, digits = 0) => {
+  if (!Number.isFinite(value)) return "—";
+  const formatted = formatCurrency(Math.abs(value), digits);
+  return value >= 0 ? `+${formatted}` : `-${formatted}`;
+};
+
+const formatPercent = (value: number, digits = 1, withSign = true) => {
+  if (!Number.isFinite(value)) return "—";
+  const fixed = value.toFixed(digits);
+  if (!withSign) return `${fixed}%`;
+  return `${value >= 0 ? "+" : ""}${fixed}%`;
+};
+
+const describeRule = (rule: MultiTPRule) => {
+  if (!rule.takeProfits.length) {
+    return `SL ${rule.stopLossPct}%`;
+  }
+  const tpParts = rule.takeProfits
+    .map((tp, idx) => {
+      const size = `${Math.round(tp.closeFraction * 100)}%`;
+      const trail = typeof tp.trailToPct === "number" ? ` → trail ${tp.trailToPct}%` : "";
+      return `TP${idx + 1} ${tp.levelPct}% (${size})${trail}`;
+    })
+    .join(" / ");
+  return `${tpParts} | SL ${rule.stopLossPct}%`;
+};
 
 export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps) {
   const {
@@ -86,6 +141,78 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
            result.profitFactor,
     isBest: best && result.tpPct === best.tpPct
   }));
+
+  const multiTPTrades = useMemo(() => {
+    return scopedData
+      .map<ExcursionTrade | null>((trade, index) => {
+        const realizedPl = typeof trade.pl === "number" ? trade.pl : undefined;
+        const margin = typeof trade.marginReq === "number" ? Math.abs(trade.marginReq) : undefined;
+        const premium = typeof trade.premium === "number" ? Math.abs(trade.premium) : undefined;
+
+        if (typeof realizedPl !== "number" || (!margin && !premium)) {
+          return null;
+        }
+
+        const marginValue = margin ?? premium ?? 0;
+        const premiumValue = premium ?? margin ?? 0;
+
+        if (marginValue <= 0 || premiumValue <= 0) {
+          return null;
+        }
+
+        const openedOn = new Date(trade.entryDate);
+        if (Number.isNaN(openedOn.getTime())) {
+          return null;
+        }
+
+        return {
+          id: `${trade.strategy}-${index}`,
+          openedOn,
+          pl: realizedPl,
+          marginReq: marginValue,
+          premium: premiumValue,
+          maxProfitPct: trade.maxProfitPct,
+          maxLossPct: trade.maxLossPct
+        } satisfies ExcursionTrade;
+      })
+      .filter((trade): trade is ExcursionTrade => Boolean(trade));
+  }, [scopedData]);
+
+  const multiTPBaseline = useMemo(() => {
+    if (!multiTPTrades.length) return null;
+    const totalPL = multiTPTrades.reduce((sum, trade) => sum + trade.pl, 0);
+    const totalPremium = multiTPTrades.reduce((sum, trade) => sum + (trade.premium ?? 0), 0);
+    const wins = multiTPTrades.filter(trade => trade.pl > 0).length;
+    const tradeCount = multiTPTrades.length;
+    const captureRate = totalPremium > 0 ? totalPL / totalPremium : 0;
+    const winRate = tradeCount > 0 ? (wins / tradeCount) * 100 : 0;
+
+    return {
+      totalPL,
+      totalPremium,
+      captureRate,
+      winRate,
+      tradeCount
+    };
+  }, [multiTPTrades]);
+
+  const multiTPResults = useMemo<MultiTPScenarioResult[]>(() => {
+    if (multiTPTrades.length < MIN_MULTI_TP_TRADES) {
+      return [];
+    }
+
+    return runMultiTPGridSearch(multiTPTrades, {
+      basis: "margin",
+      startingCapital: MULTI_TP_STARTING_CAPITAL,
+      ...MULTI_TP_GRID_CONFIG
+    });
+  }, [multiTPTrades]);
+
+  const multiTPBest = multiTPResults[0];
+  const multiTPTops = multiTPResults.slice(0, 12);
+  const multiTPCoveragePct = scopedData.length > 0 ? (multiTPTrades.length / scopedData.length) * 100 : 0;
+  const baselineCapturePct = multiTPBaseline ? multiTPBaseline.captureRate * 100 : 0;
+  const baselineWinRate = multiTPBaseline?.winRate ?? 0;
 
   if (data.length === 0) {
     return (
@@ -375,6 +502,155 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
                 View Detailed Results
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {scopedData.length > 0 && (
+        <Card className="border-dashed border-blue-200/70 dark:border-blue-900/60">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Multi-TP Exit Optimizer (MFE/MAE)
+            </CardTitle>
+            <CardDescription>
+              Sweeps staged take-profits (up to three levels) plus a global stop to approximate trade exits using your excursion data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline">
+                {multiTPTrades.length} trades w/ premium & margin · {formatPercent(multiTPCoveragePct, 1, false)} coverage
+              </Badge>
+              <Badge variant="outline">Starting capital {formatCurrency(MULTI_TP_STARTING_CAPITAL)}</Badge>
+              <Badge variant="outline">Grid size {multiTPResults.length || "—"} rules</Badge>
+            </div>
+
+            {multiTPTrades.length === 0 && (
+              <Alert>
+                <AlertDescription>
+                  Add Premium, Margin Req., and realized P/L columns to your CSV to run the multi-TP optimizer.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {multiTPTrades.length > 0 && multiTPBaseline && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Baseline P/L</p>
+                  <p className="text-2xl font-semibold">{formatCurrency(multiTPBaseline.totalPL)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {multiTPBaseline.tradeCount} trades · Win {formatPercent(baselineWinRate, 1, false)}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Baseline capture</p>
+                  <p className="text-2xl font-semibold">{formatPercent(baselineCapturePct, 1, false)}</p>
+                  <p className="text-[11px] text-muted-foreground">Total P/L ÷ total premium</p>
+                </div>
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Rule space</p>
+                  <p className="text-2xl font-semibold">{multiTPResults.length || "—"}</p>
+                  <p className="text-[11px] text-muted-foreground">1-3 TP ladders · {MULTI_TP_GRID_CONFIG.stopLossLevels.length} SLs</p>
+                </div>
+              </div>
+            )}
+
+            {multiTPTrades.length > 0 && multiTPTrades.length < MIN_MULTI_TP_TRADES && (
+              <Alert>
+                <AlertDescription>
+                  Need at least {MIN_MULTI_TP_TRADES} trades with premium & margin data before running the multi-TP grid. You currently have {multiTPTrades.length}.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {multiTPTrades.length >= MIN_MULTI_TP_TRADES && !multiTPResults.length && (
+              <Alert variant="default">
+                <AlertDescription>
+                  Unable to evaluate any multi-TP rules. Double-check that your Max Profit / Max Loss percentages are present for these trades.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {multiTPBest && multiTPResults.length > 0 && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-green-200 bg-green-50/80 p-4 dark:border-green-900/50 dark:bg-green-950/30">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">Best rule</p>
+                  <p className="text-sm font-semibold">{describeRule(multiTPBest.rule)}</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total P/L</p>
+                      <p className="font-semibold">{formatCurrency(multiTPBest.totalPL)}</p>
+                      <p className="text-[11px] text-green-700">
+                        {formatCurrencyDelta(multiTPBest.totalPL - (multiTPBaseline?.totalPL ?? 0))} vs baseline
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Capture rate</p>
+                      <p className="font-semibold">{formatPercent(multiTPBest.captureRate * 100, 1, false)}</p>
+                      <p className="text-[11px] text-green-700">
+                        {formatPercent((multiTPBest.captureRate * 100) - baselineCapturePct, 1, true)} delta
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Win rate</p>
+                      <p className="font-semibold">{formatPercent(multiTPBest.winRate, 1, false)}</p>
+                      <p className="text-[11px] text-green-700">
+                        {formatPercent(multiTPBest.winRate - baselineWinRate, 1, true)} delta
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Max drawdown</p>
+                      <p className="font-semibold">{formatPercent(multiTPBest.maxDrawdownPct, 1, true)}</p>
+                      <p className="text-[11px] text-muted-foreground">Across {multiTPBest.tradeCount} trades</p>
+                    </div>
+                  </div>
+                </div>
+
+                {multiTPTops.length > 0 && (
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">Rank</TableHead>
+                          <TableHead>Rule</TableHead>
+                          <TableHead>Total P/L</TableHead>
+                          <TableHead>Δ vs Baseline</TableHead>
+                          <TableHead>Capture</TableHead>
+                          <TableHead>Δ Capture</TableHead>
+                          <TableHead>Win %</TableHead>
+                          <TableHead>Max DD</TableHead>
+                          <TableHead>Trades</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {multiTPTops.map((scenario, index) => {
+                          const deltaPl = scenario.totalPL - (multiTPBaseline?.totalPL ?? 0);
+                          const capturePct = scenario.captureRate * 100;
+                          const deltaCapture = capturePct - baselineCapturePct;
+                          return (
+                            <TableRow key={`${scenario.rule.stopLossPct}-${index}`} className={index === 0 ? "bg-green-50/70 dark:bg-green-950/30" : undefined}>
+                              <TableCell className="font-semibold">#{index + 1}</TableCell>
+                              <TableCell>
+                                <div className="text-xs font-medium">{describeRule(scenario.rule)}</div>
+                                <div className="text-[11px] text-muted-foreground">SL {scenario.rule.stopLossPct}% · Basis {scenario.rule.basis}</div>
+                              </TableCell>
+                              <TableCell className="font-semibold">{formatCurrency(scenario.totalPL)}</TableCell>
+                              <TableCell>{formatCurrencyDelta(deltaPl)}</TableCell>
+                              <TableCell>{formatPercent(capturePct, 1, false)}</TableCell>
+                              <TableCell>{formatPercent(deltaCapture, 1, true)}</TableCell>
+                              <TableCell>{formatPercent(scenario.winRate, 1, false)}</TableCell>
+                              <TableCell>{formatPercent(scenario.maxDrawdownPct, 1, true)}</TableCell>
+                              <TableCell>{scenario.tradeCount}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
