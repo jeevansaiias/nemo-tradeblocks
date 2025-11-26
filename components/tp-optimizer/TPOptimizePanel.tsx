@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Play, Target, TrendingUp, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +9,57 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTPOptimizerStore } from "@/lib/stores/tp-optimizer-store";
+import type { TradeRecord } from "@/lib/stores/tp-optimizer-store";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { formatCurrency } from "@/lib/utils";
+import {
+  TPOptimizerTrade,
+  TPSLScenarioConfig,
+  TPSLScenarioResult,
+  evaluateScenarios,
+  findBestScenario,
+  generateBestScenariosFromExcursions,
+} from "./tpOptimizerCore";
 
 interface TPOptimizePanelProps {
   onOptimizationComplete?: () => void;
 }
+
+type ScenarioRow = TPSLScenarioResult & {
+  scenarioLabel: string;
+  source: "auto" | "custom";
+};
+
+type ExtendedTradeRecord = TradeRecord & {
+  id?: string | number;
+  marginUsed?: number;
+  marginReq?: number;
+  realizedPL?: number;
+  pl?: number;
+  mfePctMargin?: number;
+  maePctMargin?: number;
+};
+
+const DEFAULT_CUSTOM_SCENARIOS: TPSLScenarioConfig[] = [
+  { id: "scenario-1", basis: "margin", tpPct: 15, slPct: -5 },
+  { id: "scenario-2", basis: "margin", tpPct: 25, slPct: -10 },
+  { id: "scenario-3", basis: "margin", tpPct: 35, slPct: -15 },
+];
+
+const formatPercentValue = (value: number, digits = 2, withSign = false) => {
+  if (!Number.isFinite(value)) return "–";
+  const formatted = value.toFixed(digits);
+  if (!withSign) return `${formatted}%`;
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatted}%`;
+};
+
+const formatCurrencyValue = (value: number) => {
+  if (!Number.isFinite(value)) return "–";
+  return formatCurrency(value);
+};
 
 export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps) {
   const {
@@ -67,6 +113,112 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
   // Then compute derived values
   const strategies = getStrategies();
   const scopedData = getScopedData();
+
+  const optimizerTrades = useMemo<TPOptimizerTrade[]>(() => {
+    return scopedData
+      .map((trade, index) => {
+        const enriched = trade as ExtendedTradeRecord;
+        const marginCandidateRaw =
+          typeof enriched.marginUsed === "number"
+            ? enriched.marginUsed
+            : typeof enriched.marginReq === "number"
+              ? enriched.marginReq
+              : undefined;
+
+        const marginUsed =
+          marginCandidateRaw && Number.isFinite(marginCandidateRaw) && marginCandidateRaw !== 0
+            ? Math.abs(marginCandidateRaw)
+            : 100;
+
+        const realizedPL = (() => {
+          if (typeof enriched.realizedPL === "number") {
+            return enriched.realizedPL;
+          }
+          if (typeof enriched.pl === "number") {
+            return enriched.pl;
+          }
+          if (typeof trade.resultPct === "number") {
+            return (trade.resultPct / 100) * marginUsed;
+          }
+          return 0;
+        })();
+
+        const rawMfe =
+          typeof enriched.mfePctMargin === "number"
+            ? enriched.mfePctMargin
+            : typeof trade.maxProfitPct === "number"
+              ? trade.maxProfitPct
+              : 0;
+
+        const rawMae =
+          typeof enriched.maePctMargin === "number"
+            ? enriched.maePctMargin
+            : typeof trade.maxLossPct === "number"
+              ? trade.maxLossPct
+              : 0;
+
+        return {
+          id: enriched.id ?? `${trade.strategy || "trade"}-${index}`,
+          realizedPL: Number.isFinite(realizedPL) ? realizedPL : 0,
+          marginUsed,
+          mfePctMargin: Number.isFinite(rawMfe) ? Math.max(0, rawMfe) : 0,
+          maePctMargin: Number.isFinite(rawMae)
+            ? rawMae <= 0
+              ? rawMae
+              : -Math.abs(rawMae)
+            : 0,
+        } satisfies TPOptimizerTrade;
+      })
+      .filter((trade) => trade.marginUsed > 0);
+  }, [scopedData]);
+
+  const autoScenarioResults = useMemo<ScenarioRow[]>(() => {
+    if (optimizerTrades.length === 0) return [];
+    return generateBestScenariosFromExcursions(optimizerTrades, { step: 5, topN: 3 }).map((result, index) => ({
+      ...result,
+      scenarioLabel: `Auto ${index + 1}`,
+      source: "auto",
+    }));
+  }, [optimizerTrades]);
+
+  const customScenarioResults = useMemo<ScenarioRow[]>(() => {
+    if (optimizerTrades.length === 0) return [];
+    return evaluateScenarios(optimizerTrades, DEFAULT_CUSTOM_SCENARIOS).map((result, index) => ({
+      ...result,
+      scenarioLabel: `Scenario ${index + 1}`,
+      source: "custom",
+    }));
+  }, [optimizerTrades]);
+
+  const scenarioResults = useMemo<ScenarioRow[]>(
+    () => [...autoScenarioResults, ...customScenarioResults],
+    [autoScenarioResults, customScenarioResults]
+  );
+
+  const baselineScenario = useMemo(() => {
+    if (optimizerTrades.length === 0) {
+      return { totalReturnPct: 0, totalPL: 0 };
+    }
+
+    let totalReturnPct = 0;
+    let totalPL = 0;
+
+    optimizerTrades.forEach((trade) => {
+      if (!trade.marginUsed) return;
+      const returnPct = (trade.realizedPL / trade.marginUsed) * 100;
+      if (Number.isFinite(returnPct)) totalReturnPct += returnPct;
+      if (Number.isFinite(trade.realizedPL)) totalPL += trade.realizedPL;
+    });
+
+    return { totalReturnPct, totalPL };
+  }, [optimizerTrades]);
+
+  const bestScenarioInsight = useMemo(() => {
+    if (scenarioResults.length === 0) return null;
+    return findBestScenario(scenarioResults, baselineScenario);
+  }, [scenarioResults, baselineScenario]);
+
+  const bestScenarioId = bestScenarioInsight?.best.id;
 
   const handleOptimize = async () => {
     await runOptimization();
@@ -375,6 +527,90 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
                 View Detailed Results
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {optimizerTrades.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="space-y-1">
+              <CardTitle>TP/SL Scenario Grid (MFE/MAE)</CardTitle>
+              <CardDescription>
+                Auto-generated take-profit / stop-loss pairs evaluated against {optimizerTrades.length} trades.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {bestScenarioInsight && (
+              <div className="mb-2 text-sm text-muted-foreground space-y-1">
+                <div className="font-medium text-foreground">
+                  Best: TP {formatPercentValue(bestScenarioInsight.best.tpPct, 0)} / SL {formatPercentValue(bestScenarioInsight.best.slPct, 0)} (margin)
+                </div>
+                <div>
+                  Δ Return: {formatPercentValue(bestScenarioInsight.deltaReturnPct, 2, true)} • Δ P/L: {formatCurrencyValue(bestScenarioInsight.deltaPL)}
+                </div>
+              </div>
+            )}
+
+            {scenarioResults.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Scenario</TableHead>
+                      <TableHead>Basis</TableHead>
+                      <TableHead>TP %</TableHead>
+                      <TableHead>SL %</TableHead>
+                      <TableHead>Win Rate</TableHead>
+                      <TableHead>Avg Return</TableHead>
+                      <TableHead>Total Return</TableHead>
+                      <TableHead>Total P/L</TableHead>
+                      <TableHead>TP Hits</TableHead>
+                      <TableHead>SL Hits</TableHead>
+                      <TableHead>Trades</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scenarioResults.map((row) => {
+                      const isBest = row.id === bestScenarioId;
+                      return (
+                        <TableRow
+                          key={`${row.id}-${row.source}`}
+                          className={isBest ? "bg-green-50 text-green-900 dark:bg-green-950/40" : undefined}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>{row.scenarioLabel}</span>
+                              <span className="text-xs text-muted-foreground capitalize">
+                                {row.source === "auto" ? "Auto grid" : "Preset"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="capitalize">{row.basis}</TableCell>
+                          <TableCell>{formatPercentValue(row.tpPct, 0)}</TableCell>
+                          <TableCell>{formatPercentValue(row.slPct, 0)}</TableCell>
+                          <TableCell>{formatPercentValue(row.winRate, 1)}</TableCell>
+                          <TableCell>{formatPercentValue(row.avgReturnPct, 2)}</TableCell>
+                          <TableCell>{formatPercentValue(row.totalReturnPct, 2, true)}</TableCell>
+                          <TableCell>{formatCurrencyValue(row.totalPL)}</TableCell>
+                          <TableCell>{row.tpHits}</TableCell>
+                          <TableCell>{row.slHits}</TableCell>
+                          <TableCell>{row.trades}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                  <TableCaption className="text-left">
+                    Combines auto-discovered grids with default scenarios to benchmark exit rules using excursion data.
+                  </TableCaption>
+                </Table>
+              </div>
+            ) : (
+              <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                Not enough excursion data to build TP/SL scenarios yet.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
