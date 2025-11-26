@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Calculator, Play, Settings2, TrendingUp, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,10 @@ interface MultiTPOptimizerPanelProps {
 }
 
 export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimizerPanelProps) {
+  useEffect(() => {
+    console.log("MultiTPOptimizerPanel trades length:", trades.length);
+  }, [trades.length]);
+
   // Mode State
   const [mode, setMode] = useState<"auto" | "manual">("auto");
 
