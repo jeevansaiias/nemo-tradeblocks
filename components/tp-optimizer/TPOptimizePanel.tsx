@@ -174,9 +174,9 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
 
   const autoScenarioResults = useMemo<ScenarioRow[]>(() => {
     if (optimizerTrades.length === 0) return [];
-    return generateBestScenariosFromExcursions(optimizerTrades, { step: 5, topN: 3 }).map((result, index) => ({
+    return generateBestScenariosFromExcursions(optimizerTrades, { step: 10 }).map((result) => ({
       ...result,
-      scenarioLabel: `Auto ${index + 1}`,
+      scenarioLabel: `TP ${result.tpPct}% / SL ${result.slPct}%`,
       source: "auto",
     }));
   }, [optimizerTrades]);
@@ -553,6 +553,12 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
               </div>
             )}
 
+            {optimizerTrades.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Based on {optimizerTrades.length.toLocaleString()} filtered trades.
+              </p>
+            )}
+
             {scenarioResults.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
@@ -602,7 +608,7 @@ export function TPOptimizePanel({ onOptimizationComplete }: TPOptimizePanelProps
                     })}
                   </TableBody>
                   <TableCaption className="text-left">
-                    Combines auto-discovered grids with default scenarios to benchmark exit rules using excursion data.
+                    Auto grid generated at 10% TP increments plus preset scenarios; values use excursion-driven simulations.
                   </TableCaption>
                 </Table>
               </div>

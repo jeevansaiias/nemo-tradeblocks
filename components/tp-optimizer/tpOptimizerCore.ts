@@ -130,34 +130,35 @@ export function findBestScenario(
 export function generateBestScenariosFromExcursions(
   trades: TPOptimizerTrade[],
   options?: {
-    step?: number;
-    topN?: number;
+    step?: number; // step size in % (default 5)
+    topN?: number; // how many top scenarios to keep; omit for all scenarios
+    maxTpPct?: number; // optional hard cap for TP percent
   }
 ): TPSLScenarioResult[] {
   if (trades.length === 0) return [];
 
   const step = options?.step ?? 5;
-  const topN = options?.topN ?? 3;
+  const topN = options?.topN;
 
-  const maxMfe = Math.max(...trades.map((trade) => trade.mfePctMargin || 0));
-  const minMae = Math.min(...trades.map((trade) => trade.maePctMargin || 0));
+  const maxMfe = Math.max(...trades.map((t) => t.mfePctMargin || 0));
+  const minMae = Math.min(...trades.map((t) => t.maePctMargin || 0));
+
+  const tpUpperCandidate = options?.maxTpPct ?? Math.floor(maxMfe / step) * step;
+  const tpUpperBound = Math.max(step, tpUpperCandidate > 0 ? tpUpperCandidate : step);
 
   const tpLevels: number[] = [];
-  for (let tp = step; tp <= Math.floor(maxMfe / step) * step; tp += step) {
+  for (let tp = step; tp <= tpUpperBound; tp += step) {
     tpLevels.push(tp);
   }
 
+  const slFloorCandidate = Math.ceil(minMae / step) * step;
+  const slLowerBound = Math.min(-step, slFloorCandidate || -step);
   const slLevels: number[] = [];
-  for (
-    let sl = -step;
-    sl >= Math.ceil(minMae / step) * step;
-    sl -= step
-  ) {
+  for (let sl = -step; sl >= slLowerBound; sl -= step) {
     slLevels.push(sl);
   }
 
   const scenarios: TPSLScenarioConfig[] = [];
-
   tpLevels.forEach((tp) => {
     slLevels.forEach((sl) => {
       if (sl < 0 && tp > 0) {
@@ -172,8 +173,11 @@ export function generateBestScenariosFromExcursions(
   });
 
   const results = evaluateScenarios(trades, scenarios);
+  const sorted = results.sort((a, b) => b.totalReturnPct - a.totalReturnPct);
 
-  return results
-    .sort((a, b) => b.totalReturnPct - a.totalReturnPct)
-    .slice(0, topN);
+  if (typeof topN === "number" && topN > 0) {
+    return sorted.slice(0, topN);
+  }
+
+  return sorted;
 }
