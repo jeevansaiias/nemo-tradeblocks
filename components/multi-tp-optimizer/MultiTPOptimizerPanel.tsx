@@ -468,7 +468,11 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
               Top Scenarios
             </CardTitle>
             <CardDescription>
-              Showing top {Math.min(results.length, 10)} results based on <span className="font-medium">baseline-adjusted performance score</span> (Total P/L, Capture Rate, Max DD).
+              Showing top {Math.min(results.length, 10)} results based on{" "}
+              <span className="font-medium">baseline-adjusted performance score</span> (Total P/L, Capture Rate, Max DD).
+              <span className="text-xs text-muted-foreground block mt-1">
+                Based on {trades.length} trades from the currently selected backtest.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
