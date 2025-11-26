@@ -5,6 +5,7 @@ import * as React from "react"
 import { format } from "date-fns"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { formatCurrency } from "@/lib/utils"
+import { formatCompactPL } from "@/lib/utils/format"
 
 import {
   Dialog,
@@ -106,7 +107,7 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
             <div className="rounded-lg bg-white/5 p-5 border border-white/10 shadow-inner">
                 <p className="text-xs text-white/50 mb-1 flex items-center gap-1">📈 NET P/L</p>
                 <p className={`text-3xl md:text-4xl font-bold font-mono tabular-nums leading-tight break-words ${netPL >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {formatCurrency(netPL)}
+                {formatCompactPL(netPL)}
                 </p>
             </div>
 

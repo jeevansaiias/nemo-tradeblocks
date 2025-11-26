@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useCalendarStore } from "@/lib/stores/calendar-store"
 import { useBlockStore } from "@/lib/stores/block-store"
 import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
 import { WeeklySummaryPanel } from "@/components/pl-calendar/weekly-summary-panel"
-import { YearHeatmap } from "@/components/pl-calendar/YearHeatmap"
+import { YearlyPLTable } from "@/components/pl-calendar/YearlyPLTable"
 import { UtilizationPanel } from "@/components/pl-calendar/utilization-panel"
 import { DayDetailModal } from "@/components/pl-calendar/day-detail-modal"
 import { CalendarViewMode, CalendarColorMode, CalendarDayData, WeeklySummary, WeeklyBucket } from "@/lib/services/calendar-data-service"
@@ -83,8 +83,7 @@ export default function CalendarPage() {
     currentDate, setCurrentDate, 
     loadData, isLoading, 
     daySummaries,
-    weeklySummaries,
-    yearlySnapshot
+    weeklySummaries
   } = useCalendarStore()
 
   const [highlightedWeek, setHighlightedWeek] = useState<WeeklyBucket | null>(null)
@@ -200,6 +199,7 @@ export default function CalendarPage() {
 
   const monthStart = startOfMonth(currentDate)
   const monthlyWeeks = getMonthlyWeeklyBuckets(monthStart, weeklySummaries)
+  const trades = useMemo(() => daySummaries.flatMap((day) => day.trades ?? []), [daySummaries])
 
   if (!activeBlockId) {
       return (
@@ -242,7 +242,6 @@ export default function CalendarPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="month">Month</SelectItem>
-              <SelectItem value="quarter">Quarter</SelectItem>
               <SelectItem value="year">Year</SelectItem>
             </SelectContent>
           </Select>
@@ -300,12 +299,11 @@ export default function CalendarPage() {
         </div>
       ) : (
         <div className="mt-6">
-          {view === 'year' && yearlySnapshot ? (
-             <YearHeatmap 
-                data={yearlySnapshot} 
-                metric="pl" 
-                onMonthClick={handleMonthClick}
-             />
+       {view === 'year' ? (
+         <YearlyPLTable 
+           trades={trades}
+           onMonthClick={handleMonthClick}
+         />
           ) : view === 'quarter' ? (
              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                 {[0, 1, 2].map((offset) => {

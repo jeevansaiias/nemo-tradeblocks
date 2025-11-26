@@ -13,10 +13,11 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { StoredTrade } from "@/lib/db/trades-store"
-import { formatPL } from "@/lib/processing/pl-calendar"
 import { clsx } from "clsx"
 import { getMonth, getYear } from "date-fns"
 import { useMemo } from "react"
+import { formatCurrency } from "@/lib/utils"
+import { formatCompactPL } from "@/lib/utils/format"
 
 interface YearlyPLTableProps {
   trades: StoredTrade[]
@@ -198,7 +199,7 @@ export function YearlyPLTable({ trades, onMonthClick }: YearlyPLTableProps) {
                                 }}
                               >
                                 <div className="font-semibold">
-                                  {formatPL(data.pl)}
+                                  {formatCompactPL(data.pl)}
                                 </div>
                                 <div className="text-[10px] opacity-80">
                                   {data.trades} trades
@@ -208,10 +209,10 @@ export function YearlyPLTable({ trades, onMonthClick }: YearlyPLTableProps) {
                             <TooltipContent className="bg-popover border border-border">
                               <div className="space-y-1 text-sm">
                                 <div className="font-semibold">{month} {year}</div>
-                                <div>P/L: {formatPL(data.pl)}</div>
+                                <div>P/L: {formatCurrency(data.pl)}</div>
                                 <div>Trades: {data.trades}</div>
                                 <div>Win Rate: {Math.round(data.winRate)}%</div>
-                                <div>Avg P/L: {formatPL(data.avgPL)}</div>
+                                <div>Avg P/L: {formatCurrency(data.avgPL)}</div>
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -227,7 +228,7 @@ export function YearlyPLTable({ trades, onMonthClick }: YearlyPLTableProps) {
                             : "bg-destructive/20 border-destructive text-destructive"
                         )}
                       >
-                        <div>{formatPL(yearlyData[year]?.total.pl || 0)}</div>
+                        <div>{formatCompactPL(yearlyData[year]?.total.pl || 0)}</div>
                         <div className="text-xs opacity-80">
                           {yearlyData[year]?.total.trades || 0} trades
                         </div>
