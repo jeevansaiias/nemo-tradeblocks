@@ -14,9 +14,18 @@ import {
   MultiTPScenarioResult,
   runMultiTPGridSearch,
   runAutoMultiTPGridSearch,
+  computeBaselineMetrics,
+  scoreScenarioRelative,
   MultiTPRule,
   ExitBasis
 } from "@/lib/calculations/multi-tp-optimizer";
+
+interface ScoredScenario extends MultiTPScenarioResult {
+  score: number;
+  deltaPL: number;
+  deltaCapture: number;
+  deltaDrawdown: number;
+}
 
 interface MultiTPOptimizerPanelProps {
   trades: ExcursionTrade[];
@@ -58,7 +67,8 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
 
   // Results State
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [results, setResults] = useState<MultiTPScenarioResult[]>([]);
+  const [results, setResults] = useState<ScoredScenario[]>([]);
+  const [baseline, setBaseline] = useState<MultiTPScenarioResult | null>(null);
 
   const handleUseDefaults = () => {
     if (mode === "auto") {
@@ -89,10 +99,14 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
     // Allow UI to update before heavy calculation
     setTimeout(() => {
       try {
-        let scenarios: MultiTPScenarioResult[] = [];
+        // 1. Compute Baseline
+        const baselineMetrics = computeBaselineMetrics(trades, basis, startingCapital);
+        setBaseline(baselineMetrics);
+
+        let rawScenarios: MultiTPScenarioResult[] = [];
 
         if (mode === "auto") {
-          scenarios = runAutoMultiTPGridSearch(trades, {
+          rawScenarios = runAutoMultiTPGridSearch(trades, {
             basis,
             startingCapital,
             tpMin: parseFloat(tpMin),
@@ -135,10 +149,25 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
             minWinRatePct: 0
           };
 
-          scenarios = runMultiTPGridSearch(trades, config);
+          rawScenarios = runMultiTPGridSearch(trades, config);
         }
         
-        setResults(scenarios);
+        // 2. Score Scenarios Relative to Baseline
+        const scoredScenarios: ScoredScenario[] = rawScenarios.map(s => {
+          const scoring = scoreScenarioRelative(baselineMetrics, s);
+          return {
+            ...s,
+            score: scoring.score,
+            deltaPL: scoring.deltaPL,
+            deltaCapture: scoring.deltaCapture,
+            deltaDrawdown: scoring.deltaDrawdown
+          };
+        });
+
+        // 3. Sort by Score
+        scoredScenarios.sort((a, b) => b.score - a.score);
+
+        setResults(scoredScenarios);
       } catch (error) {
         console.error("Optimization failed:", error);
       } finally {
@@ -419,7 +448,7 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
       </Card>
 
       {/* Results Table */}
-      {results.length > 0 && (
+      {results.length > 0 && baseline && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -427,7 +456,7 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
               Top Scenarios
             </CardTitle>
             <CardDescription>
-              Showing top {Math.min(results.length, 10)} results based on Total P/L and Capture Rate
+              Showing top {Math.min(results.length, 10)} results based on <span className="font-medium">baseline-adjusted performance score</span> (Total P/L, Capture Rate, Max DD).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -441,14 +470,24 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
                   <p className="text-lg font-semibold mt-1">
                     {describeRule(results[0].rule)}
                   </p>
+                  <div className="text-xs text-muted-foreground space-x-2 mt-1">
+                    <span>Baseline P/L: {formatCurrency(baseline.totalPL)}</span>
+                    <span>•</span>
+                    <span>Baseline Capture: {baseline.captureRate.toFixed(2)}%</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-green-600">
                     {formatCurrency(results[0].totalPL)}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Total P/L
-                  </p>
+                  <div className="mt-1 text-sm space-x-2">
+                    <span>
+                      Δ P/L:{" "}
+                      <span className={results[0].deltaPL >= 0 ? "text-emerald-600" : "text-red-600"}>
+                        {formatCurrency(results[0].deltaPL)}
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-amber-500/20">
@@ -458,11 +497,21 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Capture Rate</span>
-                  <p className="font-medium">{results[0].captureRate.toFixed(2)}</p>
+                  <div className="flex items-baseline gap-1">
+                    <p className="font-medium">{results[0].captureRate.toFixed(2)}</p>
+                    <span className={`text-xs ${results[0].deltaCapture >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      ({results[0].deltaCapture >= 0 ? "+" : ""}{results[0].deltaCapture.toFixed(2)})
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Max Drawdown</span>
-                  <p className="font-medium text-red-600">{results[0].maxDrawdownPct.toFixed(1)}%</p>
+                  <div className="flex items-baseline gap-1">
+                    <p className="font-medium text-red-600">{results[0].maxDrawdownPct.toFixed(1)}%</p>
+                    <span className={`text-xs ${results[0].deltaDrawdown >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      ({results[0].deltaDrawdown >= 0 ? "+" : ""}{results[0].deltaDrawdown.toFixed(1)}%)
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

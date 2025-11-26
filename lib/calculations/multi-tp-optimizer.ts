@@ -609,3 +609,99 @@ function simulateCapitalPath(
 
   return { totalPL, endingCapital: equity, maxDrawdownPct: maxDrawdown * 100, equityCurve };
 }
+
+/**
+ * Score a scenario relative to a baseline.
+ */
+export interface ScenarioScore {
+  score: number;
+  deltaPL: number;
+  deltaCapture: number;
+  deltaDrawdown: number;
+}
+
+export function scoreScenarioRelative(
+  baseline: MultiTPScenarioResult,
+  scenario: MultiTPScenarioResult
+): ScenarioScore {
+  const deltaPL = scenario.totalPL - baseline.totalPL;
+  const deltaCapture = scenario.captureRate - baseline.captureRate;
+  const deltaDrawdown = scenario.maxDrawdownPct - baseline.maxDrawdownPct; // e.g. -10 - (-15) = +5 (improvement)
+
+  // Simple weighted score:
+  // 1. PL improvement is king (normalized by baseline PL magnitude)
+  // 2. Drawdown improvement is queen
+  // 3. Capture rate is tie-breaker
+  
+  const baselinePLMag = Math.abs(baseline.totalPL) || 1;
+  const plScore = (deltaPL / baselinePLMag) * 100; // % improvement in PL
+  
+  // Drawdown: if baseline is -20 and scenario is -10, delta is +10. Good.
+  // If baseline is -10 and scenario is -20, delta is -10. Bad.
+  const ddScore = deltaDrawdown * 2; // Weight DD improvement heavily
+  
+  const score = plScore + ddScore + (deltaCapture * 0.5);
+  
+  return { score, deltaPL, deltaCapture, deltaDrawdown };
+}
+
+/**
+ * Compute baseline metrics (original trades without simulated exits).
+ * Effectively simulates "holding to close" or using original P/L.
+ */
+export function computeBaselineMetrics(
+  trades: ExcursionTrade[],
+  basis: ExitBasis,
+  startingCapital: number
+): MultiTPScenarioResult {
+  // Create a dummy rule that represents "no intervention"
+  // We can't easily simulate "original exit" with the current engine unless we know the original exit %
+  // But wait, ExcursionTrade has `pl` (realized P/L).
+  // So we can just sum up the original PLs using the capital simulator.
+  
+  const capitalSettings: CapitalSettings = {
+    startingCapital,
+    allocationPct: 0.04,
+    compound: true,
+    feesPerTrade: 0
+  };
+
+  const perTradeReturnsPct: number[] = [];
+  let totalPremium = 0;
+  let wins = 0;
+  let tradeCount = 0;
+
+  for (const t of trades) {
+    const denom = basis === "margin" ? t.marginReq : t.premium;
+    if (!denom || denom <= 0) {
+      perTradeReturnsPct.push(0);
+      continue;
+    }
+
+    // Original realized return
+    const ret = (t.pl / denom) * 100;
+    perTradeReturnsPct.push(ret);
+    
+    totalPremium += t.premium || 0;
+    tradeCount++;
+    if (t.pl > 0) wins++;
+  }
+
+  const simResult = simulateCapitalPath(perTradeReturnsPct, capitalSettings);
+  
+  const avgReturn = perTradeReturnsPct.reduce((a, b) => a + b, 0) / (tradeCount || 1);
+  const avgMFE = trades.reduce((a, b) => a + b.maxProfitPct, 0) / (tradeCount || 1);
+  const captureRate = avgMFE > 0 ? (avgReturn / avgMFE) * 100 : 0;
+
+  return {
+    rule: { basis, stopLossPct: 0, takeProfits: [] }, // Dummy rule
+    totalPL: simResult.totalPL,
+    totalPremium,
+    captureRate,
+    totalReturnPct: (simResult.totalPL / startingCapital) * 100,
+    winRate: tradeCount > 0 ? (wins / tradeCount) * 100 : 0,
+    tradeCount,
+    maxDrawdownPct: simResult.maxDrawdownPct,
+    equityCurve: simResult.equityCurve
+  };
+}
