@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Calculator, Play, Settings2, TrendingUp, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,13 @@ import {
   MultiTPRule,
   ExitBasis
 } from "@/lib/calculations/multi-tp-optimizer";
+
+function computeTotalBasis(trades: ExcursionTrade[], basis: ExitBasis): number {
+  return trades.reduce((sum, trade) => {
+    const value = basis === "premium" ? trade.premium : trade.marginReq;
+    return sum + Math.max(0, value || 0);
+  }, 0);
+}
 
 interface ScoredScenario extends MultiTPScenarioResult {
   score: number;
@@ -69,6 +76,11 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [results, setResults] = useState<ScoredScenario[]>([]);
   const [baseline, setBaseline] = useState<MultiTPScenarioResult | null>(null);
+
+  const totalBasis = useMemo(() => computeTotalBasis(trades, basis), [trades, basis]);
+  const baselineCaptureUI = baseline && totalBasis > 0
+    ? (baseline.totalPL / totalBasis) * 100
+    : baseline?.captureRate ?? 0;
 
   const handleUseDefaults = () => {
     if (mode === "auto") {
@@ -473,7 +485,7 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
                   <div className="text-xs text-muted-foreground space-x-2 mt-1">
                     <span>Baseline P/L: {formatCurrency(baseline.totalPL)}</span>
                     <span>•</span>
-                    <span>Baseline Capture: {baseline.captureRate.toFixed(2)}%</span>
+                    <span>Baseline Capture: {baselineCaptureUI.toFixed(2)}%</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -497,12 +509,20 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Capture Rate</span>
-                  <div className="flex items-baseline gap-1">
-                    <p className="font-medium">{results[0].captureRate.toFixed(2)}</p>
-                    <span className={`text-xs ${results[0].deltaCapture >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                      ({results[0].deltaCapture >= 0 ? "+" : ""}{results[0].deltaCapture.toFixed(2)})
-                    </span>
-                  </div>
+                  {(() => {
+                    const best = results[0];
+                    const bestCaptureUI = totalBasis > 0 ? (best.totalPL / totalBasis) * 100 : best.captureRate;
+                    const deltaCaptureUI = bestCaptureUI - baselineCaptureUI;
+
+                    return (
+                      <div className="flex items-baseline gap-1">
+                        <p className="font-medium">{bestCaptureUI.toFixed(2)}%</p>
+                        <span className={`text-xs ${deltaCaptureUI >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          ({deltaCaptureUI >= 0 ? "+" : ""}{deltaCaptureUI.toFixed(2)})
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Max Drawdown</span>
@@ -541,7 +561,7 @@ export function MultiTPOptimizerPanel({ trades, startingCapital }: MultiTPOptimi
                       {describeRule(result.rule)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {result.captureRate.toFixed(2)}
+                      {(totalBasis > 0 ? (result.totalPL / totalBasis) * 100 : result.captureRate).toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-right">
                       {result.winRate.toFixed(1)}%
