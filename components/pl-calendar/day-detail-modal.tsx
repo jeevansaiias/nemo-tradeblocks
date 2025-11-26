@@ -23,9 +23,10 @@ interface DayDetailModalProps {
   onOpenChange: (open: boolean) => void;
   summary?: any;
   trades?: any[];
+  mode?: "day" | "week";
 }
 
-export function DayDetailModal({ open, onOpenChange, summary: propSummary, trades: propTrades }: DayDetailModalProps) {
+export function DayDetailModal({ open, onOpenChange, summary: propSummary, trades: propTrades, mode = "day" }: DayDetailModalProps) {
   const storeSummary = useCalendarStore((s) => s.getSelectedDaySummary())
   
   // Use prop summary if available (from MonthlyPLCalendar), otherwise use store summary
@@ -34,7 +35,11 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
   if (!summary) return null
 
   const dateObj = new Date(summary.date)
-  const formattedDate = format(dateObj, "MMMM d, yyyy")
+  const endDateObj = summary.endDate ? new Date(summary.endDate) : null
+  const formattedDate = mode === "week" && endDateObj
+    ? `${format(dateObj, "MMM d")} – ${format(endDateObj, "MMM d, yyyy")}`
+    : format(dateObj, "MMMM d, yyyy")
+  const subtitle = mode === "week" ? "Weekly Performance Review" : "Daily Performance Review"
   
   const realizedPL = summary.realizedPL ?? summary.totalPL ?? 0
   const netPL = realizedPL
@@ -78,7 +83,7 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
           className="max-w-5xl p-0 border-none bg-transparent shadow-none sm:max-w-5xl"
           showCloseButton={false}
         >
-        <DialogTitle className="sr-only">Daily Performance Review</DialogTitle>
+        <DialogTitle className="sr-only">{subtitle}</DialogTitle>
         
         <div className="w-full rounded-xl bg-[#0d0d0d] border border-white/10 shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
 
@@ -86,7 +91,7 @@ export function DayDetailModal({ open, onOpenChange, summary: propSummary, trade
             <div className="flex justify-between items-start mb-6">
             <div>
                 <h2 className="text-3xl font-semibold text-white">{formattedDate}</h2>
-                <p className="text-white/50 mt-1 text-sm">Daily Performance Review</p>
+                <p className="text-white/50 mt-1 text-sm">{subtitle}</p>
             </div>
 
             <button onClick={() => onOpenChange(false)} className="text-white/50 hover:text-white text-2xl">

@@ -316,6 +316,7 @@ export function MonthlyPLCalendar({ dayMap, currentDate, onDateChange, colorMode
             maxProfit: t.maxProfit,
             maxLoss: t.maxLoss
           })) || []}
+          mode="day"
       />
     </div>
   )

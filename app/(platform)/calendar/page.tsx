@@ -7,13 +7,15 @@ import { MonthlyPLCalendar } from "@/components/pl-calendar/MonthlyPLCalendar"
 import { WeeklySummaryPanel } from "@/components/pl-calendar/weekly-summary-panel"
 import { YearHeatmap } from "@/components/pl-calendar/YearHeatmap"
 import { UtilizationPanel } from "@/components/pl-calendar/utilization-panel"
+import { DayDetailModal } from "@/components/pl-calendar/day-detail-modal"
 import { CalendarViewMode, CalendarColorMode, CalendarDayData, WeeklySummary, WeeklyBucket } from "@/lib/services/calendar-data-service"
+import { StoredTrade } from "@/lib/db/trades-store"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
-import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters, startOfQuarter, isSameMonth, parseISO, startOfMonth } from "date-fns"
-import { formatCurrency, cn } from "@/lib/utils"
+import { format, addMonths, subMonths, addYears, subYears, getQuarter, addQuarters, subQuarters, startOfQuarter, parseISO, startOfMonth } from "date-fns"
+import { cn } from "@/lib/utils"
 
 import { formatCompactPL } from "@/lib/utils/format"
 
@@ -57,6 +59,22 @@ function getMonthlyWeeklyBuckets(
     }));
 }
 
+interface WeekModalSummary {
+  date: Date
+  endDate?: Date
+  realizedPL: number
+  tradeCount: number
+  winRate?: number
+  peakUtilizationPercent?: number
+  utilizationData?: {
+    metrics: {
+      avgUtilization?: number
+      peakUtilization?: number
+      concurrentPositions?: number
+    }
+  }
+}
+
 export default function CalendarPage() {
   const activeBlockId = useBlockStore((state) => state.activeBlockId)
   const { 
@@ -70,6 +88,9 @@ export default function CalendarPage() {
   } = useCalendarStore()
 
   const [highlightedWeek, setHighlightedWeek] = useState<WeeklyBucket | null>(null)
+  const [isWeekModalOpen, setIsWeekModalOpen] = useState(false)
+  const [weekModalSummary, setWeekModalSummary] = useState<WeekModalSummary | null>(null)
+  const [weekModalTrades, setWeekModalTrades] = useState<StoredTrade[]>([])
 
   useEffect(() => {
     if (activeBlockId) {
@@ -98,6 +119,64 @@ export default function CalendarPage() {
     setCurrentDate(newDate);
     setView('month');
   };
+
+  const handleWeekClick = (week: WeeklyBucket) => {
+    const start = week.startDate
+    const end = week.endDate
+
+    const weeklyDaySummaries = daySummaries.filter((day) => {
+      const dayDate = parseISO(day.date)
+      return dayDate >= start && dayDate <= end
+    })
+
+    const aggregatedTrades = weeklyDaySummaries.flatMap((day) => day.trades || [])
+    const totalTrades = weeklyDaySummaries.reduce((sum, day) => sum + (day.tradeCount || 0), 0) || week.tradeCount
+    const winningTrades = weeklyDaySummaries.reduce(
+      (sum, day) => sum + (day.trades?.filter((t) => (t.pl || 0) > 0).length || 0),
+      0
+    )
+    const winRate = totalTrades > 0
+      ? (winningTrades / totalTrades) * 100
+      : (typeof week.winRate === 'number' ? week.winRate * 100 : 0)
+
+    const peakUtilization = weeklyDaySummaries.reduce(
+      (max, day) => Math.max(max, day.peakUtilizationPercent ?? 0),
+      0
+    )
+    const avgSamples = weeklyDaySummaries
+      .map((day) => day.utilizationData?.metrics?.avgUtilization)
+      .filter((val): val is number => typeof val === 'number')
+    const avgUtilization = avgSamples.length > 0
+      ? avgSamples.reduce((sum, val) => sum + val, 0) / avgSamples.length
+      : 0
+    const concurrentPositions = weeklyDaySummaries.reduce(
+      (max, day) => Math.max(max, day.utilizationData?.metrics?.concurrentPositions ?? 0),
+      0
+    )
+
+    const summary = {
+      date: start,
+      endDate: end,
+      realizedPL: week.netPL,
+      tradeCount: totalTrades,
+      winRate,
+      peakUtilizationPercent: peakUtilization || undefined,
+      utilizationData:
+        avgSamples.length > 0 || concurrentPositions > 0
+          ? {
+              metrics: {
+                avgUtilization,
+                peakUtilization,
+                concurrentPositions,
+              },
+            }
+          : undefined,
+    }
+
+    setWeekModalSummary(summary)
+    setWeekModalTrades(aggregatedTrades)
+    setIsWeekModalOpen(true)
+  }
 
   const getHeaderLabel = () => {
     if (view === 'month') return format(currentDate, 'MMMM yyyy')
@@ -265,11 +344,26 @@ export default function CalendarPage() {
           weeks={monthlyWeeks}
           metric={colorBy}
           onWeekHover={setHighlightedWeek}
+          onWeekClick={handleWeekClick}
         />
              </div>
           )}
         </div>
       )}
+
+      <DayDetailModal 
+        open={isWeekModalOpen && !!weekModalSummary}
+        onOpenChange={(open) => {
+          setIsWeekModalOpen(open)
+          if (!open) {
+            setWeekModalSummary(null)
+            setWeekModalTrades([])
+          }
+        }}
+        summary={weekModalSummary || undefined}
+        trades={weekModalTrades}
+        mode="week"
+      />
 
       {/* Utilization Panel */}
       <UtilizationPanel data={daySummaries} />
